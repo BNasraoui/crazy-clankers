@@ -3,6 +3,7 @@ import { Car, MAX_SPEED } from './car';
 import { readInput, padName, type Input } from './input';
 import { makePerson, makeLabel, personFrom, type CarModel, type PersonModel } from './models';
 import { Look, SKY, makeSky } from './look';
+import { CHARACTER_LAYER, makeCharacter, sunDir } from './anime';
 import { pickPassenger, type PassengerType } from './passengers';
 import { QuipDirector } from './quips';
 import { Traffic } from './traffic';
@@ -88,8 +89,12 @@ export class Game {
     this.scene.background = new THREE.Color(SKY.horizon);
     this.scene.fog = new THREE.Fog(SKY.horizon, 170, 560);
     this.scene.add(this.sky);
-    this.scene.add(new THREE.HemisphereLight(0xdfeaff, 0x8a7a66, 1.25));
+    const sky = new THREE.HemisphereLight(0xdfeaff, 0x8a7a66, 1.25);
+    sky.layers.enable(CHARACTER_LAYER);
+    this.scene.add(sky);
     this.sun = new THREE.DirectionalLight(0xfff1dc, 2.6);
+    this.sun.layers.enable(CHARACTER_LAYER);
+    this.sun.shadow.camera.layers.enable(CHARACTER_LAYER);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     const sc = this.sun.shadow.camera;
@@ -126,8 +131,11 @@ export class Game {
     this.arrow.add(outline, body);
     this.scene.add(this.arrow);
 
-    this.quips = new QuipDirector((who, color, text, seconds) => {
+    this.quips = new QuipDirector((who, color, text, seconds, speaker) => {
       const el = $('#quip');
+      const face = $<HTMLImageElement>('#quip .face');
+      face.hidden = speaker === 'cab';
+      if (speaker !== 'cab') face.src = `/portraits/${speaker}.jpg`;
       el.classList.remove('hidden');
       el.style.animation = 'none';
       void el.offsetWidth;
@@ -366,7 +374,10 @@ export class Game {
 
   private makePassenger(type: PassengerType): PersonModel {
     const template = this.people[type.id];
-    return template ? personFrom(template) : makePerson(type.person);
+    if (template) return personFrom(template);
+    const person = makePerson(type.person);
+    makeCharacter(person.root);
+    return person;
   }
 
   private idleAnimations(dt: number) {
@@ -580,6 +591,7 @@ export class Game {
     if (Math.abs(this.camera.fov - fov) > 0.1) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
     this.sun.position.set(car.pos.x + 60, car.pos.y + 110, car.pos.z + 35);
     this.sun.target.position.copy(car.pos);
+    sunDir.value.copy(this.sun.position).sub(this.sun.target.position).normalize();
   }
 
   private titleCamera(dt: number) {
@@ -590,6 +602,7 @@ export class Game {
     this.camera.lookAt(p.x, p.y + 1.5, p.z);
     this.sun.position.set(p.x + 60, p.y + 110, p.z + 35);
     this.sun.target.position.copy(p);
+    sunDir.value.copy(this.sun.position).sub(this.sun.target.position).normalize();
     this.arrow.visible = false;
     const ps = document.getElementById('padstatus');
     if (ps) ps.textContent = padName ? `🎮 ${padName}` : 'Plug in or press a button on a controller to use it.';

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CHARACTER_LAYER, setOutlineResolution } from './anime';
 
 // The game's look: cel lighting with one shadow tone, ink outlines drawn from
 // the depth buffer, the 3D rendered at low resolution and scaled up with hard
@@ -76,6 +77,8 @@ function loadSettings(): LookSettings {
 export class Look {
   settings = loadSettings();
   private target: THREE.WebGLRenderTarget;
+  private chars: THREE.WebGLRenderTarget;
+  private clear = new THREE.Color();
   private quad: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
   private quadScene = new THREE.Scene();
   private quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -86,11 +89,18 @@ export class Look {
     this.target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: true });
     this.target.texture.minFilter = this.target.texture.magFilter = THREE.NearestFilter;
     this.target.depthTexture = new THREE.DepthTexture(1, 1);
+    this.chars = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: true });
+    this.chars.texture.minFilter = this.chars.texture.magFilter = THREE.NearestFilter;
+    this.chars.depthTexture = new THREE.DepthTexture(1, 1);
+    // Shadows are drawn once per frame, not once per pass.
+    renderer.shadowMap.autoUpdate = false;
 
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
       uniforms: {
         tColor: { value: this.target.texture },
         tDepth: { value: this.target.depthTexture },
+        tChar: { value: this.chars.texture },
+        tCharDepth: { value: this.chars.depthTexture },
         uLow: { value: new THREE.Vector2(1, 1) },
         uNear: { value: 0.5 },
         uFar: { value: 1000 },
@@ -107,6 +117,8 @@ export class Look {
         #include <packing>
         uniform sampler2D tColor;
         uniform sampler2D tDepth;
+        uniform sampler2D tChar;
+        uniform sampler2D tCharDepth;
         uniform vec2 uLow;
         uniform float uNear, uFar, uTime, uGrain, uOutline, uSpeed, uAspect;
         varying vec2 vUv;
@@ -136,6 +148,13 @@ export class Look {
             float edge = smoothstep(0.06, 0.16, lap) * nearer;
             edge *= smoothstep(1.0 / 420.0, 1.0 / 260.0, c);
             col = mix(col, ${glslColor(0x1b1722)}, edge * 0.92);
+          }
+
+          // Characters, at full resolution, wherever they're in front of the world.
+          vec4 ch = texture2D(tChar, vUv);
+          if (ch.a > 0.5) {
+            float charDist = -perspectiveDepthToViewZ(texture2D(tCharDepth, vUv).x, uNear, uFar);
+            if (charDist < 1.0 / invZ(uv) + 0.4) col = ch.rgb;
           }
 
           // Manga speed lines from the screen edges.
@@ -168,6 +187,9 @@ export class Look {
     const lh = Math.min(h, this.settings.height);
     const lw = Math.round((lh * w) / h);
     this.target.setSize(lw, lh);
+    const pr = this.renderer.getPixelRatio();
+    this.chars.setSize(Math.round(w * pr), Math.round(h * pr));
+    setOutlineResolution(Math.round(w * pr), Math.round(h * pr));
     this.quad.material.uniforms.uLow.value.set(lw, lh);
     this.quad.material.uniforms.uAspect.value = w / h;
   }
@@ -180,9 +202,25 @@ export class Look {
     u.uGrain.value = this.settings.grain;
     u.uOutline.value = this.settings.outline ? 1 : 0;
     u.uSpeed.value = this.settings.speedLines ? speed : 0;
-    this.renderer.setRenderTarget(this.target);
-    this.renderer.render(scene, camera);
-    this.renderer.setRenderTarget(null);
+    const r = this.renderer;
+    r.shadowMap.needsUpdate = true;
+    camera.layers.set(0);
+    r.setRenderTarget(this.target);
+    r.render(scene, camera);
+
+    // Characters on their own transparent layer.
+    const background = scene.background;
+    const alpha = r.getClearAlpha();
+    r.getClearColor(this.clear);
+    scene.background = null;
+    r.setClearColor(0x000000, 0);
+    camera.layers.set(CHARACTER_LAYER);
+    r.setRenderTarget(this.chars);
+    r.render(scene, camera);
+    camera.layers.set(0);
+    scene.background = background;
+    r.setClearColor(this.clear, alpha);
+    r.setRenderTarget(null);
     this.renderer.render(this.quadScene, this.quadCam);
   }
 

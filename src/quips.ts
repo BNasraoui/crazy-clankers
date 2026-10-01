@@ -126,7 +126,7 @@ const PRIORITY: Partial<Record<QuipEvent, number>> = {
 };
 const CHANCE: Partial<Record<QuipEvent, number>> = { jump: 0.8, nearMiss: 0.6, drift: 0.4, crash: 0.9, idle: 0.7 };
 
-export type ShowQuip = (who: string, color: string, text: string, seconds: number) => void;
+export type ShowQuip = (who: string, color: string, text: string, seconds: number, speaker: Speaker) => void;
 
 export class QuipDirector {
   private bags = new Map<string, string[]>();
@@ -153,7 +153,7 @@ export class QuipDirector {
     for (const [k, v] of Object.entries(opts.vars ?? {})) text = text.replaceAll(`{${k}}`, v);
     const seconds = Math.min(5, Math.max(2.2, 1.4 + text.length * 0.05));
     const s = SPEAKERS[speaker];
-    this.show(s.name, s.color, text, seconds);
+    this.show(s.name, s.color, text, seconds, speaker);
     babble(text, s.pitch);
     this.busyUntil = this.now + seconds;
     this.busyPriority = pri;

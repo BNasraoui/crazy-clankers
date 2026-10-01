@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { toon } from './look';
+import { makeCharacter } from './anime';
 
 const lam = (color: THREE.ColorRepresentation) => toon(color);
 const glow = (color: THREE.ColorRepresentation) => new THREE.MeshBasicMaterial({ color });
@@ -40,25 +41,13 @@ function addWheels(body: THREE.Group, halfW: number, front: number, back: number
   return { wheels, steer };
 }
 
-// Convert Blender's exported materials to the game's flat toon look.
-function toonify(scene: THREE.Object3D) {
-  scene.traverse((o) => {
-    const mesh = o as THREE.Mesh;
-    if (!mesh.isMesh) return;
-    const src = mesh.material as THREE.MeshStandardMaterial;
-    mesh.material = src.name.startsWith('light_') ? new THREE.MeshBasicMaterial({ color: src.color }) : toon({ color: src.color });
-    mesh.castShadow = true;
-  });
-}
-
 // Blender-built passengers, keyed by passenger id. Missing ones fall back to box people.
 export async function loadPeople(): Promise<Partial<Record<string, THREE.Object3D>>> {
   const people: Partial<Record<string, THREE.Object3D>> = {};
   for (const id of ['techbro']) {
     try {
       const gltf = await new GLTFLoader().loadAsync(`/models/${id}.glb`);
-      toonify(gltf.scene);
-      people[id] = gltf.scene;
+      people[id] = makeCharacter(gltf.scene);
     } catch (err) {
       console.warn(`Using the box ${id}:`, err);
     }
@@ -83,7 +72,7 @@ export async function loadCab(): Promise<CarModel> {
     const body = new THREE.Group();
     root.add(body);
     body.add(gltf.scene);
-    toonify(gltf.scene);
+    makeCharacter(root);
     const node = (name: string) => {
       const o = gltf.scene.getObjectByName(name);
       if (!o) throw new Error(`cab.glb is missing node ${name}`);
@@ -94,7 +83,9 @@ export async function loadCab(): Promise<CarModel> {
     return { root, body, wheels, steer: wheels.slice(0, 2), spinner: node('lidar') };
   } catch (err) {
     console.warn('Using the box cab:', err);
-    return makeCab();
+    const cab = makeCab();
+    makeCharacter(cab.root);
+    return cab;
   }
 }
 

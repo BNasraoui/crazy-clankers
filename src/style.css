@@ -100,3 +100,10 @@ body { font-family: Inter, system-ui, sans-serif; color: #fff; user-select: none
 #lookpanel b { font: 14px Bungee, Impact, sans-serif; color: #ffe14a; }
 #lookpanel label { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
 #lookpanel[hidden] { display: none; }
+
+#quip { display: flex; align-items: center; gap: 14px; }
+#quip .face {
+  width: 76px; height: 76px; flex: none; border-radius: 50%; object-fit: cover;
+  border: 3px solid #000; background: #fff; margin: -18px 0 -18px -26px; box-shadow: 3px 3px 0 #000;
+}
+#quip .face[hidden] { display: none; }
