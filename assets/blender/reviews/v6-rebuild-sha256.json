@@ -1,0 +1,19 @@
+{
+  "blender": "5.2.2",
+  "identical_full_rebuilds": 2,
+  "sha256": {
+    "public/models/techbro.glb": "f9485bb126a48faf073847cc85ea643bfd0df2c7c4da684686338f8d0ab48276",
+    "public/models/techbro-apose.glb": "8c5d1c2628c8d5da839721970b4a57141b45ed58fa8e6dd1393fc29d415c22d1",
+    "public/models/cab.glb": "c166f5c3f6e92ebd2c89c72f78c43c830ed1df1bf4c910afdd45353e2e40c33d",
+    "docs/renders/techbro.png": "1d3cac96e2837ec75267765edf3bccf6e65982952d235f3dd7b2e44040bcfd4a",
+    "docs/renders/techbro-head.png": "ef86ba6e940cc845ee04e6ae22f7885226df91069d73f12d3eaaf653f82e1cab",
+    "docs/renders/techbro-compare.png": "c024e489c26c90789121204f01f127c9c342d461fd55de607ceb2cf7a480f28b",
+    "docs/renders/techbro-small.png": "c1c7630f686380c096e46b31e62aae05e0ceabc3adfa00d9600c6926caea3967",
+    "docs/renders/techbro-fit-body-back.png": "a0784c27008742ed54e4fab27334f3b9a60a3643d05c4c23ed37c7ba35432baa",
+    "docs/renders/techbro-fit-body-front.png": "5f566de5895ac8f2f1bc9550c3534452af310ecf599d844a9d14894e59be1a46",
+    "docs/renders/techbro-fit-body-right.png": "afac8a7925d350ad66a58917d66df5255831dd5b02f4658b77dd8b325df751fb",
+    "docs/renders/techbro-fit-head-back.png": "69015ee6974add0d4dc02f60dc975da731fb5aac46940dc0e51c3cb46481a909",
+    "docs/renders/techbro-fit-head-front.png": "482d79241f61e941e15e58c399e55c6a9712b017b182be4d8d368d388ce95809",
+    "docs/renders/techbro-fit-head-right.png": "3b8679c25410f14262f5646d369cf512a4591a2f0b36ad7f43e03ed55dbc6af0"
+  }
+}

@@ -442,33 +442,39 @@ def export_character():
         export_texcoords=True, export_normals=True, export_materials="EXPORT",
         export_animations=False, export_skins=False, export_morph=False)
 
-C.reset_scene()
-FACE_PNG = paint_head(A, PALETTE)
-VEST_PNG = paint_vest()
-MATS_BY_NAME = A.make_materials(PALETTE, {"face": FACE_PNG, "vest": VEST_PNG, "shirt": paint_shirt(), "hair": paint_hair(A, PALETTE), "pants": paint_pants()})
-ROOT = C.empty("techbro")
-arm_r = build_arm_r()
-parts = [build_legs(), build_torso(), build_head(), build_arm_l(), arm_r, build_cup(arm_r)]
-C.report(parts)
-assert "quick" in ARGS or C.triangle_count(parts) <= TRI_BUDGET, "techbro over its triangle budget"
-if "quick" not in ARGS:
-    export_character()
+def main():
+    global MATS_BY_NAME, ROOT
+    C.reset_scene()
+    FACE_PNG = paint_head(A, PALETTE)
+    VEST_PNG = paint_vest()
+    MATS_BY_NAME = A.make_materials(PALETTE, {"face": FACE_PNG, "vest": VEST_PNG, "shirt": paint_shirt(), "hair": paint_hair(A, PALETTE), "pants": paint_pants()})
+    ROOT = C.empty("techbro")
+    arm_r = build_arm_r()
+    parts = [build_legs(), build_torso(), build_head(), build_arm_l(), arm_r, build_cup(arm_r)]
+    C.report(parts)
+    assert "quick" in ARGS or C.triangle_count(parts) <= TRI_BUDGET, "techbro over its triangle budget"
+    if "quick" not in ARGS:
+        export_character()
 
-pv = A.Preview(ROOT, outline=0.004, shadow_muls={
-    "skin": (0.70, 0.49, 0.40), "face": (0.70, 0.49, 0.40), "hair": (0.55, 0.55, 0.7)})
-head_c = HEAD_C + Vector((0.015, 0.012, 0))
-if "wave" in ARGS:  # the game waves arm_R by rotating it about Z (game) by 2.6 rad
-    arm_r.rotation_euler = (0, -2.6, 0)
-    pv.sheet("techbro-wave", (("front", 0), ("3/4", -35)), Vector((0, 1.0, 0)), 2.2, 480, aspect=0.7)
-    raise SystemExit
-pv.sheet("techbro-head", (("front", 0), ("3/4", -35), ("side", -90)), head_c, 0.35, 600)
-if "quick" not in ARGS or "body" in ARGS:
-    pv.sheet("techbro", (("front", 0), ("3/4", -35), ("side", -90), ("back", 180)),
-             Vector((0, 0.9, 0)), 1.95, 720, aspect=0.6)
-if "quick" not in ARGS:
-    pv.aim(Vector((0, 0.9, 0)), 1.9)
-    hero = pv.render(20, 700, 1400)
-    A.compare("techbro-compare", C.REPO / "docs/art/cast.jpg", (0, 95, 218, 734), hero, mirror_ref=True,
-              labels=("cast.jpg (mirrored for +X cup)", "v5 render"))
-    pv.sheet("techbro-small", (("front", 0), ("3/4", -35), ("side", -90), ("back", 180)),
-             Vector((0, 0.90, 0)), 2.0, 180, aspect=0.6)
+    pv = A.Preview(ROOT, outline=0.004, shadow_muls={
+        "skin": (0.70, 0.49, 0.40), "face": (0.70, 0.49, 0.40), "hair": (0.55, 0.55, 0.7)})
+    head_c = HEAD_C + Vector((0.015, 0.012, 0))
+    if "wave" in ARGS:  # the game waves arm_R by rotating it about Z (game) by 2.6 rad
+        arm_r.rotation_euler = (0, -2.6, 0)
+        pv.sheet("techbro-wave", (("front", 0), ("3/4", -35)), Vector((0, 1.0, 0)), 2.2, 480, aspect=0.7)
+        raise SystemExit
+    pv.sheet("techbro-head", (("front", 0), ("3/4", -35), ("side", -90)), head_c, 0.35, 600)
+    if "quick" not in ARGS or "body" in ARGS:
+        pv.sheet("techbro", (("front", 0), ("3/4", -35), ("side", -90), ("back", 180)),
+                 Vector((0, 0.9, 0)), 1.95, 720, aspect=0.6)
+    if "quick" not in ARGS:
+        pv.aim(Vector((0, 0.9, 0)), 1.9)
+        hero = pv.render(20, 700, 1400)
+        A.compare("techbro-compare", C.REPO / "docs/art/cast.jpg", (0, 95, 218, 734), hero, mirror_ref=True,
+                  labels=("cast.jpg (mirrored for +X cup)", "v5 render"))
+        pv.sheet("techbro-small", (("front", 0), ("3/4", -35), ("side", -90), ("back", 180)),
+                 Vector((0, 0.90, 0)), 2.0, 180, aspect=0.6)
+
+
+if __name__ == "__main__":
+    main()

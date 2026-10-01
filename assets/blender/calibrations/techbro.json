@@ -1,0 +1,220 @@
+{
+  "character": "techbro",
+  "height_m": 1.8,
+  "body": {
+    "metres_per_pixel": 0.002155688622754491,
+    "world_y_at_zero": 1.8452694610778442,
+    "crown_pixel": 21,
+    "soles_pixel": 856,
+    "guides": {
+      "crown": 40.5,
+      "eyes": 88.5,
+      "chin": 142.0,
+      "shoulders": 197.5,
+      "waist": 358.5,
+      "crotch": 473.5,
+      "knees": 619.5,
+      "soles": 844.5
+    },
+    "views": {
+      "front": {
+        "crop": [
+          65,
+          10,
+          595,
+          866
+        ],
+        "axis": 333,
+        "sign": 1,
+        "direction": [
+          0,
+          0,
+          1
+        ],
+        "right": [
+          1,
+          0,
+          0
+        ]
+      },
+      "right": {
+        "crop": [
+          735,
+          10,
+          925,
+          866
+        ],
+        "axis": 816,
+        "sign": 1,
+        "direction": [
+          -1,
+          0,
+          0
+        ],
+        "right": [
+          0,
+          0,
+          1
+        ]
+      },
+      "back": {
+        "crop": [
+          1080,
+          10,
+          1580,
+          866
+        ],
+        "axis": 1331,
+        "sign": 1,
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "right": [
+          -1,
+          0,
+          0
+        ]
+      }
+    },
+    "guide_scan_ranges": [
+      [
+        46,
+        80
+      ],
+      [
+        1600,
+        1620
+      ]
+    ],
+    "landmarks": {
+      "crown": 21,
+      "eyes": 89,
+      "chin": 145,
+      "shoulders": 198,
+      "waist": 359,
+      "crotch": 487,
+      "knees": 620,
+      "soles": 856
+    }
+  },
+  "head": {
+    "metres_per_pixel": 0.0007404581418879692,
+    "world_y_at_zero": 1.9273588004047308,
+    "crown_pixel": 172,
+    "chin_pixel": 533,
+    "guides": [
+      213.5,
+      280.5,
+      353.5,
+      392.5,
+      449.5,
+      474.5,
+      525.5
+    ],
+    "views": {
+      "front": {
+        "crop": [
+          25,
+          155,
+          395,
+          534
+        ],
+        "axis": 210,
+        "sign": 1,
+        "direction": [
+          0,
+          0,
+          1
+        ],
+        "right": [
+          1,
+          0,
+          0
+        ]
+      },
+      "right": {
+        "crop": [
+          850,
+          155,
+          1250,
+          534
+        ],
+        "axis": 1068,
+        "sign": 1,
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "right": [
+          0,
+          0,
+          -1
+        ]
+      },
+      "back": {
+        "crop": [
+          1290,
+          155,
+          1640,
+          534
+        ],
+        "axis": 1463,
+        "sign": 1,
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "right": [
+          -1,
+          0,
+          0
+        ]
+      }
+    },
+    "guide_scan_ranges": [
+      [
+        12,
+        30
+      ],
+      [
+        1640,
+        1655
+      ]
+    ],
+    "landmarks": {
+      "crown": 172,
+      "hairline": 270,
+      "brows": 333,
+      "eyes": 365,
+      "nose": 407,
+      "mouth": 445,
+      "chin": 533,
+      "neck": 591
+    },
+    "auxiliary_views": {
+      "three_quarter": {
+        "crop": [
+          430,
+          155,
+          835,
+          534
+        ],
+        "purpose": "grin texture source; no orthographic score"
+      }
+    }
+  },
+  "notes": [
+    "Body right profile points right; head profile points left, so head profile uses the opposite lateral camera.",
+    "Head score is crown through the common chin row; neck below this plane is excluded in both masks.",
+    "Head scale transfers the body crown-to-chin span (123 px) to head crown-to-chin (360 px).",
+    "Guide strokes are recorded separately from anatomical landmarks; generated guides do not always cross their intended feature."
+  ],
+  "props": [
+    "cup"
+  ],
+  "head_node": "head"
+}

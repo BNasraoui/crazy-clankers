@@ -1,0 +1,313 @@
+{
+  "character": "techbro",
+  "height_m": 1.8,
+  "body": {
+    "metres_per_pixel": 0.002155688622754491,
+    "world_y_at_zero": 1.8452694610778442,
+    "source_sha256": "61d37592056ad610221b24c3fe5df7f46213f1ab4a043040393466c8220e4cfe",
+    "size_pixels": [
+      1672,
+      941
+    ],
+    "detected_guides_pixels": [
+      40.5,
+      88.5,
+      142.0,
+      197.5,
+      358.5,
+      473.5,
+      619.5,
+      844.5
+    ],
+    "reviewed_guides_pixels": {
+      "crown": 40.5,
+      "eyes": 88.5,
+      "chin": 142.0,
+      "shoulders": 197.5,
+      "waist": 358.5,
+      "crotch": 473.5,
+      "knees": 619.5,
+      "soles": 844.5
+    },
+    "landmarks": {
+      "crown": {
+        "pixel_y": 21,
+        "height_m": 1.7999999999999998
+      },
+      "eyes": {
+        "pixel_y": 89,
+        "height_m": 1.6534131736526945
+      },
+      "chin": {
+        "pixel_y": 145,
+        "height_m": 1.532694610778443
+      },
+      "shoulders": {
+        "pixel_y": 198,
+        "height_m": 1.418443113772455
+      },
+      "waist": {
+        "pixel_y": 359,
+        "height_m": 1.071377245508982
+      },
+      "crotch": {
+        "pixel_y": 487,
+        "height_m": 0.7954491017964072
+      },
+      "knees": {
+        "pixel_y": 620,
+        "height_m": 0.5087425149700597
+      },
+      "soles": {
+        "pixel_y": 856,
+        "height_m": -2.220446049250313e-16
+      }
+    },
+    "views": {
+      "front": {
+        "crop": [
+          65,
+          10,
+          595,
+          866
+        ],
+        "axis": 333,
+        "sign": 1,
+        "direction": [
+          0,
+          0,
+          1
+        ],
+        "right": [
+          1,
+          0,
+          0
+        ],
+        "bounds_pixels": [
+          86,
+          21,
+          580,
+          857
+        ],
+        "mask_area_pixels": 146052
+      },
+      "right": {
+        "crop": [
+          735,
+          10,
+          925,
+          866
+        ],
+        "axis": 816,
+        "sign": 1,
+        "direction": [
+          -1,
+          0,
+          0
+        ],
+        "right": [
+          0,
+          0,
+          1
+        ],
+        "bounds_pixels": [
+          749,
+          23,
+          912,
+          856
+        ],
+        "mask_area_pixels": 85402
+      },
+      "back": {
+        "crop": [
+          1080,
+          10,
+          1580,
+          866
+        ],
+        "axis": 1331,
+        "sign": 1,
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "right": [
+          -1,
+          0,
+          0
+        ],
+        "bounds_pixels": [
+          1090,
+          23,
+          1569,
+          856
+        ],
+        "mask_area_pixels": 139761
+      }
+    },
+    "auxiliary_views": {}
+  },
+  "head": {
+    "metres_per_pixel": 0.0007404581418879692,
+    "world_y_at_zero": 1.9273588004047308,
+    "source_sha256": "c1ecebc4d315085bff5b6998fe5acbb038238884708af7224f6a9bedd0aa3a4b",
+    "size_pixels": [
+      1672,
+      941
+    ],
+    "detected_guides_pixels": [
+      213.5,
+      280.5,
+      353.5,
+      392.5,
+      449.5,
+      474.5,
+      525.5
+    ],
+    "reviewed_guides_pixels": [
+      213.5,
+      280.5,
+      353.5,
+      392.5,
+      449.5,
+      474.5,
+      525.5
+    ],
+    "landmarks": {
+      "crown": {
+        "pixel_y": 172,
+        "height_m": 1.8000000000000003
+      },
+      "hairline": {
+        "pixel_y": 270,
+        "height_m": 1.7274351020949792
+      },
+      "brows": {
+        "pixel_y": 333,
+        "height_m": 1.680786239156037
+      },
+      "eyes": {
+        "pixel_y": 365,
+        "height_m": 1.657091578615622
+      },
+      "nose": {
+        "pixel_y": 407,
+        "height_m": 1.6259923366563274
+      },
+      "mouth": {
+        "pixel_y": 445,
+        "height_m": 1.5978549272645846
+      },
+      "chin": {
+        "pixel_y": 533,
+        "height_m": 1.5326946107784432
+      },
+      "neck": {
+        "pixel_y": 591,
+        "height_m": 1.489748038548941
+      }
+    },
+    "views": {
+      "front": {
+        "crop": [
+          25,
+          155,
+          395,
+          534
+        ],
+        "axis": 210,
+        "sign": 1,
+        "direction": [
+          0,
+          0,
+          1
+        ],
+        "right": [
+          1,
+          0,
+          0
+        ],
+        "bounds_pixels": [
+          36,
+          172,
+          376,
+          534
+        ],
+        "mask_area_pixels": 81912
+      },
+      "right": {
+        "crop": [
+          850,
+          155,
+          1250,
+          534
+        ],
+        "axis": 1068,
+        "sign": 1,
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "right": [
+          0,
+          0,
+          -1
+        ],
+        "bounds_pixels": [
+          859,
+          173,
+          1244,
+          534
+        ],
+        "mask_area_pixels": 94917
+      },
+      "back": {
+        "crop": [
+          1290,
+          155,
+          1640,
+          534
+        ],
+        "axis": 1463,
+        "sign": 1,
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "right": [
+          -1,
+          0,
+          0
+        ],
+        "bounds_pixels": [
+          1295,
+          171,
+          1631,
+          534
+        ],
+        "mask_area_pixels": 80398
+      }
+    },
+    "auxiliary_views": {
+      "three_quarter": {
+        "crop": [
+          430,
+          155,
+          835,
+          534
+        ],
+        "purpose": "grin texture source; no orthographic score",
+        "bounds_pixels": [
+          437,
+          171,
+          794,
+          534
+        ],
+        "mask_area_pixels": 87636
+      }
+    }
+  }
+}
