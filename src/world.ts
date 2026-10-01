@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { makeLabel } from './models';
 import { glslColor, toon } from './look';
+import { districtOf, type District } from './districts';
 
 // The city is a 10x10 grid of blocks. Street centerlines sit every CELL units.
 // SF-style hills: intersections are flat and the streets between them are
@@ -107,7 +108,7 @@ export const blocks: Block[] = [];
       if (PARKS.has(key)) kind = 'park';
       else if (LANDMARK_BLOCKS.has(key)) kind = 'landmark';
       else if (key === '5,5') kind = 'ladies';
-      else if ((bi >= 7 && bj <= 3) || (bi >= 6 && bj <= 4 && r() < 0.5)) kind = 'downtown';
+      else if (districtOf(bi, bj).id === 'fidi') kind = 'downtown';
       const cx = -HALF + bi * CELL;
       const cz = -HALF + bj * CELL;
       blocks.push({
@@ -250,17 +251,23 @@ export function buildWorld(scene: THREE.Scene) {
   scene.add(water);
   scene.add(makeSeabed());
 
-  const boxes: { x: number; y: number; z: number; sx: number; sy: number; sz: number; c: THREE.Color; ground: number; top: number; tower: boolean }[] = [];
+  // style: 0 = house windows, 1 = glass tower bands, 2 = plain trim (cornices, doors, awnings)
+  const boxes: { x: number; y: number; z: number; sx: number; sy: number; sz: number; c: THREE.Color; ground: number; top: number; style: number }[] = [];
   const addBox = (x0: number, x1: number, z0: number, z1: number, height: number, color: THREE.ColorRepresentation, tower = false) => {
+    const style = tower ? 1 : 0;
     const hs = [heightAt(x0, z0), heightAt(x1, z0), heightAt(x0, z1), heightAt(x1, z1)];
     const ground = Math.min(...hs);
     const base = ground - 2;
     const top = Math.max(...hs) + height;
     boxes.push({
       x: (x0 + x1) / 2, y: (base + top) / 2, z: (z0 + z1) / 2,
-      sx: x1 - x0, sy: top - base, sz: z1 - z0, c: new THREE.Color(color), ground, top, tower,
+      sx: x1 - x0, sy: top - base, sz: z1 - z0, c: new THREE.Color(color), ground, top, style,
     });
     return top;
+  };
+  // A box at an exact height range (bay windows, cornices, doors, awnings).
+  const addPart = (x0: number, x1: number, z0: number, z1: number, y0: number, y1: number, color: THREE.ColorRepresentation, style: number, ground = y0) => {
+    boxes.push({ x: (x0 + x1) / 2, y: (y0 + y1) / 2, z: (z0 + z1) / 2, sx: x1 - x0, sy: y1 - y0, sz: z1 - z0, c: new THREE.Color(color), ground, top: y1, style });
   };
   // Street-facing house walls, some of which get a graffiti tag.
   const walls: { x: number; z: number; nx: number; nz: number }[] = [];
@@ -273,7 +280,8 @@ export function buildWorld(scene: THREE.Scene) {
   const LADIES = [0x5f9ec2, 0xe58fa5, 0xf2cf55, 0x86c07a, 0xb08ad8, 0xee8f5a].map(mute);
   const GLASS = [0xc9d3dc, 0xb8c4cf, 0xd9d2c3, 0x9fb0c0, 0xe2ddd2, 0xaebdca];
   const trees: THREE.Matrix4[] = [];
-  const roofs: THREE.Mesh[] = [];
+  const streetTrees: THREE.Matrix4[] = [];
+  const gables: { m: THREE.Matrix4; c: THREE.Color }[] = [];
 
   for (const b of blocks) {
     const { x0, x1, z0, z1 } = b;
@@ -305,41 +313,16 @@ export function buildWorld(scene: THREE.Scene) {
       continue;
     }
     if (b.kind === 'landmark') continue;
-
-    // Rows of houses around the block edge, Victorian-style.
+    const dist = districtOf(b.bi, b.bj);
     const ladies = b.kind === 'ladies';
-    const pick = () => (ladies ? LADIES : PASTEL)[Math.floor(r() * (ladies ? LADIES : PASTEL).length)];
-    const w = (x1 - x0) / 4;
-    for (let k = 0; k < 4; k++) {
-      const hN = 6 + r() * 4, hS = 6 + r() * 4;
-      const tN = addBox(x0 + k * w + 0.2, x0 + (k + 1) * w - 0.2, z0, z0 + 12, hN, pick());
-      const tS = addBox(x0 + k * w + 0.2, x0 + (k + 1) * w - 0.2, z1 - 12, z1, hS, pick());
-      if (!ladies) {
-        walls.push({ x: x0 + (k + 0.5) * w, z: z0, nx: 0, nz: -1 });
-        walls.push({ x: x0 + (k + 0.5) * w, z: z1, nx: 0, nz: 1 });
-      }
-      if (ladies) {
-        roofs.push(gable(x0 + (k + 0.5) * w, tN, z0 + 6, w - 0.4, 12, pick()));
-        roofs.push(gable(x0 + (k + 0.5) * w, tS, z1 - 6, w - 0.4, 12, pick()));
-      }
-    }
-    const h2 = (z1 - z0 - 24) / 2;
-    for (let k = 0; k < 2; k++) {
-      const za = z0 + 12 + k * h2 + 0.2, zb = z0 + 12 + (k + 1) * h2 - 0.2;
-      const tW = addBox(x0, x0 + 12, za, zb, 6 + r() * 4, pick());
-      addBox(x1 - 12, x1, za, zb, 6 + r() * 4, pick());
-      if (ladies) roofs.push(gable(x0 + 6, tW, (za + zb) / 2, 12, zb - za, pick(), true));
-      else {
-        walls.push({ x: x0, z: (za + zb) / 2, nx: -1, nz: 0 });
-        walls.push({ x: x1, z: (za + zb) / 2, nx: 1, nz: 0 });
-      }
-    }
+    buildFrontages(b, ladies ? PAINTED_LADIES : dist, ladies ? LADIES : dist.colors, r, addBox, addPart, gables, walls);
+    addStreetTrees(b, r, streetTrees);
   }
 
   const geo = new THREE.BoxGeometry(1, 1, 1);
   geo.setAttribute('aGround', new THREE.InstancedBufferAttribute(new Float32Array(boxes.map((b) => b.ground)), 1));
   geo.setAttribute('aTop', new THREE.InstancedBufferAttribute(new Float32Array(boxes.map((b) => b.top)), 1));
-  geo.setAttribute('aTower', new THREE.InstancedBufferAttribute(new Float32Array(boxes.map((b) => (b.tower ? 1 : 0))), 1));
+  geo.setAttribute('aTower', new THREE.InstancedBufferAttribute(new Float32Array(boxes.map((b) => b.style)), 1));
   const inst = new THREE.InstancedMesh(geo, buildingMaterial(), boxes.length);
   const m = new THREE.Matrix4();
   boxes.forEach((bx, i) => {
@@ -351,9 +334,10 @@ export function buildWorld(scene: THREE.Scene) {
   inst.castShadow = true;
   inst.receiveShadow = true;
   scene.add(inst);
-  for (const rf of roofs) scene.add(rf);
+  scene.add(makeGables(gables));
 
   scene.add(makeTrees(trees));
+  scene.add(makeTrees(streetTrees));
   addLandmarks(scene);
   addGoldenGate(scene);
 
@@ -394,7 +378,9 @@ function buildingMaterial() {
       } else {
         float along = abs(vBNormal.x) > 0.5 ? vBPos.z : vBPos.x;
         float y = vBPos.y - vGround;
-        if (vBPos.y > vTop - 0.8) {
+        if (vTower > 1.5) {
+          // plain trim: no windows
+        } else if (vBPos.y > vTop - 0.8) {
           diffuseColor.rgb = ${glslColor(0xf6f1e6)};
         } else if (vTower > 0.5) {
           float band = step(0.4, fract(y / 3.6)) * step(0.1, fract(along / 3.0));
@@ -465,19 +451,138 @@ function addGraffiti(scene: THREE.Scene, walls: { x: number; z: number; nx: numb
   }
 }
 
-function gable(x: number, y: number, z: number, w: number, d: number, color: THREE.ColorRepresentation, alongX = false) {
+const PAINTED_LADIES: District = { ...districtOf(4, 5), bays: 1, gables: 1, garages: 0.3, cornerFloors: 0, shops: 0, graffiti: 0 };
+const AWNINGS = [0xd23b2e, 0x2f6b4f, 0x2d4a7a, 0xe8a33d, 0x7a3f8a];
+const TRIM = 0xf6f1e6;
+
+type AddBox = (x0: number, x1: number, z0: number, z1: number, height: number, color: THREE.ColorRepresentation, tower?: boolean) => number;
+type AddPart = (x0: number, x1: number, z0: number, z1: number, y0: number, y1: number, color: THREE.ColorRepresentation, style: number, ground?: number) => void;
+
+// Row houses along each side of a block: narrow lots, flush to the sidewalk, with
+// bay windows, cornices or gables, garage doors or stoops, and shops on the corners.
+function buildFrontages(
+  b: Block, d: District, colors: number[], r: () => number,
+  addBox: AddBox, addPart: AddPart,
+  gables: { m: THREE.Matrix4; c: THREE.Color }[],
+  walls: { x: number; z: number; nx: number; nz: number }[],
+) {
+  const { x0, x1, z0, z1 } = b;
+  const DEPTH = 12;
+  // side: [length start, length end, which face, outward normal]
+  const rows: { a0: number; a1: number; face: 'N' | 'S' | 'W' | 'E'; corners: boolean }[] = [
+    { a0: x0, a1: x1, face: 'N', corners: true },
+    { a0: x0, a1: x1, face: 'S', corners: true },
+    { a0: z0 + DEPTH, a1: z1 - DEPTH, face: 'W', corners: false },
+    { a0: z0 + DEPTH, a1: z1 - DEPTH, face: 'E', corners: false },
+  ];
+  for (const row of rows) {
+    // Split the frontage into lots.
+    const lots: [number, number][] = [];
+    let a = row.a0;
+    while (row.a1 - a > 0.5) {
+      let w = d.lot[0] + r() * (d.lot[1] - d.lot[0]);
+      if (row.a1 - a - w < d.lot[0] * 0.75) w = row.a1 - a;
+      lots.push([a, a + w]);
+      a += w;
+    }
+    lots.forEach(([la0, la1], i) => {
+      const corner = row.corners && (i === 0 || i === lots.length - 1);
+      // Local frame → world box. along: la0..la1; depth: 0 at the face, positive inward.
+      const box = (p0: number, p1: number, d0: number, d1: number): [number, number, number, number] => {
+        if (row.face === 'N') return [p0, p1, z0 + d0, z0 + d1];
+        if (row.face === 'S') return [p0, p1, z1 - d1, z1 - d0];
+        if (row.face === 'W') return [x0 + d0, x0 + d1, p0, p1];
+        return [x1 - d1, x1 - d0, p0, p1];
+      };
+      const nx = row.face === 'W' ? -1 : row.face === 'E' ? 1 : 0;
+      const nz = row.face === 'N' ? -1 : row.face === 'S' ? 1 : 0;
+      const mid = (la0 + la1) / 2;
+      const [fx0, fx1, fz0, fz1] = box(mid, mid, 0, 0);
+      // Ground height at the facade, at a point along the lot (features sit on their own patch of slope).
+      const groundAtLot = (p: number) => { const [ax0, ax1, az0, az1] = box(p, p, 0, 0); return heightAt((ax0 + ax1) / 2, (az0 + az1) / 2); };
+      const front = groundAtLot(mid);
+      const floors = Math.round(d.floors[0] + r() * (d.floors[1] - d.floors[0])) + (corner ? d.cornerFloors : 0);
+      const color = colors[Math.floor(r() * colors.length)];
+      const width = la1 - la0;
+      const gabled = !corner && r() < d.gables;
+      const top = addBox(...box(la0 + 0.15, la1 - 0.15, 0, DEPTH), floors * 3.3 + 0.5, color);
+      const shop = corner && r() < d.shops;
+      if (gabled) {
+        // A prism along the lot's depth, peak over the middle of the facade.
+        const along = row.face === 'N' || row.face === 'S';
+        const [gx0, gx1, gz0, gz1] = box(la0 + 0.15, la1 - 0.15, 0, DEPTH);
+        const m = new THREE.Matrix4().compose(
+          new THREE.Vector3((gx0 + gx1) / 2, top, (gz0 + gz1) / 2),
+          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), along ? 0 : Math.PI / 2),
+          new THREE.Vector3(width - 0.3, Math.min(4.2, width * 0.55), DEPTH),
+        );
+        gables.push({ m, c: new THREE.Color(color).multiplyScalar(0.92) });
+      } else {
+        addPart(...box(la0, la1, -0.45, 0.6), top - 0.6, top, TRIM, 2); // cornice
+      }
+      if (floors >= 2 && width > 5 && r() < d.bays) {
+        const bw = Math.min(3.4, width * 0.5);
+        const off = width > 8 ? (r() < 0.5 ? -1 : 1) * (width / 4) : 0;
+        const bg = Math.max(groundAtLot(mid + off - bw / 2), groundAtLot(mid + off + bw / 2));
+        addPart(...box(mid + off - bw / 2, mid + off + bw / 2, -0.8, 0), bg + 3.4, top - (gabled ? 0.1 : 0.7), color, 0, bg);
+        addPart(...box(mid + off - bw / 2 - 0.1, mid + off + bw / 2 + 0.1, -0.9, 0), top - (gabled ? 0.4 : 1.0), top - (gabled ? 0.1 : 0.7), TRIM, 2);
+      }
+      if (shop) {
+        const lo = Math.min(groundAtLot(la0), groundAtLot(la1)), hi = Math.max(groundAtLot(la0), groundAtLot(la1));
+        addPart(...box(la0 + 0.3, la1 - 0.3, -0.08, 0), lo - 0.5, hi + 3, 0x2e3a46, 2);
+        addPart(...box(la0 + 0.2, la1 - 0.2, -1.5, 0), hi + 3, hi + 3.35, AWNINGS[Math.floor(r() * AWNINGS.length)], 2);
+      } else if (r() < d.garages) {
+        const gx = mid + (width > 6 ? (r() < 0.5 ? -1 : 1) * (width / 2 - 1.8) : 0);
+        const gg = Math.min(groundAtLot(gx - 1.3), groundAtLot(gx + 1.3));
+        addPart(...box(gx - 1.3, gx + 1.3, -0.08, 0), gg - 0.5, gg + 2.4, r() < 0.5 ? 0xe9e6dc : 0x4a4f58, 2);
+      } else {
+        const sx = mid + (width > 6 ? (r() < 0.5 ? -1 : 1) * (width / 2 - 1.4) : 0);
+        const sg = Math.min(groundAtLot(sx - 0.8), groundAtLot(sx + 0.8));
+        addPart(...box(sx - 0.8, sx + 0.8, -1.6, 0), sg - 0.5, sg + 0.9, 0xd8d2c4, 2); // stoop
+      }
+      if (r() < d.graffiti) walls.push({ x: (fx0 + fx1) / 2, z: (fz0 + fz1) / 2, nx, nz });
+    });
+  }
+}
+
+// Street trees in sidewalk planters, near the curb.
+function addStreetTrees(b: Block, r: () => number, out: THREE.Matrix4[]) {
+  const cx = -HALF + b.bi * CELL, cz = -HALF + b.bj * CELL;
+  const at = 6.9; // from the street centreline: just inside the curb
+  for (const side of ['N', 'S', 'W', 'E'] as const) {
+    for (const t of [0.3, 0.7]) {
+      if (r() < 0.25) continue;
+      const along = BUILD_INSET + t * (CELL - 2 * BUILD_INSET);
+      let x = 0, z = 0;
+      if (side === 'N') { x = cx + along; z = cz + at; }
+      if (side === 'S') { x = cx + along; z = cz + CELL - at; }
+      if (side === 'W') { x = cx + at; z = cz + along; }
+      if (side === 'E') { x = cx + CELL - at; z = cz + along; }
+      if (landmarks.some((l) => Math.hypot(l.curb.walk.x - x, l.curb.walk.z - z) < 7)) continue;
+      b.circles.push({ x, z, r: 0.4 });
+      const s = 0.55 + r() * 0.15;
+      out.push(new THREE.Matrix4().compose(
+        new THREE.Vector3(x, heightAt(x, z), z),
+        new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), r() * 6),
+        new THREE.Vector3(s, s * 1.1, s),
+      ));
+    }
+  }
+}
+
+function makeGables(list: { m: THREE.Matrix4; c: THREE.Color }[]) {
   const shape = new THREE.Shape();
-  shape.moveTo(-w / 2, 0);
-  shape.lineTo(w / 2, 0);
-  shape.lineTo(0, 4);
+  shape.moveTo(-0.5, 0);
+  shape.lineTo(0.5, 0);
+  shape.lineTo(0, 1);
   shape.closePath();
-  const geo = new THREE.ExtrudeGeometry(shape, { depth: d, bevelEnabled: false });
-  geo.translate(0, 0, -d / 2);
-  if (alongX) geo.rotateY(Math.PI / 2);
-  const mesh = new THREE.Mesh(geo, toon({ color }));
-  mesh.position.set(x, y, z);
-  mesh.castShadow = true;
-  return mesh;
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: 1, bevelEnabled: false });
+  geo.translate(0, 0, -0.5);
+  const inst = new THREE.InstancedMesh(geo, toon(), Math.max(1, list.length));
+  list.forEach((g, i) => { inst.setMatrixAt(i, g.m); inst.setColorAt(i, g.c); });
+  inst.count = list.length;
+  inst.castShadow = true;
+  return inst;
 }
 
 // Road paint is drawn per pixel in the shader so edges stay crisp.
@@ -523,7 +628,7 @@ function makeTerrain() {
   const parks = new Uint8Array(N * N * 4);
   for (const b of blocks) {
     if (b.kind === 'park') parks[(b.bj * N + b.bi) * 4] = 255;
-    if (b.kind === 'downtown' || b.kind === 'landmark') parks[(b.bj * N + b.bi) * 4 + 1] = 255; // paved to the building line
+    if (b.kind !== 'park' && !districtOf(b.bi, b.bj).yard) parks[(b.bj * N + b.bi) * 4 + 1] = 255; // paved to the building line
   }
   const tex = new THREE.DataTexture(parks, N, N);
   tex.magFilter = tex.minFilter = THREE.NearestFilter;

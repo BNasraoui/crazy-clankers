@@ -12,7 +12,7 @@ import type { Car } from './car';
 type Frame = 'front' | 'back' | 'walk1' | 'walk2' | 'dive'
   | 'fwalk1' | 'fwalk2' | 'bwalk1' | 'bwalk2' | 'swalk1' | 'swalk2' | 'swalk3' | 'swalk4';
 const PX_PER_M = 320 / 1.75; // sprites are cut at 320 px for a 1.75 m person
-const SIDEWALK = 7.2; // walking line, close to the curb, measured from the street centreline
+const SIDEWALK = 7.9; // walking line, just past the street trees, measured from the street centreline
 
 interface Kind { frames: Partial<Record<Frame, THREE.Texture>>; size: Partial<Record<Frame, [number, number]>> }
 
