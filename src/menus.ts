@@ -42,7 +42,7 @@ export function howToHTML() {
       <div><b>Radio</b> T / LB: next station · N / X: skip track · M / X in menus: stations</div>
       <div><b>Launch Mode</b> hold handbrake + gas (stopped or drifting), release the handbrake</div>
       <div>Stop in a ring to pick up. Stop in the beam to drop off.</div>
-      <div>Jumps, near misses, drifts and smashing junk earn tips but cost <b>rating</b>. Below 4.00 you're deactivated.</div>
+      <div>Every passenger wants something: speed, air, drifts, close calls, chaos or a smooth ride. Give it to them for up to five stars. Stars set your tip and your <b>rating</b>; so do crashes. Below 4.00 you're deactivated.</div>
     </div>`;
 }
 

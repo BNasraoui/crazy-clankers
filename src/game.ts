@@ -16,6 +16,7 @@ import { Voices } from './voices';
 import { BLOCKS_SIDES, CELL, HALF, WATER, buildWorld, curb, landmarks, N, type Curb, type Landmark } from './world';
 import { buildFeatures, groundAt } from './features';
 import { Moments } from './manga';
+import { Want, WANTS, type Feed } from './wants';
 import { Geysers, Particles, Props, type PropKind } from './props';
 import type { Pedestrians } from './pedestrians';
 import { SpritePerson, type SpriteSet } from './spritepeople';
@@ -57,6 +58,7 @@ interface Ride {
   idleT: number;
   timeLowSaid: boolean;
   ejected?: PersonModel;
+  want: Want; // what this passenger wants from the ride, rated 1-5 stars
 }
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector(sel) as T;
@@ -77,6 +79,9 @@ export class Game {
   cash = 0;
   equity = 0;
   promised = 0;
+  private starsGiven: number[] = []; // each passenger's rating this shift
+  private cardTimer = 0;
+  private stampTimer = 0;
   fares = 0;
   combo = 0;
   safety = 100;
@@ -207,6 +212,7 @@ export class Game {
   private reset() {
     this.time = START_TIME;
     this.cash = this.equity = this.promised = this.fares = this.combo = 0;
+    this.starsGiven = [];
     this.safety = 100;
     this.lowWarned = false;
     this.clock = 0;
@@ -390,7 +396,7 @@ export class Game {
       splash ||= ev.splash;
       this.acc -= STEP;
     }
-    if (hop) sfx.hop();
+    if (hop) { sfx.hop(); this.ride?.want.feed('hop'); }
     if (armed) {
       sfx.armed();
       this.popup('LAUNCH MODE');
@@ -426,8 +432,7 @@ export class Game {
         this.particles.emit(hit.at.clone().setY(hit.at.y + 1), 12, 0x2f4f45, 5, 6, 0.25);
         this.popup(hit.kind === 'lamp' ? 'LIGHTS OUT!' : 'POLE DOWN!');
       }
-      this.safetyHit(1.5);
-      this.tip('smash', 2, hit.kind === 'tree' ? 'TIMBER' : 'SMASH');
+      this.tip('smash', 1, hit.kind === 'tree' ? 'TIMBER' : 'SMASH');
     }
     this.particles.update(dt);
     if (this.peds) {
@@ -437,10 +442,7 @@ export class Game {
         sfx.yelp();
         if (Math.random() < 0.3) this.quips.say('cab', 'pedDive');
       }
-      for (let k = 0; k < pev.closeCalls; k++) {
-        this.safetyHit(1);
-        this.tip('nearMiss', 1, 'CLOSE CALL');
-      }
+      for (let k = 0; k < pev.closeCalls; k++) this.tip('nearMiss', 1, 'CLOSE CALL');
     }
     const tev = this.traffic.update(dt, this.car, this.peds?.inRoad() ?? []);
     impact = Math.max(impact, this.cableCars.update(dt, this.car));
@@ -465,22 +467,20 @@ export class Game {
     if (landed > 0.85) {
       sfx.land(landed * 4);
       this.maxAir = Math.max(this.maxAir, landed);
-      this.safetyHit(landed * 3);
       if (landed > 1.8) {
         this.moments.panel('land', landed / 3);
         this.popup('CRAZY AIR!!', 'big');
         if (!this.ride) this.quips.say('cab', 'bigAir', { force: true });
       }
-      this.tip('jump', 1 + landed * 4, `AIR ${landed.toFixed(1)}s`);
+      this.tip('jump', landed, `AIR ${landed.toFixed(1)}s`);
     } else if (landed > 0.3) sfx.land(landed * 2);
     for (let k = 0; k < tev.nearMisses; k++) {
       sfx.whoosh();
-      this.safetyHit(2);
-      this.tip('nearMiss', 2, 'NEAR MISS');
+      this.tip('nearMiss', 1, 'NEAR MISS');
     }
     if (this.car.grounded && Math.abs(this.car.lateral) > 5 && this.car.speed > 12) this.driftT += dt;
     else {
-      if (this.driftT > 0.8) this.tip('drift', this.driftT * 2, 'DRIFT');
+      if (this.driftT > 0.8) this.tip('drift', this.driftT, `DRIFT ${this.driftT.toFixed(1)}s`);
       this.driftT = 0;
     }
 
@@ -509,6 +509,7 @@ export class Game {
     const r = this.ride;
     if (r && r.firedT <= 0) {
       r.incidents++;
+      r.want.feed('crash', impact);
       if (!this.quips.say(r.type.id, 'crash')) this.quips.say('cab', 'crash');
     } else this.quips.say('cab', 'crash');
   }
@@ -517,12 +518,11 @@ export class Game {
     const colors: Record<PropKind, number> = { hydrant: 0xd23b2e, cone: 0xf26a1b, newsbox: 0x2d6fd2, trash: 0x3b7d4a, table: 0xf4f1e8, fruit: 0xf39c2b, sawhorse: 0xf4f1e8, placard: 0xf4f1e8 };
     sfx.smash();
     this.particles.emit(at.clone().setY(at.y + 0.6), 10, colors[kind], 5, 7, 0.22);
-    this.safetyHit(kind === 'cone' ? 0.5 : 1.5);
     if (kind === 'hydrant') {
       this.geysers.spawn(at);
       this.quips.say('cab', 'geyser', { force: true });
     } else this.quips.say('cab', 'smash');
-    this.tip('smash', kind === 'fruit' ? 3 : 1, kind === 'cone' ? 'CONE' : 'SMASH');
+    this.tip('smash', 1, kind === 'cone' ? 'CONE' : 'SMASH');
   }
 
   // The rating is the safety meter shown Uber-style: 5.00 at full, deactivated at 4.00.
@@ -544,7 +544,8 @@ export class Game {
     if (this.safety <= 0) { this.safety = 0; this.gameOver('DEACTIVATED'); }
   }
 
-  private tip(kind: 'jump' | 'nearMiss' | 'drift' | 'smash', base: number, label: string) {
+  // A stunt during a ride counts towards the passenger's want, if they care about it.
+  private tip(kind: Feed, amount: number, label: string) {
     const r = this.ride;
     if (!r || r.firedT > 0) return;
     const t = r.type;
@@ -554,23 +555,42 @@ export class Game {
       this.popup('SHE MISSED IT', 'bad');
       return;
     }
-    if (t.id === 'safety') {
+    const before = r.want.stars;
+    if (!r.want.feed(kind, amount)) return; // they don't care
+    if (r.want.id === 'smooth') {
       r.incidents++;
-      this.quips.say('safety', kind, { force: true });
-      this.popup('NO TIP. UNSAFE.', 'bad');
+      this.quips.say(t.id, kind === 'smash' ? 'smash' : kind === 'drift' ? 'drift' : kind === 'nearMiss' ? 'nearMiss' : 'jump', { force: true });
+      this.popup(`-1★  ${label}`, 'bad');
+      sfx.bad();
       return;
     }
-    const amt = Math.max(1, Math.round(base * (kind === 'jump' ? t.jumpMul : 1) * t.tipMul * (1 + this.combo * 0.25)));
     this.combo++;
-    if (t.id === 'founder') {
-      r.equity += amt * 10;
-      this.popup(`+${amt * 10} SHARES  ${label}`);
-    } else {
-      r.tips += amt;
-      this.popup(`+${money(amt)}  ${label}`);
-    }
-    sfx.tip();
-    if (!this.quips.say(t.id, kind) && kind === 'jump') this.quips.say('cab', 'jump');
+    const after = r.want.stars;
+    this.popup(after > before ? `${'★'.repeat(after)}  ${label}` : `+ ${label}`, after > before ? 'good' : '');
+    if (after > before) sfx.tip();
+    if (!this.quips.say(t.id, kind as 'jump') && kind === 'jump') this.quips.say('cab', 'jump');
+  }
+
+  // The card that tells you what this passenger wants, Forza-style.
+  private showWantCard(r: Ride) {
+    const w = r.want, el = $('#want-card');
+    const face = `/portraits/${r.type.id}.jpg`;
+    const targets = w.targets.map((t, i) => `<span><i>${'★'.repeat(i + 1)}</i>${t}</span>`).join('');
+    el.innerHTML = `<img class="face" src="${face}" alt=""><div class="body"><div class="who">${r.type.label.replace('★ ', '')} WANTS</div>
+      <div class="title">${w.def.icon} ${w.def.title}</div><div class="ask">“${w.ask}”</div>
+      <div class="targets">${targets || `<span>${w.def.how}</span>`}</div></div>`;
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+    clearTimeout(this.cardTimer);
+    this.cardTimer = window.setTimeout(() => el.classList.remove('show'), 4300);
+  }
+
+  // The passenger's rating at the drop-off: a big star stamp.
+  private stamp(stars: number, line: string) {
+    const el = $('#stamp');
+    el.innerHTML = `<div class="stars">${'★'.repeat(stars)}<s>${'★'.repeat(5 - stars)}</s></div><div class="line">${line}</div>`;
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+    clearTimeout(this.stampTimer);
+    this.stampTimer = window.setTimeout(() => el.classList.remove('show'), 2900);
   }
 
   // ---------- passengers ----------
@@ -661,11 +681,14 @@ export class Game {
     this.waiting = this.waiting.filter((x) => x !== w);
     const d = blocks(w.curb.road, w.dest.curb.road);
     const total = (d / 19 + 6) * w.type.timeMul;
+    const pool = w.type.wants;
+    const want = new Want(pool[Math.floor(this.rand() * pool.length)], w.type.id, total);
     this.ride = {
       type: w.type, dest: w.dest, base: 4 + d * 0.05, total, left: total, startDist: d,
       tips: 0, equity: 0, fareMul: w.type.fareMul, filmed: false, firedDone: false, firedT: 0,
-      rerouted: false, incidents: 0, slowT: 0, idleT: 7, timeLowSaid: false,
+      rerouted: false, incidents: 0, slowT: 0, idleT: 7, timeLowSaid: false, want,
     };
+    this.showWantCard(this.ride);
     this.setDest(w.dest);
     sfx.pickup();
     this.popup(w.type.label.replace('★ ', ''), 'big');
@@ -696,6 +719,7 @@ export class Game {
 
     r.left -= dt;
     if (r.left <= 0) return this.walkout();
+    r.want.tick(dt, this.car.speed, r.left / r.total);
 
     const remaining = blocks(this.car.pos, r.dest.curb.road) / r.startDist;
     if (id === 'sweater' && !r.firedDone && remaining < 0.55) this.fireSweater(r);
@@ -766,21 +790,23 @@ export class Game {
     this.cash += fare;
     this.popup(`${grade}  +${bonus}s`, 'big');
     this.popup(`FARE ${money(fare)}`, 'good');
+    // The passenger rates the ride on what they wanted: the stars set the tip and move the driver rating.
+    if (r.want.id === 'ontime') r.want.tick(0, 0, ratio);
+    const stars = Math.max(1, r.want.stars);
+    this.starsGiven.push(stars);
+    this.safety = Math.min(100, Math.max(0, this.safety + [0, -15, -8, -2, 2, 6][stars]));
+    if (this.safety <= 0) this.gameOver('DEACTIVATED');
+    const tip = Math.round(r.base * [0, 0, 0.25, 0.6, 1, 1.6][stars] * r.type.tipMul);
+    let line = tip ? `TIP ${money(tip)}` : 'NO TIP';
     if (r.type.id === 'rocket') {
-      const promise = Math.max(1, r.tips) * 100000;
+      const promise = Math.max(1, tip) * 100000;
       this.promised += promise;
-      this.popup(`TIP: ${money(promise)} (NEXT YEAR)`, 'bad');
+      line = `TIP ${money(promise)} (NEXT YEAR)`;
     } else if (r.type.id === 'founder') {
-      this.equity += r.equity;
-      if (r.equity) this.popup(`${r.equity} SHARES VESTING`, 'good');
-    } else if (r.type.id === 'safety') {
-      const bonusTip = Math.max(0, 30 - r.incidents * 8);
-      this.cash += bonusTip;
-      this.popup(bonusTip ? `SAFETY BONUS +${money(bonusTip)}` : 'NO SAFETY BONUS', bonusTip ? 'good' : 'bad');
-    } else {
-      this.cash += r.tips;
-      if (r.tips) this.popup(`TIPS +${money(r.tips)}`, 'good');
-    }
+      this.equity += tip * 10;
+      line = tip ? `${tip * 10} SHARES VESTING` : 'NO SHARES';
+    } else this.cash += tip;
+    this.stamp(stars, `${r.want.def.title} ${r.want.shown} · ${line}`);
     this.time += bonus;
     this.fares++;
     sfx.cash();
@@ -817,6 +843,8 @@ export class Game {
         ? `<div>Founder's startup got acquired! ${this.equity} shares → <b>${money(this.equity)}</b></div>`
         : `<div>Founder's startup folded. ${this.equity} shares → <b>$0</b></div>`;
     }
+    const given = this.starsGiven;
+    const starLine = given.length ? `<div>Passenger rating: <b>${(given.reduce((a, b) => a + b, 0) / given.length).toFixed(1)} ★</b> · five-star rides: <b>${given.filter((n) => n === 5).length}</b></div>` : '';
     const airLine = this.maxAir > 0.85 ? `<div>Biggest air: <b>${this.maxAir.toFixed(1)} s</b></div>` : '';
     const promiseLine = this.promised ? `<div>Tips promised for next year: <b>${money(this.promised)}</b> (received: $0)</div>` : '';
     const sub = reason === 'DEACTIVATED' ? 'Your driver rating fell below 4.00. Your account has been deactivated.' : 'Your shift is over.';
@@ -827,7 +855,7 @@ export class Game {
       <div class="stats">
         <div>${sub}</div>
         <div>Fares delivered: <b>${this.fares}</b> · Final rating: <b>${this.rating.toFixed(2)} ★</b></div>
-        ${airLine}${equityLine}${promiseLine}
+        ${starLine}${airLine}${equityLine}${promiseLine}
         <div class="total">${money(this.cash)}</div>
       </div>
       <div class="press">A / ENTER TO DRIVE AGAIN</div><div class="pad">B / Esc to change cab</div>`;
@@ -935,6 +963,12 @@ export class Game {
       const t = r.left / r.total;
       fare.classList.toggle('warn', t <= 0.45 && t > 0.15);
       fare.classList.toggle('urgent', t <= 0.15);
+      // The want meter: five star slots filling as you deliver what they asked for.
+      const w = r.want;
+      $('#fare .want .wt').textContent = `${w.def.icon} ${w.def.title} · ${w.shown}`;
+      $('#fare .want .fill').style.width = `${(w.fill * 100).toFixed(1)}%`;
+      const n = w.stars;
+      $('#fare .want .stars').innerHTML = `${'★'.repeat(n)}<s>${'★'.repeat(5 - n)}</s>`;
     }
   }
 

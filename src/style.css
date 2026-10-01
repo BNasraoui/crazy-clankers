@@ -427,3 +427,44 @@ body { font-family: var(--body); color: var(--paper); user-select: none; }
 
 /* YouTube stations play from a player kept off screen; the radio stays a sticker. */
 #radio-dashboard .radio-player { position: fixed; left: -10000px; top: 0; }
+
+/* ----- passenger wants: the meter in the fare panel, the pickup card, the drop-off stamp ----- */
+#fare { min-width: 340px; }
+#fare .want { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 8px; margin-top: 3px; }
+#fare .want .wt { grid-column: 1 / -1; font: 800 11px var(--body); letter-spacing: 0.04em; }
+#fare .want .meter { height: 9px; background: #1b172222; border: 2px solid var(--ink); border-radius: 5px; overflow: hidden;
+  background-image: repeating-linear-gradient(90deg, transparent 0 calc(20% - 2px), var(--ink) calc(20% - 2px) 20%); }
+#fare .want .fill { height: 100%; background: var(--yellow); transition: width 0.25s; }
+#fare .want .stars { font: 15px var(--num); color: #f5b400; -webkit-text-stroke: 1px var(--ink); letter-spacing: -1px; }
+#fare .want .stars s, #stamp s { text-decoration: none; color: #1b172233; -webkit-text-stroke: 0; }
+
+#want-card { position: absolute; top: 112px; left: 50%; display: none; gap: 14px; align-items: center; width: min(560px, 92vw);
+  padding: 12px 18px 12px 12px; transform: translateX(-50%) rotate(-1.5deg);
+  background: var(--yellow) var(--halftone); color: var(--ink); border: 4px solid var(--ink); border-radius: 14px; box-shadow: 7px 7px 0 var(--ink); }
+#want-card.show { display: flex; animation: card-in 4.2s cubic-bezier(.2, 1.4, .4, 1) forwards; }
+#want-card .face { width: 84px; height: 84px; flex: none; border-radius: 50%; border: 4px solid var(--ink); object-fit: cover; background: #fff; }
+#want-card .who { font: 13px var(--num); letter-spacing: 0.06em; }
+#want-card .title { font: 34px/1 var(--num); color: #fff; -webkit-text-stroke: 7px var(--ink); paint-order: stroke fill; margin: 2px 0; }
+#want-card .ask { font: 18px/1.15 var(--pen); }
+#want-card .targets { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font: 800 12px var(--body); }
+#want-card .targets i { font-style: normal; color: #b07c00; margin-right: 3px; }
+@keyframes card-in {
+  0% { transform: translateX(-50%) translateY(-40px) rotate(-8deg) scale(0.7); opacity: 0; }
+  6% { transform: translateX(-50%) rotate(-1.5deg) scale(1); opacity: 1; }
+  88% { transform: translateX(-50%) rotate(-1.5deg) scale(1); opacity: 1; }
+  100% { transform: translateX(-50%) translateY(-20px) rotate(-1.5deg) scale(0.95); opacity: 0; }
+}
+
+#stamp { position: absolute; left: 50%; top: 44%; display: none; text-align: center; pointer-events: none; }
+#stamp.show { display: block; animation: stamp-in 2.8s ease-out forwards; }
+#stamp .stars { font: 92px/1 var(--num); color: #ffd23a; -webkit-text-stroke: 8px var(--ink); paint-order: stroke fill;
+  text-shadow: 7px 7px 0 var(--ink); letter-spacing: -6px; }
+#stamp .line { display: inline-block; margin-top: 8px; padding: 4px 14px; font: 18px var(--pen); color: var(--ink);
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 8px; box-shadow: 4px 4px 0 var(--ink); }
+@keyframes stamp-in {
+  0% { transform: translate(-50%, -50%) rotate(-14deg) scale(2.6); opacity: 0; }
+  10% { transform: translate(-50%, -50%) rotate(-6deg) scale(1); opacity: 1; }
+  80% { transform: translate(-50%, -50%) rotate(-6deg) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) rotate(-6deg) scale(1.05); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { #want-card.show, #stamp.show { animation: none; } }
