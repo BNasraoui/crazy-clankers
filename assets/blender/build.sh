@@ -13,7 +13,7 @@ case "${1:-techbro}" in
   robotaxis)
     # Downloads the Sketchfab sources once (needs ~/.config/sketchfab/token).
     "$ASSET_PYTHON" fetch_sources.py
-    for car in wayfarer cybercab lineup; do
+    for car in wayfarer cybercab lineup style; do
       "$BLENDER" --background --factory-startup --python-exit-code 1 --python robotaxis.py -- "$car"
     done
     exit ;;
