@@ -134,6 +134,7 @@ export class Game {
     shape.closePath();
     const arrowGeo = new THREE.ExtrudeGeometry(shape, { depth: 0.35, bevelEnabled: true, bevelSize: 0.08, bevelThickness: 0.08, bevelSegments: 1 });
     arrowGeo.rotateX(Math.PI / 2);
+    arrowGeo.translate(0, 0, 1.5); // pivot at the tail
     this.arrow = new THREE.Group();
     const body = new THREE.Mesh(arrowGeo, this.arrowMat);
     body.castShadow = true;
@@ -648,7 +649,7 @@ export class Game {
     diff = Math.atan2(Math.sin(diff), Math.cos(diff));
     this.camYaw += diff * (1 - Math.exp(-4 * dt));
     const speedT = Math.min(1, car.speed / MAX_SPEED);
-    const back = 8.5 + speedT * 2, up = 3.6 + speedT * 0.6;
+    const back = 8.5 + speedT * 2, up = 4.3 + speedT * 0.6;
     const want = new THREE.Vector3(car.pos.x - Math.sin(this.camYaw) * back, car.pos.y + up, car.pos.z - Math.cos(this.camYaw) * back);
     want.y = Math.max(want.y, groundAt(want.x, want.z) + 1.5);
     this.camera.position.lerp(want, 1 - Math.exp(-10 * dt));
@@ -700,9 +701,21 @@ export class Game {
     this.arrow.visible = !!target && this.state === 'play';
     if (!target) return;
     const p = this.car.pos;
-    this.arrow.position.set(p.x, p.y + 3.1 + Math.sin(this.clock * 4) * 0.1, p.z);
-    // Tilted towards the chase camera so it never reads as an edge-on slab.
-    this.arrow.rotation.set(-0.45, Math.atan2(target.x - p.x, target.z - p.z), 0, 'YXZ');
+    const ahead = new THREE.Vector3(target.x - p.x, 0, target.z - p.z).normalize();
+    // Centre the arrow over the cab; its pivot is the tail.
+    this.arrow.position.set(p.x - ahead.x * 1.65 * this.arrow.scale.x, p.y + 2.9 + Math.sin(this.clock * 4) * 0.1, p.z - ahead.z * 1.65 * this.arrow.scale.x);
+    // Point level along the ground, but roll the arrow about its own length so
+    // its face turns towards the camera and never reads as an edge-on slab.
+    const dir = new THREE.Vector3(target.x - p.x, 0, target.z - p.z).normalize();
+    const toCam = this.camera.position.clone().sub(this.arrow.position);
+    toCam.addScaledVector(dir, -toCam.dot(dir)).normalize();
+    const up = new THREE.Vector3(0, 0.55, 0).addScaledVector(toCam, 0.45).normalize();
+    const side = new THREE.Vector3().crossVectors(up, dir);
+    this.arrow.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, up, dir));
+    // Pointing away from the camera there's no face to roll towards it, so lift the tip a little.
+    const camFwd = new THREE.Vector3(Math.sin(this.camYaw), 0, Math.cos(this.camYaw));
+    const lift = 0.16 * Math.max(0, dir.dot(camFwd));
+    this.arrow.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -lift));
   }
 
   private updateHud() {
