@@ -246,7 +246,7 @@ export class Game {
       this.idleAnimations(dt);
     } else {
       if (inp.pause) this.setState('paused');
-      else this.simulate(dt * this.moments.timeScale(dt), inp);
+      else this.simulate(dt * this.moments.timeScale(dt) * (this.radio.wheelOpen ? 0.3 : 1), inp);
     }
     setEngine(this.car.forward, inp.throttle, this.state === 'play');
     this.car.sync(dt);

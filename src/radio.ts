@@ -1,3 +1,4 @@
+import { RadioWheel } from './radiowheel';
 import type { Input } from './input';
 import { voiceActive } from './audio';
 
@@ -114,6 +115,8 @@ export class Radio {
   private toggle = button('Play', () => this.playPause());
   private collapsed = button('📻 Radio off · turn on', () => this.tune(this.selected));
   private returnFocus: HTMLElement | null = null;
+  private wheel = new RadioWheel();
+  private lastFrame = performance.now();
 
   constructor() {
     try {
@@ -191,11 +194,32 @@ export class Radio {
       if (input.padConfirm) (document.activeElement as HTMLElement)?.click();
       return true;
     }
+    const now = performance.now(), dt = Math.min(0.1, (now - this.lastFrame) / 1000);
+    this.lastFrame = now;
     if (state === 'play') {
-      if (input.radioNext) this.nextStation(1);
+      // Tap LB / T for the next station; hold it for the wheel.
+      const chosen = this.wheel.update(dt, input, () => this.wheelItems(), this.enabled ? this.selected : this.stations.length + 1);
+      if (chosen === 'tap') this.nextStation(1);
+      else if (chosen !== null) {
+        if (chosen === this.stations.length + 1) { if (this.enabled) this.off(); }
+        else if (chosen !== this.selected || !this.enabled) this.tune(chosen);
+        this.message(`📻 ${this.wheelItems()[chosen]?.name ?? ''}`);
+      }
       if (input.radioSkip) this.nextTrack();
-    }
+    } else if (this.wheel.isOpen) this.wheel.update(dt, { ...input, radioHold: false }, () => [], 0);
     return false;
+  }
+
+  /** True while the station wheel is up (the game slows down). */
+  get wheelOpen() { return this.wheel.isOpen; }
+
+  // Every station, then your own files, then Off.
+  private wheelItems() {
+    return [
+      ...this.stations.map((s) => ({ name: s.name })),
+      { name: 'My files', disabled: !this.files.length },
+      { name: 'Off' },
+    ];
   }
 
   private gesture() {
@@ -261,7 +285,7 @@ export class Radio {
       let shuffled = false;
       const source = youtubeSource(station.source)!;
       this.player = new YT.Player(mount, {
-        width: 288, height: 216,
+        width: 240, height: 200, // YouTube's minimum is 200 x 200
         playerVars: { controls: 1, playsinline: 1, origin: location.origin, autoplay: 0 },
         events: {
           onReady: ({ target }) => {

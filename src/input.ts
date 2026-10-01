@@ -2,6 +2,9 @@ export interface Input {
   radioNext: boolean;
   radioSkip: boolean;
   radioMenu: boolean;
+  radioHold: boolean; // LB / T held: the station wheel
+  aimX: number; // right stick, -1..1 (picks on the station wheel)
+  aimY: number;
   padConfirm: boolean;
   throttle: number;
   brake: number;
@@ -47,7 +50,7 @@ const down = (...codes: string[]) => codes.some((c) => held.has(c));
 const tapped = (...codes: string[]) => codes.some((c) => fresh.has(c));
 
 // One controller's state, normalised to the standard Xbox-style layout.
-interface PadState { steer: number; throttle: number; brake: number; buttons: boolean[]; ly: number; rx: number }
+interface PadState { steer: number; throttle: number; brake: number; buttons: boolean[]; ly: number; rx: number; ry: number }
 
 // Browsers report the "standard" layout for most pads. On Linux, Steam's virtual
 // Xbox 360 pad can arrive unmapped instead: then triggers are axes 2 and 5 (-1..1)
@@ -55,7 +58,7 @@ interface PadState { steer: number; throttle: number; brake: number; buttons: bo
 function readPad(p: Gamepad): PadState {
   const pressed = p.buttons.map((x) => x.pressed || x.value > 0.5);
   if (p.mapping === 'standard') {
-    return { steer: p.axes[0] ?? 0, throttle: p.buttons[7]?.value ?? 0, brake: p.buttons[6]?.value ?? 0, buttons: pressed, ly: p.axes[1] ?? 0, rx: p.axes[2] ?? 0 };
+    return { steer: p.axes[0] ?? 0, throttle: p.buttons[7]?.value ?? 0, brake: p.buttons[6]?.value ?? 0, buttons: pressed, ly: p.axes[1] ?? 0, rx: p.axes[2] ?? 0, ry: p.axes[3] ?? 0 };
   }
   const trig = (i: number) => (p.axes.length > i ? Math.max(0, ((p.axes[i] ?? -1) + 1) / 2) : 0);
   // Remap to standard indices: 0 A, 1 B, 2 X, 3 Y, 4 LB, 5 RB, 8 Back, 9 Start.
@@ -65,7 +68,7 @@ function readPad(p: Gamepad): PadState {
   // D-pad arrives as a hat on axes 6/7.
   const hx = p.axes[6] ?? 0, hy = p.axes[7] ?? 0;
   std[12] = hy < -0.5; std[13] = hy > 0.5; std[14] = hx < -0.5; std[15] = hx > 0.5;
-  return { steer: p.axes[0] ?? 0, throttle: trig(5), brake: trig(2), buttons: std, ly: p.axes[1] ?? 0, rx: p.axes[3] ?? 0 };
+  return { steer: p.axes[0] ?? 0, throttle: trig(5), brake: trig(2), buttons: std, ly: p.axes[1] ?? 0, rx: p.axes[3] ?? 0, ry: p.axes[4] ?? 0 };
 }
 
 export function readInput(dt: number): Input {
@@ -80,6 +83,9 @@ export function readInput(dt: number): Input {
     radioNext: tapped('KeyT'),
     radioSkip: tapped('KeyN'),
     radioMenu: tapped('KeyM'),
+    radioHold: down('KeyT'),
+    aimX: 0,
+    aimY: 0,
     padConfirm: false,
     throttle: down('KeyW', 'ArrowUp') ? 1 : 0,
     brake: down('KeyS', 'ArrowDown') ? 1 : 0,
@@ -115,6 +121,8 @@ export function readInput(dt: number): Input {
     input.padConfirm ||= edge(0);
     input.radioNext ||= edge(4);
     input.radioSkip ||= edge(2);
+    input.radioHold ||= !!st.buttons[4];
+    if (Math.hypot(st.rx, st.ry) > 0.5) { input.aimX = st.rx; input.aimY = st.ry; }
     input.pause ||= edge(9);
     input.restart ||= edge(3);
     input.debug ||= edge(8);
