@@ -1,4 +1,54 @@
 {
+ "drops": [
+  {
+   "id": "drop-barris",
+   "kind": "drop",
+   "wall": "#a0644f",
+   "base": "#564e4d"
+  },
+  {
+   "id": "drop-burrito",
+   "kind": "drop",
+   "wall": "#fec841",
+   "base": "#be625a"
+  },
+  {
+   "id": "drop-crypto",
+   "kind": "drop",
+   "wall": "#cdbb9f",
+   "base": "#d4b677"
+  },
+  {
+   "id": "drop-lab",
+   "kind": "drop",
+   "wall": "#fdd36a",
+   "base": "#dfc27e"
+  },
+  {
+   "id": "drop-ladies-a",
+   "kind": "drop",
+   "wall": "#e4d7be",
+   "base": "#aba290"
+  },
+  {
+   "id": "drop-ladies-b",
+   "kind": "drop",
+   "wall": "#cbbba0",
+   "base": "#a19795"
+  },
+  {
+   "id": "drop-phlz",
+   "kind": "drop",
+   "wall": "#765b3f",
+   "base": "#535e4d"
+  },
+  {
+   "id": "drop-seriesa",
+   "kind": "drop",
+   "wall": "#5a3f22",
+   "base": "#3f372b"
+  }
+ ],
  "haight": [
   {
    "id": "haight-10",
