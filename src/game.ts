@@ -960,12 +960,11 @@ export class Game {
     const want = $('#want');
     want.classList.toggle('hidden', !r);
     if (r) {
-      const w = r.want, n = w.stars;
+      const w = r.want;
       $('#want .lbl').textContent = `${r.type.label.replace('★ ', '')} WANTS`;
       $('#want .score b').textContent = `${w.def.icon} ${w.def.title}`;
-      $('#want .stars').innerHTML = `${'★'.repeat(n)}<s>${'★'.repeat(5 - n)}</s>`;
       $('#want .fill').style.width = `${(w.fill * 100).toFixed(1)}%`;
-      $('#want .note').textContent = w.targets.length ? `★★★★★ AT ${w.targets.at(-1)!.toUpperCase()} · NOW ${w.shown.toUpperCase()}` : 'EVERY BUMP COSTS A STAR';
+      $('#want .note').textContent = w.targets.length ? `GOAL ${w.targets.at(-1)!.toUpperCase()} · NOW ${w.shown.toUpperCase()}` : 'EVERY BUMP COSTS YOU';
     }
   }
 

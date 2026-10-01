@@ -434,10 +434,9 @@ body { font-family: var(--body); color: var(--paper); user-select: none; }
   border: 3px solid var(--ink); border-radius: 10px; box-shadow: 5px 5px 0 var(--ink); transform: rotate(1.5deg);
 }
 #want .lbl { font: 14px var(--pen); }
-#want .score { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: -2px; }
-#want .score b { font: 21px/1.15 var(--num); white-space: nowrap; }
-#want .stars { font: 17px var(--num); color: #fff; -webkit-text-stroke: 1.5px var(--ink); paint-order: stroke fill; letter-spacing: -1px; white-space: nowrap; }
-#want .stars s, #stamp s { text-decoration: none; color: #1b172233; -webkit-text-stroke: 0; }
+#want .score { margin-top: -2px; }
+#want .score b { display: block; font: 18px/1.2 var(--num); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#stamp s { text-decoration: none; color: #1b172233; -webkit-text-stroke: 0; }
 #want .track { position: relative; height: 12px; margin-top: 4px; background: #fff8; border: 2px solid var(--ink); border-radius: 6px; overflow: hidden;
   background-image: repeating-linear-gradient(90deg, transparent 0 calc(20% - 2px), var(--ink) calc(20% - 2px) 20%); }
 #want .fill { height: 100%; background: var(--magenta); transition: width 0.2s; }
