@@ -6,6 +6,7 @@ export interface Input {
   confirm: boolean; // edge-triggered
   pause: boolean; // edge-triggered
   restart: boolean; // edge-triggered
+  debug: boolean; // edge-triggered: toggles the look panel
 }
 
 const held = new Set<string>();
@@ -44,6 +45,7 @@ export function readInput(dt: number): Input {
     confirm: tapped('Enter', 'Space'),
     pause: tapped('Escape', 'KeyP'),
     restart: tapped('KeyR'),
+    debug: false,
   };
 
   if (pad) {
@@ -58,6 +60,7 @@ export function readInput(dt: number): Input {
     input.confirm ||= edge(0);
     input.pause ||= edge(9);
     input.restart ||= edge(3);
+    input.debug ||= edge(8);
     prevButtons = b;
   }
   fresh.clear();

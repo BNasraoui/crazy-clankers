@@ -1,0 +1,222 @@
+import * as THREE from 'three';
+
+// The game's look: cel lighting with one shadow tone, ink outlines drawn from
+// the depth buffer, the 3D rendered at low resolution and scaled up with hard
+// pixels, then film grain and speed lines on top. The HUD is DOM, so it stays sharp.
+
+const gradientMap = (() => {
+  const tex = new THREE.DataTexture(new Uint8Array([150, 255]), 2, 1, THREE.RedFormat);
+  tex.minFilter = tex.magFilter = THREE.NearestFilter;
+  tex.needsUpdate = true;
+  return tex;
+})();
+
+export function toon(p: THREE.ColorRepresentation | THREE.MeshToonMaterialParameters = {}) {
+  const params = typeof p === 'object' && !(p instanceof THREE.Color) ? p : { color: p };
+  return new THREE.MeshToonMaterial({ gradientMap, ...params });
+}
+
+export const glslColor = (hex: THREE.ColorRepresentation) => {
+  const c = new THREE.Color(hex);
+  return `vec3(${c.r.toFixed(4)}, ${c.g.toFixed(4)}, ${c.b.toFixed(4)})`;
+};
+
+export const SKY = { zenith: 0x2c74d6, horizon: 0xd3e6f3 };
+
+export function makeSky() {
+  const mat = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    depthWrite: false,
+    fog: false,
+    vertexShader: /* glsl */ `
+      varying vec3 vDir;
+      void main() {
+        vDir = normalize(position);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: /* glsl */ `
+      varying vec3 vDir;
+      float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float noise(vec2 p) {
+        vec2 i = floor(p), f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+      }
+      float fbm(vec2 p) { return 0.55 * noise(p) + 0.3 * noise(p * 2.1) + 0.15 * noise(p * 4.3); }
+      void main() {
+        float h = vDir.y;
+        vec3 col = mix(${glslColor(SKY.horizon)}, ${glslColor(SKY.zenith)}, smoothstep(-0.02, 0.5, h));
+        // Flat cel clouds: a lit top and one shadow tone underneath.
+        vec2 q = vDir.xz / max(h, 0.06) * 0.9;
+        float n = fbm(q * 0.7);
+        float band = smoothstep(0.03, 0.12, h) * (1.0 - smoothstep(0.55, 0.8, h));
+        if (n > 0.6 && band > 0.5) col = n > 0.64 ? vec3(1.0) : ${glslColor(0xc9d6e6)};
+        gl_FragColor = vec4(col, 1.0);
+        #include <colorspace_fragment>
+      }`,
+  });
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(900, 32, 16), mat);
+  sky.frustumCulled = false;
+  sky.renderOrder = -1;
+  return sky;
+}
+
+export interface LookSettings { height: number; grain: number; outline: boolean; speedLines: boolean }
+const DEFAULTS: LookSettings = { height: 480, grain: 0.07, outline: true, speedLines: true };
+const STORE = 'clankers.look';
+
+function loadSettings(): LookSettings {
+  try {
+    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(STORE) ?? '{}') };
+  } catch {
+    return { ...DEFAULTS };
+  }
+}
+
+export class Look {
+  settings = loadSettings();
+  private target: THREE.WebGLRenderTarget;
+  private quad: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
+  private quadScene = new THREE.Scene();
+  private quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  private w = 1;
+  private h = 1;
+
+  constructor(private renderer: THREE.WebGLRenderer) {
+    this.target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: true });
+    this.target.texture.minFilter = this.target.texture.magFilter = THREE.NearestFilter;
+    this.target.depthTexture = new THREE.DepthTexture(1, 1);
+
+    this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+      uniforms: {
+        tColor: { value: this.target.texture },
+        tDepth: { value: this.target.depthTexture },
+        uLow: { value: new THREE.Vector2(1, 1) },
+        uNear: { value: 0.5 },
+        uFar: { value: 1000 },
+        uTime: { value: 0 },
+        uGrain: { value: 0.07 },
+        uOutline: { value: 1 },
+        uSpeed: { value: 0 },
+        uAspect: { value: 1 },
+      },
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+      fragmentShader: /* glsl */ `
+        #include <packing>
+        uniform sampler2D tColor;
+        uniform sampler2D tDepth;
+        uniform vec2 uLow;
+        uniform float uNear, uFar, uTime, uGrain, uOutline, uSpeed, uAspect;
+        varying vec2 vUv;
+
+        // 1/distance is linear across a flat surface in screen space, so its
+        // Laplacian is zero on planes and spikes at creases and silhouettes.
+        float invZ(vec2 uv) {
+          float d = texture2D(tDepth, uv).x;
+          return 1.0 / max(-perspectiveDepthToViewZ(d, uNear, uFar), 0.001);
+        }
+        float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+
+        void main() {
+          vec2 uv = (floor(vUv * uLow) + 0.5) / uLow;
+          vec3 col = texture2D(tColor, uv).rgb;
+
+          if (uOutline > 0.5) {
+            vec2 t = 1.0 / uLow;
+            float c = invZ(uv);
+            float l = invZ(uv - vec2(t.x, 0.0));
+            float r = invZ(uv + vec2(t.x, 0.0));
+            float u = invZ(uv + vec2(0.0, t.y));
+            float d = invZ(uv - vec2(0.0, t.y));
+            float lap = abs(4.0 * c - l - r - u - d) / c;
+            // Only ink the nearer side of a silhouette, so lines stay one pixel wide.
+            float nearer = step(max(max(l, r), max(u, d)) * 0.5, c);
+            float edge = smoothstep(0.06, 0.16, lap) * nearer;
+            edge *= smoothstep(1.0 / 420.0, 1.0 / 260.0, c);
+            col = mix(col, ${glslColor(0x1b1722)}, edge * 0.92);
+          }
+
+          // Manga speed lines from the screen edges.
+          if (uSpeed > 0.0) {
+            vec2 p = vUv - 0.5;
+            p.x *= uAspect;
+            float a = (atan(p.y, p.x) + 3.14159) / 6.28318 * 180.0;
+            float on = step(0.82, hash(vec2(floor(a), floor(uTime * 16.0))));
+            float thin = 1.0 - smoothstep(0.08, 0.2, abs(fract(a) - 0.5));
+            float sl = on * thin * smoothstep(0.34, 0.7, length(p)) * uSpeed;
+            col = mix(col, vec3(1.0), sl * 0.6);
+          }
+
+          col += (hash(gl_FragCoord.xy + fract(uTime * 7.3) * 517.0) - 0.5) * uGrain;
+          col *= 1.0 - 0.2 * smoothstep(0.5, 0.95, length((vUv - 0.5) * vec2(uAspect, 1.0)));
+          gl_FragColor = vec4(col, 1.0);
+          #include <colorspace_fragment>
+        }`,
+      depthTest: false,
+      depthWrite: false,
+    }));
+    this.quad.frustumCulled = false;
+    this.quadScene.add(this.quad);
+    this.buildPanel();
+  }
+
+  setSize(w: number, h: number) {
+    this.w = w;
+    this.h = h;
+    const lh = Math.min(h, this.settings.height);
+    const lw = Math.round((lh * w) / h);
+    this.target.setSize(lw, lh);
+    this.quad.material.uniforms.uLow.value.set(lw, lh);
+    this.quad.material.uniforms.uAspect.value = w / h;
+  }
+
+  render(scene: THREE.Scene, camera: THREE.PerspectiveCamera, time: number, speed: number) {
+    const u = this.quad.material.uniforms;
+    u.uNear.value = camera.near;
+    u.uFar.value = camera.far;
+    u.uTime.value = time;
+    u.uGrain.value = this.settings.grain;
+    u.uOutline.value = this.settings.outline ? 1 : 0;
+    u.uSpeed.value = this.settings.speedLines ? speed : 0;
+    this.renderer.setRenderTarget(this.target);
+    this.renderer.render(scene, camera);
+    this.renderer.setRenderTarget(null);
+    this.renderer.render(this.quadScene, this.quadCam);
+  }
+
+  // Backquote (`) or the controller's Select button toggles a tuning panel.
+  private buildPanel() {
+    const panel = document.createElement('div');
+    panel.id = 'lookpanel';
+    panel.hidden = true;
+    panel.innerHTML = `
+      <b>LOOK</b>
+      <label>Resolution <select id="lk-res">
+        ${[240, 360, 480, 720, 4000].map((v) => `<option value="${v}">${v === 4000 ? 'native' : v + 'p'}</option>`).join('')}
+      </select></label>
+      <label>Grain <input id="lk-grain" type="range" min="0" max="0.25" step="0.01"></label>
+      <label><input id="lk-outline" type="checkbox"> Outlines</label>
+      <label><input id="lk-speed" type="checkbox"> Speed lines</label>`;
+    document.body.appendChild(panel);
+    const res = panel.querySelector<HTMLSelectElement>('#lk-res')!;
+    const grain = panel.querySelector<HTMLInputElement>('#lk-grain')!;
+    const outline = panel.querySelector<HTMLInputElement>('#lk-outline')!;
+    const speed = panel.querySelector<HTMLInputElement>('#lk-speed')!;
+    res.value = String(this.settings.height);
+    grain.value = String(this.settings.grain);
+    outline.checked = this.settings.outline;
+    speed.checked = this.settings.speedLines;
+    const apply = () => {
+      this.settings = { height: +res.value, grain: +grain.value, outline: outline.checked, speedLines: speed.checked };
+      try { localStorage.setItem(STORE, JSON.stringify(this.settings)); } catch { /* storage unavailable */ }
+      this.setSize(this.w, this.h);
+    };
+    for (const el of [res, grain, outline, speed]) el.addEventListener('input', apply);
+    addEventListener('keydown', (e) => { if (e.code === 'Backquote') panel.hidden = !panel.hidden; });
+    this.togglePanel = () => { panel.hidden = !panel.hidden; };
+  }
+
+  togglePanel = () => {};
+}

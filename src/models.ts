@@ -1,6 +1,8 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { toon } from './look';
 
-const lam = (color: THREE.ColorRepresentation) => new THREE.MeshLambertMaterial({ color });
+const lam = (color: THREE.ColorRepresentation) => toon(color);
 const glow = (color: THREE.ColorRepresentation) => new THREE.MeshBasicMaterial({ color });
 
 function box(w: number, h: number, d: number, mat: THREE.Material, x = 0, y = 0, z = 0) {
@@ -13,8 +15,8 @@ function box(w: number, h: number, d: number, mat: THREE.Material, x = 0, y = 0,
 export interface CarModel {
   root: THREE.Group; // position + yaw
   body: THREE.Group; // pitch + roll
-  wheels: THREE.Mesh[];
-  steer: THREE.Group[]; // front wheel pivots
+  wheels: THREE.Object3D[];
+  steer: THREE.Object3D[]; // front wheel pivots
   spinner?: THREE.Object3D;
 }
 
@@ -38,7 +40,37 @@ function addWheels(body: THREE.Group, halfW: number, front: number, back: number
   return { wheels, steer };
 }
 
-// The player: a polite white robotaxi with a spinning lidar puck.
+// The player's cab, built in Blender (assets/blender/cab.py). Falls back to the
+// box version if the file can't be loaded.
+export async function loadCab(): Promise<CarModel> {
+  try {
+    const gltf = await new GLTFLoader().loadAsync('/models/cab.glb');
+    const root = new THREE.Group();
+    const body = new THREE.Group();
+    root.add(body);
+    body.add(gltf.scene);
+    gltf.scene.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const src = mesh.material as THREE.MeshStandardMaterial;
+      mesh.material = src.name.startsWith('light_') ? new THREE.MeshBasicMaterial({ color: src.color }) : toon({ color: src.color });
+      mesh.castShadow = true;
+    });
+    const node = (name: string) => {
+      const o = gltf.scene.getObjectByName(name);
+      if (!o) throw new Error(`cab.glb is missing node ${name}`);
+      o.rotation.order = 'YXZ'; // steer about Y, then spin about the axle
+      return o;
+    };
+    const wheels = ['wheel_FL', 'wheel_FR', 'wheel_RL', 'wheel_RR'].map(node);
+    return { root, body, wheels, steer: wheels.slice(0, 2), spinner: node('lidar') };
+  } catch (err) {
+    console.warn('Using the box cab:', err);
+    return makeCab();
+  }
+}
+
+// The placeholder cab: a polite white robotaxi with a spinning lidar puck.
 export function makeCab(): CarModel {
   const root = new THREE.Group();
   const body = new THREE.Group();
@@ -95,7 +127,7 @@ export function makeWedge(): CarModel {
   const geo = new THREE.ExtrudeGeometry(s, { depth: 2.2, bevelEnabled: false });
   geo.translate(0, 0, -1.1);
   geo.rotateY(-Math.PI / 2);
-  const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0xaeb3b6, flatShading: true }));
+  const m = new THREE.Mesh(geo, toon(0xaeb3b6));
   m.castShadow = true;
   body.add(m);
   body.add(box(2.1, 0.08, 0.06, glow(0xffffff), 0, 1.12, 2.82));

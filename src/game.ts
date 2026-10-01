@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { Car, MAX_SPEED } from './car';
 import { readInput, padName, type Input } from './input';
-import { makeCab, makePerson, makeLabel, type PersonModel } from './models';
+import { makePerson, makeLabel, type CarModel, type PersonModel } from './models';
+import { Look, SKY, makeSky } from './look';
 import { pickPassenger, type PassengerType } from './passengers';
 import { QuipDirector } from './quips';
 import { Traffic } from './traffic';
@@ -74,18 +75,21 @@ export class Game {
   private shake = 0;
   private camYaw = START.yaw;
   private sun: THREE.DirectionalLight;
+  private look: Look;
+  private sky = makeSky();
   private arrow: THREE.Group;
   private arrowMat: THREE.MeshLambertMaterial;
   private destMarker: THREE.Group | null = null;
   private quipTimer = 0;
   private rand = Math.random;
 
-  constructor(public renderer: THREE.WebGLRenderer) {
-    const fog = 0xc9d3dc;
-    this.scene.background = new THREE.Color(fog);
-    this.scene.fog = new THREE.Fog(fog, 150, 460);
-    this.scene.add(new THREE.HemisphereLight(0xe4eef8, 0x6b5e50, 1.6));
-    this.sun = new THREE.DirectionalLight(0xfff1dc, 2.2);
+  constructor(public renderer: THREE.WebGLRenderer, cab: CarModel) {
+    this.look = new Look(renderer);
+    this.scene.background = new THREE.Color(SKY.horizon);
+    this.scene.fog = new THREE.Fog(SKY.horizon, 170, 560);
+    this.scene.add(this.sky);
+    this.scene.add(new THREE.HemisphereLight(0xdfeaff, 0x8a7a66, 1.25));
+    this.sun = new THREE.DirectionalLight(0xfff1dc, 2.6);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     const sc = this.sun.shadow.camera;
@@ -97,7 +101,6 @@ export class Game {
     this.scene.add(this.sun, this.sun.target);
 
     buildWorld(this.scene);
-    const cab = makeCab();
     this.scene.add(cab.root);
     this.car = new Car(cab);
     this.traffic = new Traffic(this.scene, 46);
@@ -142,6 +145,7 @@ export class Game {
   resize(w: number, h: number) {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.look.setSize(w, h);
   }
 
   private reset() {
@@ -187,7 +191,10 @@ export class Game {
     setEngine(this.car.forward, inp.throttle, this.state === 'play');
     this.car.sync(dt);
     this.traffic.sync(dt);
-    this.renderer.render(this.scene, this.camera);
+    if (inp.debug) this.look.togglePanel();
+    this.sky.position.copy(this.camera.position);
+    const rush = this.state === 'play' ? THREE.MathUtils.clamp((this.car.speed - 28) / 12, 0, 1) : 0;
+    this.look.render(this.scene, this.camera, performance.now() / 1000, rush);
   }
 
   private start() {

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Game } from './game';
+import { loadCab } from './models';
 import './style.css';
 
 const canvas = document.getElementById('view') as HTMLCanvasElement;
@@ -8,7 +9,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 
-const game = new Game(renderer);
+const game = new Game(renderer, await loadCab());
 const fit = () => {
   renderer.setSize(innerWidth, innerHeight, false);
   game.resize(innerWidth, innerHeight);
