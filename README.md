@@ -33,6 +33,15 @@ Rebuild everything (deterministic; same input gives byte-identical output):
 
 - `common.py`: flat materials, mesh builder, glTF export, toon preview renderer.
 - `cab.py`: `cab` > `body`, `lidar`, `wheel_FL/FR/RL/RR` (left = +X, the driver's left; cab faces +Z).
+- `robotaxis.py`: parody robotaxis from Sketchfab models (see `docs/CREDITS.md`), built with
+  `build.sh robotaxis`. `fetch_sources.py` downloads the sources into the git-ignored
+  `assets/blender/sources/` using a Sketchfab API token in `~/.config/sketchfab/token`.
+  - `wayfarer` (Waymo-style, from a Jaguar I-PACE) > `body`, `lidar` (spins about Y),
+    `wheel_FL/FR/RL/RR`. 4.68 m long, wheel radius 0.418 m, axles at z = ±1.501, track x = ±0.805.
+  - `cybercab` (Cybercab-style two-seater) > `body`, `wheel_FL/FR/RL/RR`. 4.41 m long, wheel
+    radius 0.37 m, axles at z = ±1.27, track x = ±0.84.
+  Each is under 12,000 triangles, uses flat role materials only (`light_*` are drawn unlit), and
+  carries no logos, badges, model names or licence plates.
 - `techbro.py`: `techbro` > `legs`, `torso`, `head`, `arm_L`, `arm_R` > `cup`. `arm_R` is at +X so
   the game's wave (`rotation.z = 2.6`) raises it outwards.
 

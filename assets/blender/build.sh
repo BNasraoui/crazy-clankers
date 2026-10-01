@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rebuild Tech Bro v6 and its measured turnaround acceptance artifacts.
+# Rebuild Tech Bro v6 and its measured turnaround acceptance artifacts, the cab, or the robotaxis.
 set -euo pipefail
 cd "$(dirname "$0")"
 if [[ -z "${BLENDER:-}" ]]; then
@@ -10,8 +10,15 @@ fi
 ASSET_PYTHON="${ASSET_PYTHON:-$(dirname "$(readlink -f "$BLENDER")")/5.2/python/bin/python3.13}"
 case "${1:-techbro}" in
   cab) "$BLENDER" --background --factory-startup --python-exit-code 1 --python cab.py; exit ;;
+  robotaxis)
+    # Downloads the Sketchfab sources once (needs ~/.config/sketchfab/token).
+    "$ASSET_PYTHON" fetch_sources.py
+    for car in wayfarer cybercab lineup; do
+      "$BLENDER" --background --factory-startup --python-exit-code 1 --python robotaxis.py -- "$car"
+    done
+    exit ;;
   techbro) ;;
-  *) echo 'Usage: build.sh [techbro|cab]' >&2; exit 2 ;;
+  *) echo 'Usage: build.sh [techbro|cab|robotaxis]' >&2; exit 2 ;;
 esac
 "$ASSET_PYTHON" test_sheets.py
 "$ASSET_PYTHON" test_profile.py
