@@ -2,6 +2,8 @@
 // Every passenger picks one want per trip from their own pool (passengers.ts).
 
 export type WantId = 'speed' | 'air' | 'drift' | 'closecalls' | 'reckless' | 'smooth' | 'ontime';
+const FAST = 20; // m/s, about 45 mph
+
 export type Feed = 'jump' | 'hop' | 'nearMiss' | 'drift' | 'smash' | 'crash';
 
 interface WantDef {
@@ -14,7 +16,7 @@ interface WantDef {
 }
 
 export const WANTS: Record<WantId, WantDef> = {
-  speed: { title: 'SPEED', how: 'Average speed', icon: '💨', thresholds: [10, 14, 18, 22, 26], scaled: false, show: (v) => `${Math.round(v * 2.237)} mph` },
+  speed: { title: 'OVER 45 MPH', how: 'Seconds above 45 mph', icon: '💨', thresholds: [2, 5, 8, 12, 16], scaled: true, show: (v) => `${v.toFixed(1)}s` },
   air: { title: 'AIR TIME', how: 'Seconds off the ground', icon: '🛫', thresholds: [1, 2.5, 4, 6, 8], scaled: true, show: (v) => `${v.toFixed(1)}s` },
   drift: { title: 'DRIFT', how: 'Seconds sideways', icon: '🌀', thresholds: [1.5, 4, 7, 11, 16], scaled: true, show: (v) => `${v.toFixed(1)}s` },
   closecalls: { title: 'CLOSE CALLS', how: 'Near misses', icon: '😱', thresholds: [1, 3, 5, 8, 12], scaled: true, show: (v) => `${Math.round(v)}` },
@@ -35,9 +37,7 @@ export const ASKS: Record<string, Partial<Record<WantId, string>>> = {
 };
 
 export class Want {
-  value = 0; // speed: average m/s · smooth: penalty points · ontime: fraction left · else: running total
-  private dist = 0;
-  private time = 0;
+  value = 0; // smooth: penalty points · ontime: fraction left · else: running total
   readonly def: WantDef;
   readonly ask: string;
   private steps: number[];
@@ -51,21 +51,19 @@ export class Want {
     if (id === 'ontime') this.value = 1;
   }
 
-  // Called every frame of the ride.
-  tick(dt: number, speed: number, timeLeft: number) {
-    if (this.id === 'speed') {
-      this.dist += speed * dt;
-      this.time += dt;
-      this.value = this.time > 0 ? this.dist / this.time : 0;
-    }
+  // Called every frame of the ride: speed, air and drift fill continuously, so every moment counts.
+  tick(dt: number, speed: number, timeLeft: number, airborne: boolean, sliding: boolean) {
+    if (this.id === 'speed' && speed > FAST) this.value += dt;
+    if (this.id === 'air' && airborne) this.value += dt;
+    if (this.id === 'drift' && sliding) this.value += dt;
     if (this.id === 'ontime') this.value = timeLeft;
   }
 
   // Something happened on the ride. Returns true if this passenger cares.
   feed(kind: Feed, amount = 1): boolean {
     switch (this.id) {
-      case 'air': if (kind === 'jump') { this.value += amount; return true; } break;
-      case 'drift': if (kind === 'drift') { this.value += amount; return true; } break;
+      case 'air': return kind === 'jump'; // the air itself is counted as it happens, in tick()
+      case 'drift': return kind === 'drift';
       case 'closecalls': if (kind === 'nearMiss') { this.value += 1; return true; } break;
       case 'reckless': if (kind !== 'drift' && kind !== 'hop') { this.value += kind === 'crash' ? 2 : 1; return true; } break;
       case 'smooth':

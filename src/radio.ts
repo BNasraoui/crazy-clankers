@@ -113,6 +113,7 @@ export class Radio {
   private enabled = false;
   private playing = false;
   private interacted = false;
+  private autostarting = false; // trying to play before any input, which some browsers refuse
   private volume = 0.35;
   private ducked = false;
   private failedTracks = new Set<number>();
@@ -190,6 +191,8 @@ export class Radio {
     this.screen.append(transport, this.rows, form, local, privacy, this.note, button('Back to game', () => this.close()));
     document.body.append(this.dashboard, this.collapsed, this.screen, this.toast);
     this.renderStations();
+    // Start straight away where the browser allows it (the Deck's Chrome does); otherwise on the first input.
+    setTimeout(() => this.autostart(), 0);
     this.audio.onended = () => (this.isStream() ? this.tune(this.selected, true) : this.nextTrack());
     this.audio.onerror = () => (this.isStream() ? this.stationFailed() : this.trackFailed());
     document.addEventListener('click', e => {
@@ -245,6 +248,13 @@ export class Radio {
       { name: 'My files', disabled: !this.files.length },
       { name: 'Off' },
     ];
+  }
+
+  private autostart() {
+    if (this.interacted || !this.stations.length || !streamSource(this.stations[0].source)) return;
+    this.autostarting = true;
+    this.tune(0);
+    this.audio.addEventListener('playing', () => { this.autostarting = false; }, { once: true });
   }
 
   private gesture() {
@@ -467,6 +477,8 @@ export class Radio {
     void this.audio.play().catch(error => {
       if (token !== this.generation || error.name === 'AbortError') return;
       if (error.name === 'NotAllowedError') {
+        // Before any input: wait quietly, and start on the first key, click or button.
+        if (this.autostarting) { this.autostarting = false; this.off(); this.collapsed.hidden = true; this.interacted = false; return; }
         this.playing = false; this.toggle.textContent = 'Play'; this.message('Press Play to start the radio.');
       } else this.trackFailed();
     });

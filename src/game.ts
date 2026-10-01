@@ -251,6 +251,7 @@ export class Game {
     } else if (this.state === 'paused') {
       if (inp.confirm || inp.pause) this.setState('play');
       else if (inp.restart) this.start();
+      else if (inp.back) this.showTitle(); // Backspace or B: back to the title screen
     } else if (this.state === 'over') {
       if (inp.confirm) this.start();
       else if (inp.back) this.showPicker();
@@ -342,7 +343,7 @@ export class Game {
     if (s === 'play') ov.innerHTML = '';
     if (s === 'paused') {
       ov.className = 'dim';
-      ov.innerHTML = `<h2>PAUSED</h2><div class="press">A / ENTER TO RESUME</div><div class="pad">Y / R to restart</div><button class="radio-menu-button" data-radio-open>Radio · M / X</button>`;
+      ov.innerHTML = `<h2>PAUSED</h2><div class="press">A / ENTER TO RESUME</div><div class="pad">Y / R to restart · B / Backspace for the main menu</div><button class="radio-menu-button" data-radio-open>Radio · M / X</button>`;
     }
   }
 
@@ -711,7 +712,15 @@ export class Game {
 
     r.left -= dt;
     if (r.left <= 0) return this.walkout();
-    r.want.tick(dt, this.car.speed, r.left / r.total);
+    // The CMO's air only counts once her phone is up (after the first jump).
+    const airborne = !this.car.grounded && (r.type.id !== 'cmo' || r.filmed);
+    const sliding = this.car.grounded && Math.abs(this.car.lateral) > 3 && this.car.speed > 8;
+    const before = r.want.stars;
+    r.want.tick(dt, this.car.speed, r.left / r.total, airborne, sliding);
+    if (r.want.id !== 'ontime' && r.want.stars > before) {
+      this.popup('★'.repeat(r.want.stars), 'good');
+      sfx.tip();
+    }
 
     const remaining = blocks(this.car.pos, r.dest.curb.road) / r.startDist;
     if (id === 'sweater' && !r.firedDone && remaining < 0.55) this.fireSweater(r);
@@ -783,7 +792,7 @@ export class Game {
     this.popup(`${grade}  +${bonus}s`, 'big');
     this.popup(`FARE ${money(fare)}`, 'good');
     // The passenger rates the ride on what they wanted: the stars set the tip and move the driver rating.
-    if (r.want.id === 'ontime') r.want.tick(0, 0, ratio);
+    if (r.want.id === 'ontime') r.want.tick(0, 0, ratio, false, false);
     const stars = Math.max(1, r.want.stars);
     this.starsGiven.push(stars);
     this.safety = Math.min(100, Math.max(0, this.safety + [0, -15, -8, -2, 2, 6][stars]));
