@@ -258,7 +258,7 @@ const SPECIAL_LOTS: [string, number, number, Side, number, number][] = [
   ['drop-crypto', 8, 6, 'N', 0.5, 18],
   ['drop-burrito', 3, 6, 'E', 0.5, 16],
   ['drop-ladies-b', 5, 5, 'W', 0.5, 16], // Postcard Row, facing Alamo Square
-  ['drop-ladies-a', 5, 5, 'N', 0, 21],
+  ['drop-ladies-a', 5, 5, 'N', 0.42, 21], // one lot in, so a painted corner house turns the corner
 ];
 // Drawings for the base of a downtown tower: [drawing, block bi, bj, face, t].
 const SPECIAL_BASES: [string, number, number, Side, number][] = [
