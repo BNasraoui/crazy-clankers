@@ -237,12 +237,13 @@ def triangle_count(objs):
 
 # --- export ------------------------------------------------------------------
 
-def export_glb(name):
+def export_glb(name, texcoords=False):
+    """texcoords=True exports UVs (and so embeds image textures) for textured models."""
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     path = MODELS_DIR / f"{name}.glb"
     bpy.ops.export_scene.gltf(
         filepath=str(path), export_format="GLB", export_yup=True, export_apply=True,
-        export_cameras=False, export_lights=False, export_texcoords=False,
+        export_cameras=False, export_lights=False, export_texcoords=texcoords,
         export_normals=True, export_tangents=False, export_materials="EXPORT",
         export_animations=False, export_skins=False, export_morph=False,
         export_extras=False, use_selection=False,
