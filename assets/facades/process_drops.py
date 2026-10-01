@@ -1,10 +1,10 @@
 # Turn the picked drop-off drawings into public/facades/drop-*.jpg and update their manifest entries in place.
-#   python3 process_drops.py <workdir> <public/facades>
+#   python3 process_drops.py <workdir> <public/facades> [id ...]   (default: every id in PICKS)
 # PICKS maps id -> (source png in workdir, px to trim off the top, px to trim off the bottom): the trims remove any
 # sliver of sky above the roofline and of sidewalk below the wall; the sides are trimmed to keep 3:2.
 import json, sys, colorsys, collections
 from PIL import Image
-W, OUT = sys.argv[1:3]
+W, OUT, *ONLY = sys.argv[1:]
 # Same colour picks as process.py.
 def body_colour(im):
     im = im.convert('RGB').resize((120, 180))
@@ -24,7 +24,7 @@ def strip_colour(im, box):
     return '#%02x%02x%02x' % s.getpixel((0, 0))
 PICKS = {
     'drop-lab': ('drop-lab-t2.png', 10, 36),
-    'drop-crypto': ('drop-crypto-t4.png', 0, 0),
+    'drop-crypto': ('drop-crypto-b1.png', 4, 10),  # 2026-10-02 redo: a crypto-bro Pacific Heights mansion, not a castle
     'drop-phlz': ('drop-phlz-t2.png', 0, 0),
     'drop-barris': ('drop-barris-t2.png', 0, 0),
     'drop-seriesa': ('drop-seriesa-t1.png', 6, 0),
@@ -33,10 +33,11 @@ PICKS = {
     'drop-ladies-b': ('drop-ladies-b-t1.png', 0, 0),
 }
 # Where body_colour picks a trim colour over the wall, the wall colour sampled by hand.
-WALL = {'drop-burrito': '#e6bd58'}
+WALL = {'drop-burrito': '#e6bd58', 'drop-crypto': '#dfdde2'}
 man = json.load(open(f'{OUT}/manifest.json'))
 entries = {e['id']: e for es in man.values() for e in es}
 for fid, (png, top, bottom) in PICKS.items():
+    if ONLY and fid not in ONLY: continue
     im = Image.open(f'{W}/{png}').convert('RGB')
     w, h = im.size
     h2 = h - top - bottom
