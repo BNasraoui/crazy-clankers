@@ -16,8 +16,8 @@ export function useDevice(d: Device) {
 }
 
 addEventListener('keydown', () => useDevice('kb'), true);
-addEventListener('mousedown', () => useDevice('kb'), true);
-addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') useDevice('touch'); }, true);
+// pointerType tells a real mouse from a finger (a tap also fires a fake mouse event, so don't listen for those).
+addEventListener('pointerdown', (e) => useDevice(e.pointerType === 'mouse' ? 'kb' : 'touch'), true);
 
 // [pad face button, its colour class, keyboard key]. On a touchscreen the label itself is what you tap.
 const KEYS: Record<Act, [string, string, string]> = {
