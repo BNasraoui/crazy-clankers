@@ -4,7 +4,8 @@ export type Speaker = 'cab' | 'techbro' | 'cmo' | 'ceo' | 'founder' | 'sweater' 
 export type QuipEvent =
   | 'pickup' | 'dropoff' | 'walkout' | 'idle'
   | 'jump' | 'jumpFirst' | 'nearMiss' | 'crash' | 'drift' | 'slow' | 'timeLow'
-  | 'fired' | 'back' | 'reroute' | 'safetyLow';
+  | 'fired' | 'back' | 'reroute' | 'safetyLow'
+  | 'dash' | 'smash' | 'geyser' | 'underwater' | 'bigAir';
 
 export const SPEAKERS: Record<Speaker, { name: string; color: string; pitch: number }> = {
   cab: { name: 'YOUR CAB', color: '#14a892', pitch: 880 },
@@ -29,6 +30,11 @@ export const LINES: Record<Speaker, Partial<Record<QuipEvent, string[]>>> = {
     dropoff: ['Thank you for riding. Please rate me five stars. Or else.', 'Arrived. Your data has been lovingly retained.'],
     walkout: ['Rating lowered. Feelings: none.', 'Another satisfied customer. Statistically.'],
     idle: ['Lidar spinning. Vibes immaculate.', 'I can see in 360 degrees. I choose not to.', 'Updating terms of service... done.'],
+    dash: ['Engaging ludicrous mode.', 'Acceleration profile: unhinged.'],
+    smash: ['Street furniture reclassified as projectiles.', 'That was in the way. It is no longer in the way.', 'Cone detected. Cone ignored.'],
+    geyser: ['Water feature unlocked.', 'I have created a fountain. You are welcome.'],
+    underwater: ['I am now a submarine. Please remain seated.', 'Waterproofing: untested. Now tested.', 'Recalculating route via the ocean floor.'],
+    bigAir: ['Altitude exceeds my operating permit.', 'Requesting clearance from air traffic control.', 'I can see my depot from here.'],
   },
   techbro: {
     pickup: ["Bro. Let's GO. I've got a pitch in ten.", 'Yo, is this the robot one? Sick. Very on thesis.', "Quick ride, bro, I'm between two coffee chats."],
@@ -121,10 +127,10 @@ export const LINES: Record<Speaker, Partial<Record<QuipEvent, string[]>>> = {
 };
 
 const PRIORITY: Partial<Record<QuipEvent, number>> = {
-  pickup: 3, dropoff: 3, walkout: 3, fired: 3, back: 3, reroute: 3, jumpFirst: 2,
-  crash: 2, safetyLow: 2, jump: 1, nearMiss: 1, timeLow: 1,
+  pickup: 3, dropoff: 3, walkout: 3, fired: 3, back: 3, reroute: 3, underwater: 3, jumpFirst: 2,
+  crash: 2, safetyLow: 2, geyser: 2, bigAir: 2, jump: 1, nearMiss: 1, timeLow: 1, dash: 1,
 };
-const CHANCE: Partial<Record<QuipEvent, number>> = { jump: 0.8, nearMiss: 0.6, drift: 0.4, crash: 0.9, idle: 0.7 };
+const CHANCE: Partial<Record<QuipEvent, number>> = { jump: 0.8, nearMiss: 0.6, drift: 0.4, crash: 0.9, idle: 0.7, dash: 0.35, smash: 0.25 };
 
 export type ShowQuip = (who: string, color: string, text: string, seconds: number, speaker: Speaker) => void;
 

@@ -62,12 +62,23 @@ export function heightAt(x: number, z: number): number {
   return (a + (b - a) * u) * (1 - v) + (c + (d - c) * u) * v;
 }
 
-function renderHeight(x: number, z: number) {
-  const over = Math.max(Math.abs(x), Math.abs(z)) - (HALF + 10);
+// The bay: the city drops off its edges to a sandy sea floor you can drive on.
+export const WATER = -2;
+export const SEA_FLOOR = -14;
+// East and north (the bay side) are open out to here; west and south stop at BOUND.
+export const SEA_REACH = HALF + 170;
+
+export function terrainAt(x: number, z: number) {
+  const over = Math.max(Math.abs(x), Math.abs(z)) - (HALF + 8);
   const h = heightAt(x, z);
   if (over <= 0) return h;
-  return h + (-4 - h) * clamp(over / 14, 0, 1);
+  const t = clamp(over / 24, 0, 1);
+  return h + (SEA_FLOOR - h) * t * t * (3 - 2 * t);
 }
+
+// Extra round obstacles outside the city blocks (bridge towers, seabed rocks).
+export const extraCircles: Circle[] = [];
+const renderHeight = terrainAt;
 
 export type BlockKind = 'res' | 'downtown' | 'park' | 'ladies' | 'landmark';
 export interface Circle { x: number; z: number; r: number }
@@ -80,7 +91,7 @@ export interface Block {
   circles: Circle[];
 }
 
-const PARKS = new Set(['4,5', '2,7', '0,2', '0,3', '3,0']);
+const PARKS = new Set(['4,5', '2,7', '0,2', '0,3', '3,0', '1,8']);
 const LANDMARK_BLOCKS = new Set(['8,2', '7,1', '9,1']);
 
 export const blocks: Block[] = [];
@@ -150,11 +161,24 @@ export function collide(pos: THREE.Vector3, vel: THREE.Vector2, r: number): numb
       }
     }
   }
-  const lim = BOUND - r;
-  if (pos.x > lim) { pos.x = lim; hit(-1, 0); }
+  if (Math.abs(pos.x) > HALF + 10 || Math.abs(pos.z) > HALF + 10) {
+    for (const c of extraCircles) {
+      const dx = pos.x - c.x, dz = pos.z - c.z;
+      const d = Math.hypot(dx, dz);
+      if (d < c.r + r && d > 1e-4) {
+        const nx = dx / d, nz = dz / d;
+        pos.x = c.x + nx * (c.r + r);
+        pos.z = c.z + nz * (c.r + r);
+        hit(nx, nz);
+      }
+    }
+  }
+  // West and south end at a sea wall; the bay to the east and north is open.
+  const lim = BOUND - r, reach = SEA_REACH - r;
+  if (pos.x > reach) { pos.x = reach; hit(-1, 0); }
   if (pos.x < -lim) { pos.x = -lim; hit(1, 0); }
   if (pos.z > lim) { pos.z = lim; hit(0, -1); }
-  if (pos.z < -lim) { pos.z = -lim; hit(0, 1); }
+  if (pos.z < -reach) { pos.z = -reach; hit(0, 1); }
   return impact;
 }
 
@@ -211,11 +235,13 @@ export function buildWorld(scene: THREE.Scene) {
 
   const water = new THREE.Mesh(
     new THREE.PlaneGeometry(4000, 4000),
-    toon({ color: 0x3d6f8e }),
+    toon({ color: 0x2f86b0, transparent: true, opacity: 0.55, depthWrite: false }),
   );
   water.rotation.x = -Math.PI / 2;
-  water.position.y = -2;
+  water.position.y = WATER;
+  water.renderOrder = 2;
   scene.add(water);
+  scene.add(makeSeabed());
 
   const boxes: { x: number; y: number; z: number; sx: number; sy: number; sz: number; c: THREE.Color; ground: number; top: number; tower: boolean }[] = [];
   const addBox = (x0: number, x1: number, z0: number, z1: number, height: number, color: THREE.ColorRepresentation, tower = false) => {
@@ -511,7 +537,7 @@ function makeSeaWall() {
   const edge = BOUND + 0.6;
   for (let s = -edge; s < edge; s += 6) {
     const c = s + 3;
-    for (const [x, z, rot] of [[c, -edge, 0], [c, edge, 0], [-edge, c, 1], [edge, c, 1]] as const) {
+    for (const [x, z, rot] of [[c, edge, 0], [-edge, c, 1]] as const) {
       const h = heightAt(x, z);
       mats.push(new THREE.Matrix4().compose(
         new THREE.Vector3(x, h + 0.2, z),
@@ -602,14 +628,52 @@ function addLandmarks(scene: THREE.Scene) {
   }
 }
 
+function makeSeabed() {
+  const g = new THREE.Group();
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), toon({ color: 0xc9b98f }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = SEA_FLOOR - 0.05;
+  floor.receiveShadow = true;
+  g.add(floor);
+  // Rocks you can hit and kelp you can't, out in the bay.
+  const r = rng(404);
+  const rockGeo = new THREE.IcosahedronGeometry(1, 0);
+  const kelpGeo = new THREE.BoxGeometry(0.4, 1, 0.15).translate(0, 0.5, 0);
+  const rocks = new THREE.InstancedMesh(rockGeo, toon({ color: 0x7f7a70 }), 70);
+  const kelp = new THREE.InstancedMesh(kelpGeo, toon({ color: 0x3f8a4a }), 160);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+  const spot = () => {
+    // Somewhere in the open bay, east or north of the city.
+    const east = r() < 0.5;
+    const along = -HALF - 160 + r() * (2 * HALF + 160);
+    const out = HALF + 36 + r() * 130;
+    return east ? [out, Math.min(along, HALF)] : [Math.min(along, HALF + 150), -out];
+  };
+  for (let k = 0; k < 70; k++) {
+    const [x, z] = spot();
+    const s = 1.2 + r() * 2.2;
+    rocks.setMatrixAt(k, m.compose(new THREE.Vector3(x, SEA_FLOOR + s * 0.3, z), q.setFromEuler(e.set(r() * 3, r() * 3, r() * 3)), new THREE.Vector3(s, s * 0.7, s)));
+    extraCircles.push({ x, z, r: s * 0.9 });
+  }
+  for (let k = 0; k < 160; k++) {
+    const [x, z] = spot();
+    const h = 2 + r() * 6;
+    kelp.setMatrixAt(k, m.compose(new THREE.Vector3(x, SEA_FLOOR, z), q.setFromEuler(e.set((r() - 0.5) * 0.3, r() * 3, (r() - 0.5) * 0.3)), new THREE.Vector3(1, h, 1)));
+  }
+  rocks.castShadow = true;
+  g.add(rocks, kelp);
+  return g;
+}
+
 function addGoldenGate(scene: THREE.Scene) {
   const red = toon({ color: 0xc0392b });
   const zc = -HALF - 110;
   const towers = [-340, -150];
   for (const tx of towers) {
     for (const off of [-5, 5]) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(3, 90, 3), red);
-      leg.position.set(tx, 43, zc + off);
+      extraCircles.push({ x: tx, z: zc + off, r: 2.2 });
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(3, 110, 3), red);
+      leg.position.set(tx, 33, zc + off);
       scene.add(leg);
     }
     for (const yy of [30, 60, 86]) {

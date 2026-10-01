@@ -8,7 +8,9 @@ import { pickPassenger, type PassengerType } from './passengers';
 import { QuipDirector } from './quips';
 import { Traffic } from './traffic';
 import { sfx, setEngine, unlockAudio } from './audio';
-import { BLOCKS_SIDES, buildWorld, curb, heightAt, landmarks, N, type Curb, type Landmark } from './world';
+import { BLOCKS_SIDES, WATER, buildWorld, curb, landmarks, N, type Curb, type Landmark } from './world';
+import { buildFeatures, groundAt } from './features';
+import { Geysers, Particles, Props, type PropKind } from './props';
 
 const STEP = 1 / 120;
 const START_TIME = 75;
@@ -77,6 +79,11 @@ export class Game {
   private camYaw = START.yaw;
   private sun: THREE.DirectionalLight;
   private look: Look;
+  private props: Props;
+  private particles: Particles;
+  private geysers: Geysers;
+  private maxAir = 0;
+  private underwaterView = false;
   private sky = makeSky();
   private arrow: THREE.Group;
   private arrowMat: THREE.MeshLambertMaterial;
@@ -106,6 +113,10 @@ export class Game {
     this.scene.add(this.sun, this.sun.target);
 
     buildWorld(this.scene);
+    buildFeatures(this.scene);
+    this.props = new Props(this.scene);
+    this.particles = new Particles(this.scene);
+    this.geysers = new Geysers(this.scene, this.particles);
     this.scene.add(cab.root);
     this.car = new Car(cab);
     this.traffic = new Traffic(this.scene, 46);
@@ -166,6 +177,9 @@ export class Game {
     this.camYaw = START.yaw;
     this.camera.position.set(START.x, this.car.pos.y + 4, START.z + 9);
     this.traffic.scatter();
+    this.props.reset();
+    this.geysers.reset();
+    this.maxAir = 0;
     for (const w of this.waiting) this.scene.remove(w.person.root, w.marker);
     this.waiting = [];
     if (this.ride?.ejected) this.scene.remove(this.ride.ejected.root);
@@ -201,6 +215,16 @@ export class Game {
     this.traffic.sync(dt);
     if (inp.debug) this.look.togglePanel();
     this.sky.position.copy(this.camera.position);
+    const under = this.camera.position.y < WATER;
+    if (under !== this.underwaterView) {
+      this.underwaterView = under;
+      const fog = this.scene.fog as THREE.Fog;
+      fog.color.set(under ? 0x1d6a86 : SKY.horizon);
+      fog.near = under ? 4 : 170;
+      fog.far = under ? 110 : 560;
+      (this.scene.background as THREE.Color).set(under ? 0x1d6a86 : SKY.horizon);
+      this.sky.visible = !under;
+    }
     const rush = this.state === 'play' ? THREE.MathUtils.clamp((this.car.speed - 28) / 12, 0, 1) : 0;
     this.look.render(this.scene, this.camera, performance.now() / 1000, rush);
   }
@@ -232,7 +256,8 @@ export class Game {
       <div class="press">PRESS A / ENTER</div>
       <div class="controls">
         <b>Gas</b> RT / W &nbsp; <b>Brake / reverse</b> LT / S &nbsp; <b>Steer</b> stick / A D<br>
-        <b>Drift</b> B or RB / Space (hold) &nbsp; <b>Pause</b> Start / Esc<br>
+        <b>Drift</b> B or RB / Space (hold) &nbsp; <b>Hop</b> A / E &nbsp; <b>Pause</b> Start / Esc<br>
+        <b>Crazy Dash</b> tap brake, then gas &nbsp; Smash junk, hit hydrants, jump off the piers.<br>
         Stop in a ring to pick up. Stop in the beam to drop off.<br>
         Jumps, near misses and drifts earn tips but cost your <b>DMV permit</b>.
       </div>
@@ -244,23 +269,54 @@ export class Game {
     this.quips.update(this.clock);
 
     this.acc = Math.min(this.acc + dt, 0.1);
-    let impact = 0, landed = 0;
+    let impact = 0, landed = 0, hop = false, dash = false, splash = false;
+    let first = true;
     while (this.acc >= STEP) {
-      const ev = this.car.step(STEP, inp);
+      // Edge-triggered buttons only count on the first physics step of the frame.
+      const ev = this.car.step(STEP, first ? inp : { ...inp, hop: false });
+      first = false;
       impact = Math.max(impact, ev.impact);
       landed = Math.max(landed, ev.landed);
+      hop ||= ev.hop;
+      dash ||= ev.dash;
+      splash ||= ev.splash;
       this.acc -= STEP;
     }
+    if (hop) sfx.hop();
+    if (dash) {
+      sfx.dash();
+      this.popup('CRAZY DASH!');
+      this.quips.say('cab', 'dash');
+    }
+    if (splash) {
+      sfx.splash();
+      this.particles.emit(this.car.pos.clone().setY(WATER), 50, 0xe6f6ff, 9, 12, 0.45);
+      this.popup('SEABED MODE', 'big');
+      this.quips.say('cab', 'underwater', { force: true });
+    }
+    for (const hit of this.props.update(dt, this.car)) this.onSmash(hit.kind, hit.pos);
+    if (this.geysers.update(dt, this.car)) {
+      this.car.launch(17);
+      sfx.geyser();
+      this.popup('GEYSER LAUNCH!', 'big');
+    }
+    this.particles.update(dt);
     const tev = this.traffic.update(dt, this.car);
     impact = Math.max(impact, tev.impact);
     if (tev.honk) sfx.honk();
 
     if (impact > 5) this.onCrash(impact);
-    if (landed > 0.45) {
+    // A plain hop is about 0.7 s of air, so it takes a real jump to earn a tip.
+    if (landed > 0.85) {
       sfx.land(landed * 4);
+      this.maxAir = Math.max(this.maxAir, landed);
       this.safetyHit(landed * 3);
+      if (landed > 1.8) {
+        this.popup('CRAZY AIR!!', 'big');
+        if (!this.ride) this.quips.say('cab', 'bigAir', { force: true });
+      }
       this.tip('jump', 1 + landed * 4, `AIR ${landed.toFixed(1)}s`);
-    }
+    } else if (landed > 0.3) sfx.land(landed * 2);
     for (let k = 0; k < tev.nearMisses; k++) {
       sfx.whoosh();
       this.safetyHit(2);
@@ -299,6 +355,18 @@ export class Game {
     } else this.quips.say('cab', 'crash');
   }
 
+  private onSmash(kind: PropKind, at: THREE.Vector3) {
+    const colors: Record<PropKind, number> = { hydrant: 0xd23b2e, cone: 0xf26a1b, newsbox: 0x2d6fd2, trash: 0x3b7d4a, table: 0xf4f1e8, fruit: 0xf39c2b, sawhorse: 0xf4f1e8, placard: 0xf4f1e8 };
+    sfx.smash();
+    this.particles.emit(at.clone().setY(at.y + 0.6), 10, colors[kind], 5, 7, 0.22);
+    this.safetyHit(kind === 'cone' ? 0.5 : 1.5);
+    if (kind === 'hydrant') {
+      this.geysers.spawn(at);
+      this.quips.say('cab', 'geyser', { force: true });
+    } else this.quips.say('cab', 'smash');
+    this.tip('smash', kind === 'fruit' ? 3 : 1, kind === 'cone' ? 'CONE' : 'SMASH');
+  }
+
   private safetyHit(n: number) {
     this.safety -= n;
     this.lastIncident = this.clock;
@@ -309,7 +377,7 @@ export class Game {
     if (this.safety <= 0) { this.safety = 0; this.gameOver('PERMIT REVOKED'); }
   }
 
-  private tip(kind: 'jump' | 'nearMiss' | 'drift', base: number, label: string) {
+  private tip(kind: 'jump' | 'nearMiss' | 'drift' | 'smash', base: number, label: string) {
     const r = this.ride;
     if (!r || r.firedT > 0) return;
     const t = r.type;
@@ -462,7 +530,7 @@ export class Game {
     const p = this.makePassenger(r.type);
     const f = this.car.fwd;
     p.root.position.set(this.car.pos.x - f.y * 3.5, 0, this.car.pos.z + f.x * 3.5);
-    p.root.position.y = heightAt(p.root.position.x, p.root.position.z);
+    p.root.position.y = groundAt(p.root.position.x, p.root.position.z);
     p.root.rotation.y = this.car.yaw;
     this.scene.add(p.root);
     r.ejected = p;
@@ -555,6 +623,7 @@ export class Game {
         ? `<div>Founder's startup got acquired! ${this.equity} shares → <b>${money(this.equity)}</b></div>`
         : `<div>Founder's startup folded. ${this.equity} shares → <b>$0</b></div>`;
     }
+    const airLine = this.maxAir > 0.85 ? `<div>Biggest air: <b>${this.maxAir.toFixed(1)} s</b></div>` : '';
     const promiseLine = this.promised ? `<div>Tips promised for next year: <b>${money(this.promised)}</b> (received: $0)</div>` : '';
     const sub = reason === 'PERMIT REVOKED' ? 'The DMV has suspended your driverless permit.' : 'Your shift is over.';
     const ov = $('#overlay');
@@ -564,7 +633,7 @@ export class Game {
       <div class="stats">
         <div>${sub}</div>
         <div>Fares delivered: <b>${this.fares}</b></div>
-        ${equityLine}${promiseLine}
+        ${airLine}${equityLine}${promiseLine}
         <div class="total">${money(this.cash)}</div>
       </div>
       <div class="press">A / ENTER TO DRIVE AGAIN</div>`;
@@ -581,10 +650,10 @@ export class Game {
     const speedT = Math.min(1, car.speed / MAX_SPEED);
     const back = 8.5 + speedT * 2, up = 3.6 + speedT * 0.6;
     const want = new THREE.Vector3(car.pos.x - Math.sin(this.camYaw) * back, car.pos.y + up, car.pos.z - Math.cos(this.camYaw) * back);
-    want.y = Math.max(want.y, heightAt(want.x, want.z) + 1.5);
+    want.y = Math.max(want.y, groundAt(want.x, want.z) + 1.5);
     this.camera.position.lerp(want, 1 - Math.exp(-10 * dt));
     const cam = this.camera.position;
-    cam.y = Math.max(cam.y, heightAt(cam.x, cam.z) + 1.2);
+    cam.y = Math.max(cam.y, groundAt(cam.x, cam.z) + 1.2);
     this.shake *= Math.exp(-6 * dt);
     if (this.shake > 0.01) this.camera.position.add(new THREE.Vector3((this.rand() - 0.5) * this.shake, (this.rand() - 0.5) * this.shake, 0));
     this.camera.lookAt(car.pos.x + Math.sin(this.camYaw) * 4, car.pos.y + 1.6, car.pos.z + Math.cos(this.camYaw) * 4);
@@ -632,7 +701,8 @@ export class Game {
     if (!target) return;
     const p = this.car.pos;
     this.arrow.position.set(p.x, p.y + 3.1 + Math.sin(this.clock * 4) * 0.1, p.z);
-    this.arrow.rotation.set(0, Math.atan2(target.x - p.x, target.z - p.z), 0);
+    // Tilted towards the chase camera so it never reads as an edge-on slab.
+    this.arrow.rotation.set(-0.45, Math.atan2(target.x - p.x, target.z - p.z), 0, 'YXZ');
   }
 
   private updateHud() {
@@ -672,7 +742,7 @@ function groundRing(cx: number, cz: number, r0: number, r1: number, color: numbe
     const a = (k / seg) * Math.PI * 2;
     for (const r of [r0, r1]) {
       const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-      pos.push(x, heightAt(x, z) + 0.15, z);
+      pos.push(x, groundAt(x, z) + 0.15, z);
     }
     if (k < seg) {
       const i = k * 2;
