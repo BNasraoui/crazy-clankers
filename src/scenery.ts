@@ -9,11 +9,31 @@ export const kit: Partial<Record<string, THREE.Object3D>> = {};
 const KIT = ['tree_plane', 'tree_cypress', 'tree_palm', 'street_lamp', 'trolley_pole', 'utility_pole',
   'muni_shelter', 'bench', 'planter', 'fire_hydrant', 'cable_car', 'cable_car_track'];
 
+// Retries a load a few times: the browser refuses requests when too many are in flight.
+export async function retry<T>(load: () => Promise<T>, tries = 4): Promise<T> {
+  for (let k = 1; ; k++) {
+    try {
+      return await load();
+    } catch (err) {
+      if (k >= tries) throw err;
+      await new Promise((ok) => setTimeout(ok, 300 * k));
+    }
+  }
+}
+
+// Runs the jobs at most `limit` at a time.
+export async function pool<T>(items: T[], limit: number, job: (item: T) => Promise<void>) {
+  const queue = [...items];
+  await Promise.all(Array.from({ length: Math.min(limit, queue.length) }, async () => {
+    for (let item = queue.shift(); item !== undefined; item = queue.shift()) await job(item);
+  }));
+}
+
 export async function loadStreetKit() {
   const loader = new GLTFLoader();
-  await Promise.all(KIT.map(async (id) => {
+  await pool(KIT, 4, async (id) => {
     try {
-      const gltf = await loader.loadAsync(`/models/street/${id}.glb`);
+      const gltf = await retry(() => loader.loadAsync(`/models/street/${id}.glb`));
       gltf.scene.traverse((o) => {
         const mesh = o as THREE.Mesh;
         if (!mesh.isMesh) return;
@@ -25,7 +45,7 @@ export async function loadStreetKit() {
     } catch (err) {
       console.warn(`No street kit ${id}:`, err);
     }
-  }));
+  });
 }
 
 export interface Part { geometry: THREE.BufferGeometry; material: THREE.Material; local: THREE.Matrix4 }

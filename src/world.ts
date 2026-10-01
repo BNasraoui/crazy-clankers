@@ -3,6 +3,7 @@ import { makeLabel } from './models';
 import { glslColor, toon } from './look';
 import { districtOf, type District } from './districts';
 import { instance, kit, sag, wirePoints } from './scenery';
+import { FacadeBuilder, facadeSets, houseSet } from './facades';
 
 // The city is a 10x10 grid of blocks. Street centerlines sit every CELL units.
 // SF-style hills: intersections are flat and the streets between them are
@@ -299,8 +300,7 @@ export function buildWorld(scene: THREE.Scene) {
   const trees: TreeSpot[] = [];
   const streetTrees: TreeSpot[] = [];
   const gables: { m: THREE.Matrix4; c: THREE.Color }[] = [];
-  const facadeCards: FacadeCard[] = [];
-  const facadeFronts = { n: 0 };
+  const facades = new FacadeBuilder();
 
   for (const b of blocks) {
     const { x0, x1, z0, z1 } = b;
@@ -324,20 +324,35 @@ export function buildWorld(scene: THREE.Scene) {
       continue;
     }
     if (b.kind === 'downtown') {
+      const tiles = (facadeSets.fidi ?? []).filter((f) => f.kind === 'tile');
+      const bases = (facadeSets.fidi ?? []).filter((f) => f.kind === 'towerbase');
+      const tower = (a0: number, a1: number, c0: number, c1: number, height: number) => {
+        const tile = tiles.length ? tiles[Math.floor(r() * tiles.length)] : null;
+        const top = addBox(a0, a1, c0, c1, height, tile ? tile.wall : GLASS[Math.floor(r() * GLASS.length)], true, tile ? 2 : undefined);
+        if (!tile) return;
+        const base = bases.length ? bases[Math.floor(r() * bases.length)] : null;
+        // Paint all four sides: the tile repeats every 4 floors (14.4 m), with a lobby at street level.
+        for (const [cx, cz, fnx, fnz, w] of [[(a0 + a1) / 2, c0, 0, -1, a1 - a0], [(a0 + a1) / 2, c1, 0, 1, a1 - a0], [a0, (c0 + c1) / 2, -1, 0, c1 - c0], [a1, (c0 + c1) / 2, 1, 0, c1 - c0]] as const) {
+          const g = heightAt(cx, cz) - 1;
+          const y0 = base ? g + 8.5 : g;
+          facades.add({ image: tile.id, cx, cz, nx: fnx, nz: fnz, width: w + 0.02, y0, y1: top, repeatU: Math.max(1, Math.round(w / 14.4)), repeatV: (top - y0) / 14.4 });
+          if (base) facades.add({ image: base.id, cx, cz, nx: fnx, nz: fnz, width: w + 0.02, y0: g - 1.5, y1: y0 + 0.05, lift: 0.05 });
+        }
+      };
       const split = r() < 0.5;
       if (split) {
         const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
         for (const [a0, a1, c0, c1] of [[x0, mx - 1, z0, mz - 1], [mx + 1, x1, z0, mz - 1], [x0, mx - 1, mz + 1, z1], [mx + 1, x1, mz + 1, z1]])
-          addBox(a0, a1, c0, c1, 24 + r() * 50, GLASS[Math.floor(r() * GLASS.length)], true);
+          tower(a0, a1, c0, c1, 24 + r() * 50);
       } else {
-        addBox(x0, x1, z0, z1, 40 + r() * 70, GLASS[Math.floor(r() * GLASS.length)], true);
+        tower(x0, x1, z0, z1, 40 + r() * 70);
       }
       continue;
     }
     if (b.kind === 'landmark') continue;
     const dist = districtOf(b.bi, b.bj);
     const ladies = b.kind === 'ladies';
-    buildFrontages(b, ladies ? PAINTED_LADIES : dist, ladies ? LADIES : dist.colors, r, addBox, addPart, gables, walls, facadeCards, facadeFronts);
+    buildFrontages(b, ladies ? PAINTED_LADIES : dist, ladies ? LADIES : dist.colors, r, addBox, addPart, gables, walls, facades, ladies ? 'haight' : dist.id);
     addStreetTrees(b, r, streetTrees);
   }
 
@@ -357,7 +372,7 @@ export function buildWorld(scene: THREE.Scene) {
   inst.receiveShadow = true;
   scene.add(inst);
   scene.add(makeGables(gables));
-  scene.add(makeFacadeCards(facadeCards));
+  scene.add(facades.build());
 
   scene.add(makeTrees(trees));
   scene.add(makeTrees(streetTrees));
@@ -479,14 +494,6 @@ const PAINTED_LADIES: District = { ...districtOf(4, 5), bays: 1, gables: 1, gara
 const AWNINGS = [0xd23b2e, 0x2f6b4f, 0x2d4a7a, 0xe8a33d, 0x7a3f8a];
 const TRIM = 0xf6f1e6;
 
-// Painted facade prototype: these blocks get drawn facades on their street faces
-// (the robotaxi rank street, x = -64 between z = -64 and 0).
-const FACADE_BLOCKS = new Set(['3,4', '4,4']);
-export interface FacadeCard { cx: number; cz: number; nx: number; nz: number; width: number; lo: number; hi: number; top: number; pick: number }
-// Per drawing: the wall colour (for the plain sides of painted houses) and the base colour (foundation band on slopes).
-const FACADE_WALL = [0x9ebb9d, 0xf1d493, 0x708b9d, 0xc56644, 0xb6a9c9, 0xd39e7d]; // each drawing's body paint
-const FACADE_BASE = [0xb5b59c, 0xaab0a3, 0x909ca2, 0xb97f61, 0x968ba5, 0x98907a];
-
 type AddBox = (x0: number, x1: number, z0: number, z1: number, height: number, color: THREE.ColorRepresentation, tower?: boolean, style?: number) => number;
 type AddPart = (x0: number, x1: number, z0: number, z1: number, y0: number, y1: number, color: THREE.ColorRepresentation, style: number, ground?: number) => void;
 
@@ -497,11 +504,14 @@ function buildFrontages(
   addBox: AddBox, addPart: AddPart,
   gables: { m: THREE.Matrix4; c: THREE.Color }[],
   walls: { x: number; z: number; nx: number; nz: number }[],
-  cards: FacadeCard[] = [],
-  frontCount = { n: 0 },
+  facades?: FacadeBuilder,
+  districtId = '',
 ) {
   const { x0, x1, z0, z1 } = b;
-  const painted = FACADE_BLOCKS.has(`${b.bi},${b.bj}`);
+  // Every house whose district has drawings gets a painted front.
+  const set = facades ? houseSet(districtId) : [];
+  const painted = set.length >= 3; // fewer and the street repeats itself
+  let lastPick = -1;
   const DEPTH = 12;
   // side: [length start, length end, which face, outward normal]
   const rows: { a0: number; a1: number; face: 'N' | 'S' | 'W' | 'E'; corners: boolean }[] = [
@@ -539,12 +549,21 @@ function buildFrontages(
       const floors = Math.round(d.floors[0] + r() * (d.floors[1] - d.floors[0])) + (corner ? d.cornerFloors : 0);
       const color = colors[Math.floor(r() * colors.length)];
       const width = la1 - la0;
-      if (painted) {
-        // Painted lot: a full-width plain box, with the drawing carrying the bays, doors and cornice.
-        const pick = (frontCount.n++) % FACADE_WALL.length;
-        const top = addBox(...box(la0, la1, 0, DEPTH), floors * 3.3 + 0.5, FACADE_WALL[pick], false, 2);
-        const ends = [groundAtLot(la0), groundAtLot(la1)];
-        cards.push({ cx: (fx0 + fx1) / 2, cz: (fz0 + fz1) / 2, nx, nz, width: width + 0.02, lo: Math.min(...ends), hi: Math.max(...ends), top, pick });
+      if (painted && facades) {
+        // Painted lot: a full-width box in the drawing's body colour; the drawing carries
+        // the bays, doors and cornice. Neighbours never repeat a drawing.
+        let pick = Math.floor(r() * set.length);
+        if (pick === lastPick) pick = (pick + 1) % set.length;
+        lastPick = pick;
+        const img = set[pick];
+        const top = addBox(...box(la0, la1, 0, DEPTH), floors * 3.3 + 0.5, img.wall, false, 2);
+        const paint = (cx: number, cz: number, fnx: number, fnz: number, w: number, g0: number, g1: number) => {
+          const lo = Math.min(g0, g1), hi = Math.max(g0, g1);
+          // Start the drawing at the uphill end so nothing is buried; a foundation band fills below.
+          facades.add({ image: img.id, cx, cz, nx: fnx, nz: fnz, width: w, y0: hi, y1: top });
+          facades.addColour(img.base, { cx, cz, nx: fnx, nz: fnz, width: w, y0: lo - 0.6, y1: hi });
+        };
+        paint((fx0 + fx1) / 2, (fz0 + fz1) / 2, nx, nz, width + 0.02, groundAtLot(la0), groundAtLot(la1));
         if (corner) {
           // A corner lot also shows its side wall to the cross street: paint it as two narrow fronts.
           const end = i === 0 ? la0 : la1;
@@ -553,10 +572,7 @@ function buildFrontages(
           for (const [k0, k1] of [[0, 0.5], [0.5, 1]]) {
             const [ax0, , az0] = box(end, end, k0 * DEPTH, k0 * DEPTH);
             const [bx0, , bz0] = box(end, end, k1 * DEPTH, k1 * DEPTH);
-            const g0 = heightAt(ax0, az0), g1 = heightAt(bx0, bz0);
-            // Same drawing as the front, so the whole house is one colour.
-            cards.push({ cx: (ax0 + bx0) / 2, cz: (az0 + bz0) / 2, nx: sx, nz: sz, width: DEPTH / 2 + 0.02,
-              lo: Math.min(g0, g1), hi: Math.max(g0, g1), top, pick });
+            paint((ax0 + bx0) / 2, (az0 + bz0) / 2, sx, sz, DEPTH / 2 + 0.02, heightAt(ax0, az0), heightAt(bx0, bz0));
           }
         }
         return;
@@ -627,36 +643,6 @@ function addStreetTrees(b: Block, r: () => number, out: TreeSpot[]) {
       ) });
     }
   }
-}
-
-const FACADES = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6'];
-function makeFacadeCards(cards: FacadeCard[]) {
-  const g = new THREE.Group();
-  const loader = new THREE.TextureLoader();
-  const mats = FACADES.map((id) => {
-    const tex = loader.load(`/facades/${id}.jpg`);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 8;
-    return toon({ map: tex });
-  });
-  const baseMats = FACADE_BASE.map((c) => toon({ color: c }));
-  for (const c of cards) {
-    // The drawing starts at the uphill end of the lot, so its ground floor is never buried;
-    // a plain foundation band fills down to the street on the downhill side (very SF).
-    const yaw = Math.atan2(c.nx, c.nz);
-    const h = c.top - c.hi;
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(c.width, h), mats[c.pick]);
-    mesh.position.set(c.cx + c.nx * 0.03, c.hi + h / 2, c.cz + c.nz * 0.03);
-    mesh.rotation.y = yaw;
-    mesh.receiveShadow = true;
-    g.add(mesh);
-    const fb = c.hi - (c.lo - 0.6);
-    const base = new THREE.Mesh(new THREE.PlaneGeometry(c.width, fb), baseMats[c.pick]);
-    base.position.set(c.cx + c.nx * 0.03, c.lo - 0.6 + fb / 2, c.cz + c.nz * 0.03);
-    base.rotation.y = yaw;
-    g.add(base);
-  }
-  return g;
 }
 
 function makeGables(list: { m: THREE.Matrix4; c: THREE.Color }[]) {
