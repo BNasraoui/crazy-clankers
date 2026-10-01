@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Radio } from './radio';
 import { Car, MAX_SPEED, handlingOf } from './car';
 import { readInput, padName, padDebug, type Input } from './input';
 import { CABS, EXTRA_CARS, makeCar, makePerson, makeLabel, personFrom, type PersonModel } from './models';
@@ -61,6 +62,7 @@ const blocks = (a: THREE.Vector3, b: THREE.Vector3) => Math.abs(a.x - b.x) + Mat
 const money = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 
 export class Game {
+  private radio = new Radio();
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(70, 1, 0.5, 1400);
   car: Car;
@@ -228,6 +230,7 @@ export class Game {
 
   frame(dt: number) {
     const inp = readInput(dt);
+    if (this.radio.frame(inp, this.state)) { setEngine(0, 0, false); return; }
     if (this.state === 'title' || this.state === 'picker') {
       this.menuFrame(dt, inp);
       this.traffic.update(dt, this.car);
@@ -326,7 +329,7 @@ export class Game {
     if (s === 'play') ov.innerHTML = '';
     if (s === 'paused') {
       ov.className = 'dim';
-      ov.innerHTML = `<h2>PAUSED</h2><div class="press">A / ENTER TO RESUME</div><div class="pad">Y / R to restart</div>`;
+      ov.innerHTML = `<h2>PAUSED</h2><div class="press">A / ENTER TO RESUME</div><div class="pad">Y / R to restart</div><button class="radio-menu-button" data-radio-open>Radio · M / X</button>`;
     }
   }
 

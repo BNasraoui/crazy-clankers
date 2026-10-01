@@ -353,3 +353,47 @@ body { font-family: var(--body); color: var(--paper); user-select: none; }
   #moment .sfx .en { font-size: 30px; }
 }
 @media (prefers-reduced-motion: reduce) { #moment.on, #moment.on .focus, #moment.on .sfx { animation-duration: 0.01s; } }
+
+/* Clankers FM: dashboard hardware, paper station cards, unobscured video. */
+#radio-dashboard, #radio-screen, #radio-collapsed, #radio-toast, .radio-menu-button {
+  color: var(--ink); background: var(--paper); border: 3px solid var(--ink);
+  border-radius: 8px; box-shadow: 5px 5px 0 var(--ink);
+}
+#radio-dashboard[hidden], #radio-screen[hidden], #radio-collapsed[hidden], #radio-toast[hidden], .radio-player[hidden] { display: none; }
+#radio-dashboard { position: fixed; left: 18px; bottom: 150px; z-index: 20; width: 310px; padding: 8px; background: var(--teal) var(--halftone); }
+#radio-dashboard > b { display: block; font: 16px/1.3 var(--pen); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.radio-track { font: 600 11px/1.5 var(--body); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-bottom: 5px; }
+.radio-player { width: 288px; height: 216px; background: var(--ink); }
+.radio-player iframe { display: block; width: 288px; height: 216px; border: 0; }
+.radio-controls { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+#radio-dashboard button, #radio-screen button, .radio-menu-button, #radio-collapsed {
+  cursor: pointer; font: 14px var(--pen); border: 2px solid var(--ink); border-radius: 5px; padding: 5px 8px; background: var(--paper); color: var(--ink);
+}
+#radio-dashboard button:hover, #radio-screen button:hover { background: var(--yellow); }
+#radio-dashboard label { display: flex; align-items: center; gap: 10px; font: 13px var(--pen); }
+#radio-dashboard input { min-width: 0; flex: 1; accent-color: var(--ink); }
+#radio-collapsed { position: fixed; left: 18px; bottom: 150px; z-index: 20; background: var(--teal); }
+#radio-toast { position: fixed; top: 185px; right: 18px; z-index: 21; max-width: min(520px, calc(100vw - 370px)); padding: 9px 16px; font: 16px var(--pen); background: var(--yellow); }
+.radio-menu-button { pointer-events: auto; position: relative; margin-top: 18px; background: var(--teal); }
+.title-screen .radio-menu-button { position: absolute; right: 3%; bottom: 13%; }
+#radio-screen { position: fixed; z-index: 15; inset: 24px 24px 24px 350px; padding: 20px 24px; overflow-y: auto; background: var(--paper) var(--halftone); }
+#radio-screen header { border-bottom: 4px solid var(--ink); margin-bottom: 10px; }
+#radio-screen header span { font: 13px var(--pen); }
+#radio-screen h2 { margin: 0; font: 42px/1.3 var(--num); color: var(--ink); text-shadow: 3px 3px 0 var(--teal); }
+#radio-screen p { font: 600 13px/1.5 var(--body); }
+.radio-station { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 10px; margin: 10px 0; background: #fff; border: 2px solid var(--ink); border-radius: 6px; }
+.radio-station > button:first-child { grid-column: 1 / -1; text-align: left; background: var(--yellow) !important; }
+#radio-screen input { width: 100%; min-width: 0; padding: 7px; border: 2px solid var(--ink); border-radius: 4px; font: 14px var(--body); color: var(--ink); background: #fff; user-select: text; }
+.radio-station input { grid-column: span 2; }
+#radio-screen form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-top: 3px solid var(--ink); padding-top: 12px; margin-top: 16px; }
+#radio-screen label { font: 14px var(--pen); }
+#radio-screen form button { grid-column: 1 / -1; background: var(--teal); }
+.radio-local { display: flex; gap: 8px; margin-top: 18px; }
+#radio-screen button:disabled { opacity: 0.4; cursor: default; }
+#radio-screen :focus-visible, #radio-dashboard :focus-visible, .radio-menu-button:focus-visible, #radio-collapsed:focus-visible { outline: 4px solid var(--magenta); outline-offset: 2px; }
+@media (max-width: 659px), (max-height: 599px) {
+  #radio-screen { inset: 12px; }
+  #radio-dashboard { bottom: 12px; }
+}
+#radio-screen .radio-controls > label { display: flex; align-items: center; gap: 8px; flex-basis: 100%; }
+#radio-screen .radio-controls input { width: 180px; }

@@ -1,4 +1,7 @@
 // Everything is synthesized; no audio files.
+let voiceUntil = 0;
+export const voiceActive = () => performance.now() < voiceUntil;
+
 let ctx: AudioContext | null = null;
 let master: GainNode;
 let engineGain: GainNode;
@@ -76,6 +79,7 @@ function noise(dur: number, vol: number, cutoff: number) {
 // Animal Crossing-style babble: one blip per couple of letters.
 export function babble(text: string, pitch: number) {
   const n = Math.min(14, Math.ceil(text.length / 3));
+  voiceUntil = performance.now() + n * 70 + 100;
   for (let i = 0; i < n; i++) tone(pitch * (0.85 + Math.random() * 0.4), 0.05, 'square', 0.05, i * 0.07);
 }
 

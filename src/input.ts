@@ -1,4 +1,8 @@
 export interface Input {
+  radioNext: boolean;
+  radioSkip: boolean;
+  radioMenu: boolean;
+  padConfirm: boolean;
   throttle: number;
   brake: number;
   steer: number; // -1 left .. 1 right
@@ -20,6 +24,9 @@ const fresh = new Set<string>();
 const GAME_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'];
 
 addEventListener('keydown', (e) => {
+  const target = e.target instanceof HTMLElement ? e.target : null;
+  if (e.code !== 'Escape' && (target?.closest('input, textarea, #radio-screen') ||
+    (target?.closest('button') && ['Enter', 'Space'].includes(e.code)))) return;
   if (!held.has(e.code)) fresh.add(e.code);
   held.add(e.code);
   if (GAME_KEYS.includes(e.code)) e.preventDefault();
@@ -70,6 +77,10 @@ export function readInput(dt: number): Input {
   keySteer += Math.max(-rate * dt, Math.min(rate * dt, target - keySteer));
 
   const input: Input = {
+    radioNext: tapped('KeyT'),
+    radioSkip: tapped('KeyN'),
+    radioMenu: tapped('KeyM'),
+    padConfirm: false,
     throttle: down('KeyW', 'ArrowUp') ? 1 : 0,
     brake: down('KeyS', 'ArrowDown') ? 1 : 0,
     steer: keySteer,
@@ -101,6 +112,9 @@ export function readInput(dt: number): Input {
     input.brake = Math.max(input.brake, st.brake);
     input.handbrake ||= !!(st.buttons[1] || st.buttons[5]);
     input.confirm ||= edge(0);
+    input.padConfirm ||= edge(0);
+    input.radioNext ||= edge(4);
+    input.radioSkip ||= edge(2);
     input.pause ||= edge(9);
     input.restart ||= edge(3);
     input.debug ||= edge(8);

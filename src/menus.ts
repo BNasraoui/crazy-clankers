@@ -27,6 +27,7 @@ export function titleHTML(padName: string) {
       <img class="keyart" src="/keyart/${art}.jpg" alt="">
       <div class="logo-block">${LOGO}<div class="tag">You are AGI. Drive like it.</div></div>
       <div class="press-start">PRESS <i class="glyph a">A</i> TO START</div>
+      <button class="radio-menu-button" data-radio-open>Radio · M / X</button>
       <div class="corner-prompts">${btn('Y', 'HOW TO PLAY')}${btn('B', 'OPTIONS')}</div>
       <div class="pad-note">${padName ? `🎮 ${padName}` : 'Press any button on a controller to use it.'}</div>
     </div>`;
@@ -38,6 +39,7 @@ export function howToHTML() {
       <b>HOW TO PLAY</b>
       <div><b>Gas</b> RT / W · <b>Brake / reverse</b> LT / S · <b>Steer</b> stick / A D</div>
       <div><b>Drift</b> B or RB / Space (hold) · <b>Hop</b> A / E · <b>Pause</b> Start / Esc</div>
+      <div><b>Radio</b> T / LB: next station · N / X: skip track · M / X in menus: stations</div>
       <div><b>Launch Mode</b> hold handbrake + gas (stopped or drifting), release the handbrake</div>
       <div>Stop in a ring to pick up. Stop in the beam to drop off.</div>
       <div>Jumps, near misses, drifts and smashing junk earn tips but cost <b>rating</b>. Below 4.00 you're deactivated.</div>

@@ -1,0 +1,13 @@
+# Dashboard radio
+
+Open **Radio** on the title or pause menu with **M / X** or the on-screen button. Paste a YouTube playlist/video URL or ID, optionally name it, then select **Add station**. Each card supports tuning, renaming, removing and moving up/down. Stations and radio volume persist when localStorage is available. `DEFAULT_STATIONS` in `src/radio.ts` contains two clearly marked official NCS video placeholders; replace these with the desired playlists. Both returned official-channel embed HTML from YouTube oEmbed during implementation.
+
+While driving, **T / LB** changes station and **N / X** skips the track. These were unused by the existing driving controls. Inside Radio, D-pad/stick moves focus, A activates, B/Esc returns; left/right adjusts a focused volume slider. Playback, previous/next station, skip, volume and Off are also available in the Radio screen. Keyboard users can Tab through its native controls. Browser file choosers may require a click/tap rather than a gamepad event.
+
+**Play my own files** accepts multiple audio files; **Choose folder** uses `webkitdirectory`. Files play through a plain audio element and blob URLs, with no upload or persistence of their contents. Choose them again after reload. Files and YouTube playlists are shuffled. A single-video station advances to the next station when it ends or is skipped.
+
+The official YouTube iframe loads lazily after the first menu interaction. The 288×216 player sits inside a dashboard frame above the lower-left corner, clear of the 1280×800 HUD; no game UI covers the iframe. Controls and branding remain intact. Off destroys the iframe before collapsing the dashboard. Hiding the tab or shrinking the window below 660×600 also switches YouTube off. The station screen reserves space for the dashboard. There is no audio extraction, music proxy, hosted music or YouTube Data API key.
+
+Browsers may still require pressing Play in the visible player, especially after controller input; autoplay blocking produces a prompt. Recognized unplayable-video errors skip tracks; station exhaustion advances with a note, and exhausting stations switches off. API/network failure leaves the game usable and suggests local files/reload. Radio volume ducks to 60% during the game's synthesized voice blips. There is no existing user-facing master/music volume setting to inherit.
+
+Player sizing and playback use the [YouTube IFrame API](https://developers.google.com/youtube/iframe_api_reference) and retain its [required player functionality](https://developers.google.com/youtube/terms/required-minimum-functionality). See [browser checks](../tests/README.md) for validation and remaining device checks.

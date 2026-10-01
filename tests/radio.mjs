@@ -1,0 +1,43 @@
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
+
+const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
+try {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  await page.route('https://www.youtube.com/**', route => route.abort());
+  await page.goto('http://localhost:5173');
+  await page.waitForFunction(() => window.game);
+  assert.equal(await page.getByRole('button', { name: 'Radio · M / X', exact: true }).count(), 1, 'title menu offers Radio');
+  await page.getByRole('button', { name: 'Radio · M / X', exact: true }).click();
+  assert.equal(await page.locator('#radio-screen').isVisible(), true);
+  await page.getByLabel('YouTube URL or ID').fill('https://www.youtube.com/watch?v=K4DyBUG242c');
+  await page.getByLabel('Station name (optional)').fill('Test station');
+  await page.getByRole('button', { name: 'Add station', exact: true }).click();
+  assert.equal(await page.getByRole('button', { name: 'Tune Test station', exact: true }).count(), 1);
+  const row = page.locator('.radio-station').filter({ has: page.getByRole('button', { name: 'Tune Test station', exact: true }) });
+  await row.getByLabel('Station name').fill('Renamed');
+  await row.getByRole('button', { name: 'Save name' }).click();
+  await page.getByRole('button', { name: 'Tune Renamed', exact: true }).locator('..').getByRole('button', { name: 'Move up' }).click();
+  assert.equal(await page.locator('.radio-station').nth(1).getByLabel('Station name').inputValue(), 'Renamed');
+  await page.reload();
+  await page.waitForFunction(() => window.game);
+  await page.keyboard.press('m');
+  await page.locator('#radio-screen').waitFor({ state: 'visible' });
+  assert.equal(await page.getByRole('button', { name: 'Tune Renamed', exact: true }).count(), 1);
+  await page.getByRole('button', { name: 'Tune Renamed', exact: true }).locator('..').getByRole('button', { name: 'Remove' }).click();
+  assert.equal(await page.getByRole('button', { name: 'Tune Renamed', exact: true }).count(), 0);
+  assert.equal(await page.getByRole('button', { name: 'Play my own files', exact: true }).count(), 1);
+  await page.screenshot({ path: '/tmp/clankers-radio/stations.png' });
+  await page.getByRole('button', { name: 'Back to game' }).click();
+  await page.locator('#overlay').click({ position: { x: 600, y: 300 } });
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => window.game.state === 'picker');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => window.game.state === 'play');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => window.game.state === 'paused');
+  await page.getByRole('button', { name: 'Radio · M / X', exact: true }).click();
+  assert.equal(await page.locator('#radio-screen').isVisible(), true);
+  assert.equal(await page.evaluate(() => window.game.state), 'paused');
+  console.log('Radio UI: title/pause, add, rename, reorder, persist, remove and local picker passed');
+} finally { await browser.close(); }
