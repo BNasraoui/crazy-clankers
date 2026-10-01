@@ -123,16 +123,27 @@ def load(character):
     return data
 
 
+def sheet_path(character, kind):
+    """A kind may name its sheet ("image", repo relative); else the passenger turnaround."""
+    image = load(character)[kind].get("image")
+    if image:
+        return ROOT / image
+    return ROOT / "docs/art/turnarounds" / f"{character}-{kind}.png"
+
+
 def reference(character, kind, view):
     cfg = load(character)
     v = cfg[kind]["views"][view]
-    path = ROOT / "docs/art/turnarounds" / f"{character}-{kind}.png"
-    im = Image.open(path).convert("RGB").crop(v["crop"])
+    im = Image.open(sheet_path(character, kind)).convert("RGB").crop(v["crop"])
     return im, silhouette(im)
 
 
 def ortho_camera(character, kind, view):
-    """Exact pixel camera, with zero elevation; no auto fit to model bounds."""
+    """Exact pixel camera, with zero elevation; no auto fit to model bounds.
+
+    A view may give its image "up" direction and "up_axis" (the pixel row of the
+    world origin along it), for plan views; otherwise image up is world +Y.
+    """
     import anime as A
     import bpy
     from mathutils import Vector
@@ -142,18 +153,29 @@ def ortho_camera(character, kind, view):
     v = k["views"][view]
     x0, y0, x1, y1 = v["crop"]
     s = k["metres_per_pixel"]
-    height = k["world_y_at_zero"] - (y0 + y1) * 0.5 * s
     horizontal = ((x0 + x1) * 0.5 - v["axis"]) * s * v["sign"]
     direction = Vector(v["direction"])
     right = Vector(v["right"])
-    target = A.gv(right * horizontal + Vector((0, height, 0)))
+    if "up" in v:
+        up = Vector(v["up"])
+        height = (v["up_axis"] - (y0 + y1) * 0.5) * s
+    else:
+        up = Vector((0, 1, 0))
+        height = k["world_y_at_zero"] - (y0 + y1) * 0.5 * s
+    target = A.gv(right * horizontal + up * height)
     camera = bpy.data.cameras.new(f"fit-{kind}-{view}")
     camera.type = "ORTHO"
     camera.ortho_scale = max(x1 - x0, y1 - y0) * s
     obj = bpy.data.objects.new(camera.name, camera)
     bpy.context.scene.collection.objects.link(obj)
     obj.location = target + A.gv(direction) * 5
-    obj.rotation_euler = (target - obj.location).to_track_quat("-Z", "Y").to_euler()
+    if "up" in v:
+        from mathutils import Matrix
+
+        basis = Matrix((A.gv(right), A.gv(up), A.gv(direction))).transposed()
+        obj.rotation_euler = basis.to_euler()
+    else:
+        obj.rotation_euler = (target - obj.location).to_track_quat("-Z", "Y").to_euler()
     scene = bpy.context.scene
     scene.camera = obj
     scene.render.resolution_x = x1 - x0

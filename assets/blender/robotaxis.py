@@ -1142,4 +1142,5 @@ def main():
         finish(car, root, parts)
 
 
-main()
+if __name__ == "__main__":
+    main()
