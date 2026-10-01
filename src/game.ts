@@ -28,7 +28,7 @@ import { burst, howToHTML, pickerHTML, titleHTML } from './menus';
 const STEP = 1 / 120;
 const START_TIME = 75;
 const START = BAY; // every shift starts by pulling out of the robotaxi rank
-const WAITING_COUNT = 16;
+const WAITING_COUNT = 26;
 
 interface Waiting {
   type: PassengerType;
@@ -601,7 +601,7 @@ export class Game {
       const side = BLOCKS_SIDES[Math.floor(this.rand() * 4)];
       const c = curb(bi, bj, side, this.rand());
       if (flat(c.road, this.car.pos) < 40) continue;
-      if (this.waiting.some((w) => flat(w.curb.road, c.road) < 28)) continue;
+      if (this.waiting.some((w) => flat(w.curb.road, c.road) < 22)) continue;
       if (landmarks.some((l) => flat(l.curb.road, c.road) < 12)) continue;
       const type = pickPassenger(this.rand);
       const far = landmarks.filter((l) => blocks(l.curb.road, c.road) > 160);
@@ -664,6 +664,8 @@ export class Game {
 
   private updateWaiting(dt: number) {
     this.idleAnimations(dt);
+    // With a passenger aboard, the others' rings and beams are just noise: hide them (they still wait).
+    for (const w of this.waiting) w.marker.visible = !this.ride;
     if (this.ride || this.car.speed > 4) return;
     const w = this.waiting.find((w) => flat(w.curb.road, this.car.pos) < 7);
     if (w) this.pickup(w);
