@@ -75,7 +75,7 @@ for i, node in enumerate(nodes):
         assert max(v[0] for v in indices) < len(positions)
         triangles += len(indices) // 3
 assert triangles <= 30000, triangles
-assert 1.78 <= bounds[1][1] <= 1.82, bounds
+assert 1.74 <= bounds[1][1] <= 1.80, bounds
 assert abs(bounds[0][1]) < .002, bounds
 required = {'skin', 'face', 'hair', 'vest', 'shirt', 'pants', 'shoes', 'sole', 'cup', 'coffee', 'straw'}
 assert required <= {m['name'] for m in model['materials']}

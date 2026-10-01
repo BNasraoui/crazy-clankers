@@ -1,0 +1,1 @@
+PASS: all seven pivots identical; legs, torso, arms and cup geometry/indices/normals/UVs byte-identical by accessor.

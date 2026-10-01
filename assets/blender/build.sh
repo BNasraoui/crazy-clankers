@@ -9,4 +9,6 @@ fi
 for model in cab techbro; do
   "$BLENDER" --background --factory-startup --python-exit-code 1 --python "$model.py"
 done
+"$BLENDER" --background --factory-startup --python-exit-code 1 --python test_head_shape.py
+python3 head_compare.py
 python3 validate_techbro.py
