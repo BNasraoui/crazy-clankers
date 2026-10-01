@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { toon } from './look';
 
 // The SF street kit (assets/blender/street_kit.py): trees, lamps, poles, shelters
-// and the cable car, loaded once and drawn as instanced meshes.
+// and the cable car, loaded once and drawn as instanced meshes; and the landmarks.
 
 export const kit: Partial<Record<string, THREE.Object3D>> = {};
 const KIT = ['tree_plane', 'tree_cypress', 'tree_palm', 'street_lamp', 'trolley_pole', 'utility_pole',
@@ -29,21 +29,28 @@ export async function pool<T>(items: T[], limit: number, job: (item: T) => Promi
   }));
 }
 
+// The landmarks (assets/blender/landmarks.py), one of each, placed by world.ts.
+export const landmarkModels: Partial<Record<string, THREE.Object3D>> = {};
+const LANDMARKS = ['salesfarce_tower', 'pyramid', 'ferry_building', 'coit_tower', 'golden_gate'];
+
+// Loads the street kit and the landmarks; a model that fails to load is just missing.
 export async function loadStreetKit() {
   const loader = new GLTFLoader();
-  await pool(KIT, 4, async (id) => {
+  const jobs = [...KIT.map((id) => ({ id, dir: 'street', into: kit })), ...LANDMARKS.map((id) => ({ id, dir: 'landmarks', into: landmarkModels }))];
+  await pool(jobs, 4, async ({ id, dir, into }) => {
     try {
-      const gltf = await retry(() => loader.loadAsync(`/models/street/${id}.glb`));
+      const gltf = await retry(() => loader.loadAsync(`/models/${dir}/${id}.glb`));
       gltf.scene.traverse((o) => {
         const mesh = o as THREE.Mesh;
         if (!mesh.isMesh) return;
         const src = mesh.material as THREE.MeshStandardMaterial;
         mesh.material = src.name.startsWith('light_') ? new THREE.MeshBasicMaterial({ color: src.color }) : toon({ color: src.color });
+        mesh.castShadow = mesh.receiveShadow = !src.name.startsWith('light_');
       });
       gltf.scene.updateMatrixWorld(true);
-      kit[id] = gltf.scene;
+      into[id] = gltf.scene;
     } catch (err) {
-      console.warn(`No street kit ${id}:`, err);
+      console.warn(`No ${dir} model ${id}:`, err);
     }
   });
 }

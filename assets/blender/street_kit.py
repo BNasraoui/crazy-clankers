@@ -1187,4 +1187,5 @@ def main():
         build_prop(arg)
 
 
-main()
+if __name__ == "__main__":
+    main()
