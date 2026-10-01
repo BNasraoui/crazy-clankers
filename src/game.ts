@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Car, MAX_SPEED } from './car';
 import { readInput, padName, type Input } from './input';
-import { makePerson, makeLabel, type CarModel, type PersonModel } from './models';
+import { makePerson, makeLabel, personFrom, type CarModel, type PersonModel } from './models';
 import { Look, SKY, makeSky } from './look';
 import { pickPassenger, type PassengerType } from './passengers';
 import { QuipDirector } from './quips';
@@ -83,7 +83,7 @@ export class Game {
   private quipTimer = 0;
   private rand = Math.random;
 
-  constructor(public renderer: THREE.WebGLRenderer, cab: CarModel) {
+  constructor(public renderer: THREE.WebGLRenderer, cab: CarModel, private people: Partial<Record<string, THREE.Object3D>> = {}) {
     this.look = new Look(renderer);
     this.scene.background = new THREE.Color(SKY.horizon);
     this.scene.fog = new THREE.Fog(SKY.horizon, 170, 560);
@@ -349,7 +349,7 @@ export class Game {
       const d = blocks(c.road, dest.curb.road);
       const color = d > 420 ? 0x47e05a : d > 270 ? 0xffd23a : 0xff5a3a;
 
-      const person = makePerson(type.person);
+      const person = this.makePassenger(type);
       person.root.position.copy(c.walk);
       person.root.rotation.y = c.facing;
       const marker = new THREE.Group();
@@ -362,6 +362,11 @@ export class Game {
       this.waiting.push({ type, dest, curb: c, person, marker, phase: this.rand() * 6 });
       return;
     }
+  }
+
+  private makePassenger(type: PassengerType): PersonModel {
+    const template = this.people[type.id];
+    return template ? personFrom(template) : makePerson(type.person);
   }
 
   private idleAnimations(dt: number) {
@@ -442,7 +447,7 @@ export class Game {
   private fireSweater(r: Ride) {
     r.firedDone = true;
     r.firedT = 5;
-    const p = makePerson(r.type.person);
+    const p = this.makePassenger(r.type);
     const f = this.car.fwd;
     p.root.position.set(this.car.pos.x - f.y * 3.5, 0, this.car.pos.z + f.x * 3.5);
     p.root.position.y = heightAt(p.root.position.x, p.root.position.z);

@@ -40,6 +40,40 @@ function addWheels(body: THREE.Group, halfW: number, front: number, back: number
   return { wheels, steer };
 }
 
+// Convert Blender's exported materials to the game's flat toon look.
+function toonify(scene: THREE.Object3D) {
+  scene.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const src = mesh.material as THREE.MeshStandardMaterial;
+    mesh.material = src.name.startsWith('light_') ? new THREE.MeshBasicMaterial({ color: src.color }) : toon({ color: src.color });
+    mesh.castShadow = true;
+  });
+}
+
+// Blender-built passengers, keyed by passenger id. Missing ones fall back to box people.
+export async function loadPeople(): Promise<Partial<Record<string, THREE.Object3D>>> {
+  const people: Partial<Record<string, THREE.Object3D>> = {};
+  for (const id of ['techbro']) {
+    try {
+      const gltf = await new GLTFLoader().loadAsync(`/models/${id}.glb`);
+      toonify(gltf.scene);
+      people[id] = gltf.scene;
+    } catch (err) {
+      console.warn(`Using the box ${id}:`, err);
+    }
+  }
+  return people;
+}
+
+export function personFrom(template: THREE.Object3D): PersonModel {
+  const root = new THREE.Group();
+  const body = template.clone(true);
+  root.add(body);
+  const part = (name: string) => body.getObjectByName(name) ?? new THREE.Object3D();
+  return { root, armL: part('arm_L'), armR: part('arm_R') };
+}
+
 // The player's cab, built in Blender (assets/blender/cab.py). Falls back to the
 // box version if the file can't be loaded.
 export async function loadCab(): Promise<CarModel> {
@@ -49,13 +83,7 @@ export async function loadCab(): Promise<CarModel> {
     const body = new THREE.Group();
     root.add(body);
     body.add(gltf.scene);
-    gltf.scene.traverse((o) => {
-      const mesh = o as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      const src = mesh.material as THREE.MeshStandardMaterial;
-      mesh.material = src.name.startsWith('light_') ? new THREE.MeshBasicMaterial({ color: src.color }) : toon({ color: src.color });
-      mesh.castShadow = true;
-    });
+    toonify(gltf.scene);
     const node = (name: string) => {
       const o = gltf.scene.getObjectByName(name);
       if (!o) throw new Error(`cab.glb is missing node ${name}`);
