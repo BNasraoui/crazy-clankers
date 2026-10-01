@@ -20,6 +20,9 @@ few thin ink lines along the seams an artist would draw.
   The texture is not used: the mesh is made symmetric, the mirrors, plate recess and
   baked-in wheels are ironed away, it is decimated, then the colour borders (glass
   canopy, light bars, cladding) are cut into it along planes, so they come out straight.
+  It has no source panel gaps to draw over, so its ink is all ours: the butterfly-door
+  cut and hinge line, a shoulder line, frunk and boot lids, the sills and arch lips, and
+  bands round the canopy and both light bars (traced off the colour borders).
   Nodes: cybercab > body, wheel_FL/FR/RL/RR.
 - lineup: both side on next to the current cab.glb at the same scale.
 - style: the robotaxi from docs/art/scene-target.jpg next to both cars at a similar
@@ -59,6 +62,16 @@ def side_frame(sx):
 
 def top_frame():
     return Matrix.Translation((0, 0, 4.0))
+
+
+def front_frame():
+    """Local XY is the front view's (x, up)."""
+    return Matrix(((1, 0, 0, 0), (0, 0, 1, -4.0), (0, 1, 0, 0), (0, 0, 0, 1)))
+
+
+def back_frame():
+    """Local XY is the rear view's (x, up)."""
+    return Matrix(((1, 0, 0, 0), (0, 0, -1, 4.0), (0, 1, 0, 0), (0, 0, 0, 1)))
 
 
 # Ray directions into the body from the front, the back and the top.
@@ -360,6 +373,57 @@ def ink(b, bvh, frame, pts, direction, width=0.016, depth=0.005, step=0.08):
         steps = (max(1, math.ceil((p1 - p0).length / step)), 1)
         plate(b, "trim", bvh, frame, [p0 - n, p1 - n, p1 + n, p0 + n], direction,
               depth=depth, steps=steps)
+
+
+def ink_strip(b, bvh, frame, pts, direction, width, depth=0.01, sink=0.012, step=0.16):
+    """Like ink, but the whole polyline as one closed strip with mitred joints: fewer
+    triangles and no overlaps at the joints. Long segments are split every `step`."""
+    pts = [Vector(p) for p in pts]
+    dense = [pts[0]]
+    for p0, p1 in zip(pts, pts[1:]):
+        n = max(1, math.ceil((p1 - p0).length / step))
+        dense += [p0.lerp(p1, i / n) for i in range(1, n + 1)]
+    closed = (dense[0] - dense[-1]).length < 1e-6
+    if closed:
+        dense.pop()
+    m = len(dense)
+    direction = direction.normalized()
+
+    def side(i):
+        """The mitred half-width offset at point i."""
+        prev = dense[i - 1] if (i > 0 or closed) else None
+        nxt = dense[(i + 1) % m] if (i < m - 1 or closed) else None
+        ds = [(q - p).normalized() for p, q in ((prev, dense[i]), (dense[i], nxt)) if p is not None and q is not None]
+        normals = [Vector((-d.y, d.x)) for d in ds]
+        avg = sum(normals, Vector((0, 0))).normalized()
+        return avg * (width / 2 / max(0.5, avg.dot(normals[0])))
+    top, bot = [], []
+    for i, p in enumerate(dense):
+        off = side(i)
+        trow, brow = [], []
+        for q in (p - off, p + off):
+            for nudge in (0.0, 0.012, -0.012, 0.024, -0.024):
+                hit = bvh.ray_cast(frame @ Vector((q.x + nudge, q.y + nudge, 0)), direction, 8.0)[0]
+                if hit is not None:
+                    break
+            assert hit is not None, f"ink point {q[:]} missed the body"
+            trow.append(b.bm.verts.new(hit - direction * depth))
+            brow.append(b.bm.verts.new(hit + direction * sink))
+        top.append(trow)
+        bot.append(brow)
+    before = b._begin()
+    pairs = list(zip(range(m), range(1, m))) + ([(m - 1, 0)] if closed else [])
+    for i, j in pairs:
+        b.bm.faces.new((top[i][0], top[j][0], top[j][1], top[i][1]))
+        b.bm.faces.new((bot[i][0], bot[i][1], bot[j][1], bot[j][0]))
+        for k in (0, 1):
+            b.bm.faces.new((top[i][k], bot[i][k], bot[j][k], top[j][k]))
+    if not closed:
+        for i in (0, m - 1):
+            b.bm.faces.new((top[i][0], top[i][1], bot[i][1], bot[i][0]))
+    new = [f for f in b.bm.faces if f not in before]
+    bmesh.ops.recalc_face_normals(b.bm, faces=new)
+    return b._assign(before, "trim")
 
 
 def to_object(b, *args, **kw):
@@ -739,7 +803,7 @@ def build_cybercab():
     join_into(b, [src])
     bvh = BVHTree.FromBMesh(b.bm)
     arch_liners(b, axles, skin)
-    cybercab_seams(b, bvh)
+    cybercab_seams(b, bvh, axles)
     body = to_object(b, "body", mats, parent=root, smooth_angle=SMOOTH_ANGLE)
     calm_normals(body, iterations=10)
     wheels = cc_wheels(root, mats, roles, axles)
@@ -853,12 +917,100 @@ def arch_liners(b, axles, skin):
             b._assign(before, "trim")
 
 
-def cybercab_seams(b, bvh):
-    """Butterfly-door shut lines."""
+# Ink an artist would draw on the Cybercab, in the side frame (forward, up) in metres.
+CC_SIDE_INK = [
+    [(0.8, 0.36), (0.84, 0.62), (0.87, 0.97)],                     # door, front edge
+    [(-0.3, 0.36), (-0.38, 0.7), (-0.47, 1.1)],                     # door, rear edge
+    [(0.8, 0.36), (0.25, 0.355), (-0.3, 0.36)],                     # door, bottom edge
+    [(0.87, 0.97), (0.66, 1.16), (0.4, 1.33), (0.05, 1.44)],        # hinge line up the A-pillar
+    [(1.1, 0.835), (0.6, 0.85), (-0.6, 0.875), (-1.84, 0.9)],       # shoulder
+]
+# In the top frame (x, y): the frunk lid and the hinge line along the roof rail.
+CC_FRUNK = [(0.0, -1.3), (0.48, -1.2), (0.58, -1.3), (0.56, -1.72), (0.44, -1.84),
+            (-0.44, -1.84), (-0.56, -1.72), (-0.58, -1.3), (-0.48, -1.2), (0.0, -1.3)]
+CC_RAIL = [(0.645, -0.75), (0.62, 0.0), (0.585, 0.75)]
+# In the back frame (x, up): the boot lid, hanging from the rear light bar.
+CC_BOOT = [(0.62, 0.86), (0.64, 0.52), (0.0, 0.5), (-0.64, 0.52), (-0.62, 0.86)]
+# Swaps a frame's local X and Y, to trace borders that run up rather than across.
+SWAP = Matrix(((0, 1, 0, 0), (1, 0, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)))
+
+
+def border(bm, bvh, frame, direction, us, v_in, v_out, roles, offset):
+    """Trace a colour border: along each column u of the frame, bisect for the v where
+    the ray stops hitting `roles` (hit at v_in, missed at v_out), and step `offset`
+    further out, so a line there lies beside the border. Columns that do not cross the
+    border are left out. `v_in` may also be a list, one per column."""
+    names = list(CYBERCAB_PALETTE)
+    want = {names.index(r) for r in roles}
+    bm.faces.ensure_lookup_table()
+
+    def hits(u, v):
+        _, _, i, _ = bvh.ray_cast(frame @ Vector((u, v, 0)), direction, 8.0)
+        return i is not None and bm.faces[i].material_index in want
+    out = []
+    for u, v0 in zip(us, v_in if isinstance(v_in, list) else [v_in] * len(us)):
+        a, b = v0, v_out
+        if not hits(u, a) or hits(u, b):
+            continue
+        for _ in range(14):
+            m = (a + b) / 2
+            a, b = (m, b) if hits(u, m) else (a, m)
+        v = (a + b) / 2
+        out.append((u, round(v + math.copysign(offset, v_out - v0), 4)))
+    return out
+
+
+def span(a, b, n):
+    return [a + (b - a) * i / n for i in range(n + 1)]
+
+
+def arch_lip(ay, r, n=10):
+    """The arc round a wheel arch in the side frame, down to the sills."""
+    a0 = math.asin((CC_LINER_Z - CC_WHEEL_R) / r)
+    return [(-ay - math.cos(a) * r, CC_WHEEL_R + math.sin(a) * r) for a in span(a0, math.pi - a0, n)]
+
+
+CC_INK = 0.024   # bolder than the Wayfarer's seams: they lie over the source's own gaps
+
+
+def cybercab_seams(b, bvh, axles):
+    """Butterfly-door cut, hinge line, shoulder line, frunk and boot lid, and ink round
+    the canopy, the light bars, the sills and the wheel arches."""
+    w = CC_INK
+    off = w / 2 + 0.002
+    lines = []   # (frame, direction, points, width)
     for sx in (1, -1):
         s = side_frame(sx)
-        ink(b, bvh, s, [(0.8, 0.3), (0.84, 0.62), (0.86, 0.94)], inward(sx))         # door front
-        ink(b, bvh, s, [(-0.3, 0.29), (-0.38, 0.7), (-0.47, 1.08)], inward(sx))      # door rear
+        for pts in CC_SIDE_INK:
+            lines.append((s, inward(sx), pts, w))
+        # Canopy edge along the belt, and the sill.
+        lines.append((s, inward(sx), border(b.bm, bvh, s, inward(sx), span(1.16, -1.24, 12),
+                                           1.3, 0.8, ("glass", "trim"), off), w))
+        lines.append((s, inward(sx), [(0.82, 0.27 + off), (-0.82, 0.27 + off)], w))
+        for ay in axles:
+            lines.append((s, inward(sx), arch_lip(ay, CC_ARCH_R + off + 0.008), w))
+        lines.append((top_frame(), DOWN, [(sx * x, y) for x, y in CC_RAIL], w))
+    # Canopy edge across the scuttle and round the rear glass.
+    lines.append((top_frame(), DOWN, border(b.bm, bvh, top_frame(), DOWN, span(-0.74, 0.74, 10),
+                                            -0.8, -1.5, ("glass", "trim"), off), w))
+    lines.append((back_frame(), BACKWARD, border(b.bm, bvh, back_frame(), BACKWARD,
+                                                 span(-0.6, 0.6, 12), 1.5, 1.0, ("glass", "trim"), off), w))
+    # Its sides run down the C-pillars: trace them row by row, from points on the glass.
+    for sx in (1, -1):
+        f = back_frame() @ SWAP
+        lines.append((f, BACKWARD, border(b.bm, bvh, f, BACKWARD, span(1.1, 1.35, 5),
+                                          [sx * x for x in (0.8, 0.775, 0.7, 0.65, 0.64, 0.5)],
+                                          sx * 0.2, ("glass", "trim"), off), w))
+    # Narrower bands framing the light bars, so the thin bars still show between them.
+    lw = 0.016
+    for frame, d, mid, role, xs in ((front_frame(), FORWARD, 0.68, "light_head", span(-0.9, 0.9, 12)),
+                                    (back_frame(), BACKWARD, 0.915, "light_tail", span(-0.94, 0.94, 12))):
+        for v_out in (mid + 0.15, mid - 0.15):
+            lines.append((frame, d, border(b.bm, bvh, frame, d, xs, mid, v_out, (role,), lw / 2 + 0.002), lw))
+    lines.append((top_frame(), DOWN, CC_FRUNK, w))
+    lines.append((back_frame(), BACKWARD, CC_BOOT, w))
+    for frame, d, pts, width in lines:
+        ink_strip(b, bvh, frame, pts, d, width)
 
 
 def cc_wheels(root, mats, roles, axles):
