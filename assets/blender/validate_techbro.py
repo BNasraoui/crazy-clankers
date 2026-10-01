@@ -8,10 +8,13 @@ import json
 import math
 from pathlib import Path
 import struct
+import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 CAB_SHA256 = 'c166f5c3f6e92ebd2c89c72f78c43c830ed1df1bf4c910afdd45353e2e40c33d'
-raw = (ROOT / 'public/models/techbro.glb').read_bytes()
+asset = sys.argv[1] if len(sys.argv)>1 else 'techbro'
+assert asset in {'techbro','techbro-apose'}
+raw = (ROOT / f'public/models/{asset}.glb').read_bytes()
 magic, version, length = struct.unpack_from('<III', raw)
 assert magic == 0x46546C67 and version == 2 and length == len(raw)
 json_length, chunk_type = struct.unpack_from('<II', raw, 12)
@@ -27,7 +30,12 @@ assert root.get('translation', [0, 0, 0]) == [0, 0, 0]
 assert set(root['children']) == {by_name[n] for n in ('legs', 'torso', 'head', 'arm_L', 'arm_R')}
 assert nodes[by_name['arm_R']]['children'] == [by_name['cup']]
 assert nodes[by_name['arm_R']]['translation'][0] > 0
-assert abs(nodes[by_name['head']]['translation'][1] - 1.44) < .001
+calibration=json.loads((ROOT/'assets/blender/calibrations/techbro.json').read_text())['body']
+neck_y=calibration['world_y_at_zero']-159*calibration['metres_per_pixel']
+shoulder_y=calibration['world_y_at_zero']-207*calibration['metres_per_pixel']
+assert abs(nodes[by_name['head']]['translation'][1]-neck_y)<1e-5
+for arm in ['arm_L','arm_R']:
+    assert abs(nodes[by_name[arm]]['translation'][1]-shoulder_y)<1e-5
 assert not model.get('skins') and not model.get('animations')
 assert len(model['meshes']) == 6
 parents = {child: i for i, n in enumerate(nodes) for child in n.get('children', [])}
@@ -75,8 +83,11 @@ for i, node in enumerate(nodes):
         assert max(v[0] for v in indices) < len(positions)
         triangles += len(indices) // 3
 assert triangles <= 30000, triangles
-assert 1.74 <= bounds[1][1] <= 1.80, bounds
-assert abs(bounds[0][1]) < .002, bounds
+model_height=bounds[1][1]-bounds[0][1]
+assert 1.79 <= model_height <= 1.81, bounds
+if asset=='techbro-apose':assert abs(model_height-1.8)<.001
+assert world_origin(by_name['cup'])[0]>0
+assert abs(bounds[0][1]) < .003, bounds
 required = {'skin', 'face', 'hair', 'vest', 'shirt', 'pants', 'shoes', 'sole', 'cup', 'coffee', 'straw'}
 assert required <= {m['name'] for m in model['materials']}
 for material in model['materials']:
@@ -95,6 +106,6 @@ for img in model['images']:
     assert max(width, height) <= 2048
     images.append({'name': img['name'], 'width': width, 'height': height})
 assert hashlib.sha256((ROOT / 'public/models/cab.glb').read_bytes()).hexdigest() == CAB_SHA256
-print(json.dumps({'triangles': triangles, 'nodes': len(nodes), 'meshes': len(model['meshes']),
+print(json.dumps({'asset':asset,'height_m':model_height,'pivots':{name:world_origin(by_name[name]) for name in by_name},'triangles': triangles, 'nodes': len(nodes), 'meshes': len(model['meshes']),
                   'materials': len(model['materials']), 'textures': images,
                   'bounds': bounds, 'bytes': len(raw), 'cab_sha256': CAB_SHA256}, indent=2))
