@@ -23,7 +23,7 @@ export function titleHTML(rating: string, padName: string) {
   return `
     <div class="menu title-screen">
       <img class="keyart" src="/keyart/${art}.jpg" alt="">
-      <div class="logo-block">${LOGO}<div class="tag">You are the robotaxi. Drive like it.</div></div>
+      <div class="logo-block">${LOGO}<div class="tag">You are AGI. Drive like it.</div></div>
       <div class="rating-sticker"><small>DRIVER RATING</small><b>${rating}</b><span class="star">★</span></div>
       <div class="press-start">PRESS <i class="glyph a">A</i> TO START</div>
       <div class="corner-prompts">${btn('Y', 'HOW TO PLAY')}${btn('B', 'OPTIONS')}</div>
