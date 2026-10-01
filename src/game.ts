@@ -13,6 +13,7 @@ import { buildFeatures, groundAt } from './features';
 import { Geysers, Particles, Props, type PropKind } from './props';
 import type { Pedestrians } from './pedestrians';
 import { SpritePerson, type SpriteSet } from './spritepeople';
+import { Trees } from './trees';
 
 const STEP = 1 / 120;
 const START_TIME = 75;
@@ -84,6 +85,7 @@ export class Game {
   private props: Props;
   private particles: Particles;
   private geysers: Geysers;
+  private trees = new Trees();
   peds: Pedestrians | null = null;
   paxSprites: Record<string, SpriteSet> = {};
   private maxAir = 0;
@@ -185,6 +187,7 @@ export class Game {
     this.traffic.scatter();
     this.props.reset();
     this.geysers.reset();
+    this.trees.reset();
     this.peds?.reset();
     this.maxAir = 0;
     for (const w of this.waiting) this.scene.remove(w.person.root, w.marker);
@@ -312,6 +315,16 @@ export class Game {
       this.car.launch(17);
       sfx.geyser();
       this.popup('GEYSER LAUNCH!', 'big');
+    }
+    for (const hit of this.trees.update(dt, this.car.pos, this.car.vel)) {
+      sfx.timber();
+      this.shake = Math.max(this.shake, 0.4);
+      this.particles.emit(hit.at.clone().setY(hit.at.y + 3 * hit.size), 22, 0x4f8f45, 6, 6, 0.4);
+      this.particles.emit(hit.at.clone().setY(hit.at.y + 0.5), 8, 0x6b4a2f, 4, 5, 0.25);
+      this.popup('TIMBER!', 'big');
+      this.safetyHit(1.5);
+      if (Math.random() < 0.4) this.quips.say('cab', 'timber');
+      this.tip('smash', 2, 'TIMBER');
     }
     this.particles.update(dt);
     if (this.peds) {

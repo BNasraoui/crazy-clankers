@@ -5,7 +5,7 @@ export type QuipEvent =
   | 'pickup' | 'dropoff' | 'walkout' | 'idle'
   | 'jump' | 'jumpFirst' | 'nearMiss' | 'crash' | 'drift' | 'slow' | 'timeLow'
   | 'fired' | 'back' | 'reroute' | 'safetyLow'
-  | 'dash' | 'smash' | 'geyser' | 'underwater' | 'bigAir' | 'pedDive';
+  | 'dash' | 'smash' | 'geyser' | 'underwater' | 'bigAir' | 'pedDive' | 'timber';
 
 export const SPEAKERS: Record<Speaker, { name: string; color: string; pitch: number }> = {
   cab: { name: 'YOUR CAB', color: '#14a892', pitch: 880 },
@@ -34,6 +34,7 @@ export const LINES: Record<Speaker, Partial<Record<QuipEvent, string[]>>> = {
     smash: ['Street furniture reclassified as projectiles.', 'That was in the way. It is no longer in the way.', 'Cone detected. Cone ignored.'],
     geyser: ['Water feature unlocked.', 'I have created a fountain. You are welcome.'],
     underwater: ['I am now a submarine. Please remain seated.', 'Waterproofing: untested. Now tested.', 'Recalculating route via the ocean floor.'],
+    timber: ['Urban forestry: optimised.', 'That tree was not in my map data.', 'Shade is a privilege, not a right.', 'I have filed this under vegetation management.'],
     pedDive: ['Pedestrian successfully avoided. By them.', 'They saw me. That counts.', 'Human reflexes: impressive.', 'Yielding is a two-way street.'],
     bigAir: ['Altitude exceeds my operating parameters.', 'Requesting clearance from air traffic control.', 'I can see my depot from here.'],
   },

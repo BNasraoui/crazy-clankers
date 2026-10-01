@@ -85,7 +85,14 @@ export const extraCircles: Circle[] = [];
 const renderHeight = terrainAt;
 
 export type BlockKind = 'res' | 'downtown' | 'park' | 'ladies' | 'landmark';
-export interface Circle { x: number; z: number; r: number }
+export interface Circle { x: number; z: number; r: number; breakable?: boolean; down?: boolean }
+
+// Trees knock over when hit hard enough. collide() queues them here; the game animates them.
+export const TREE_BREAK_SPEED = 7; // m/s (about 16 mph); slower than this, a tree is solid
+export const brokenTrees: Circle[] = [];
+export interface TreeRef { circle: Circle; base: THREE.Matrix4; meshes: THREE.InstancedMesh[]; index: number }
+export const treeRefs = new Map<Circle, TreeRef>();
+type TreeSpot = { m: THREE.Matrix4; c: Circle };
 export interface Block {
   bi: number;
   bj: number;
@@ -155,9 +162,16 @@ export function collide(pos: THREE.Vector3, vel: THREE.Vector2, r: number): numb
       }
     }
     for (const c of b.circles) {
+      if (c.down) continue;
       const dx = pos.x - c.x, dz = pos.z - c.z;
       const d = Math.hypot(dx, dz);
       if (d < c.r + r && d > 1e-4) {
+        if (c.breakable && vel.length() > TREE_BREAK_SPEED) {
+          c.down = true;
+          brokenTrees.push(c);
+          vel.multiplyScalar(0.85);
+          continue;
+        }
         const nx = dx / d, nz = dz / d;
         pos.x = c.x + nx * (c.r + r);
         pos.z = c.z + nz * (c.r + r);
@@ -279,8 +293,8 @@ export function buildWorld(scene: THREE.Scene) {
   const PASTEL = [0xf3dc8a, 0xb7dcc4, 0x9fbad3, 0xf2e6cc, 0xd98a6c, 0xb3c79c, 0xf0c4a2, 0xe9e3d6, 0xc7b8d8].map(mute);
   const LADIES = [0x5f9ec2, 0xe58fa5, 0xf2cf55, 0x86c07a, 0xb08ad8, 0xee8f5a].map(mute);
   const GLASS = [0xc9d3dc, 0xb8c4cf, 0xd9d2c3, 0x9fb0c0, 0xe2ddd2, 0xaebdca];
-  const trees: THREE.Matrix4[] = [];
-  const streetTrees: THREE.Matrix4[] = [];
+  const trees: TreeSpot[] = [];
+  const streetTrees: TreeSpot[] = [];
   const gables: { m: THREE.Matrix4; c: THREE.Color }[] = [];
 
   for (const b of blocks) {
@@ -291,13 +305,14 @@ export function buildWorld(scene: THREE.Scene) {
         const tx = x0 + 3 + r() * (x1 - x0 - 6);
         const tz = z0 + 3 + r() * (z1 - z0 - 6);
         if (b.bi === 3 && b.bj === 0 && Math.hypot(tx - (x0 + x1) / 2, tz - (z0 + z1) / 2) < 9) continue;
-        b.circles.push({ x: tx, z: tz, r: 1.1 });
+        const circle: Circle = { x: tx, z: tz, r: 1.1, breakable: true };
+        b.circles.push(circle);
         const s = 0.8 + r() * 0.6;
-        trees.push(new THREE.Matrix4().compose(
+        trees.push({ c: circle, m: new THREE.Matrix4().compose(
           new THREE.Vector3(tx, heightAt(tx, tz), tz),
           new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), r() * 6),
           new THREE.Vector3(s, s, s),
-        ));
+        ) });
       }
       continue;
     }
@@ -546,7 +561,7 @@ function buildFrontages(
 }
 
 // Street trees in sidewalk planters, near the curb.
-function addStreetTrees(b: Block, r: () => number, out: THREE.Matrix4[]) {
+function addStreetTrees(b: Block, r: () => number, out: TreeSpot[]) {
   const cx = -HALF + b.bi * CELL, cz = -HALF + b.bj * CELL;
   const at = 6.9; // from the street centreline: just inside the curb
   for (const side of ['N', 'S', 'W', 'E'] as const) {
@@ -559,13 +574,14 @@ function addStreetTrees(b: Block, r: () => number, out: THREE.Matrix4[]) {
       if (side === 'W') { x = cx + at; z = cz + along; }
       if (side === 'E') { x = cx + CELL - at; z = cz + along; }
       if (landmarks.some((l) => Math.hypot(l.curb.walk.x - x, l.curb.walk.z - z) < 7)) continue;
-      b.circles.push({ x, z, r: 0.4 });
+      const circle: Circle = { x, z, r: 0.4, breakable: true };
+      b.circles.push(circle);
       const s = 0.55 + r() * 0.15;
-      out.push(new THREE.Matrix4().compose(
+      out.push({ c: circle, m: new THREE.Matrix4().compose(
         new THREE.Vector3(x, heightAt(x, z), z),
         new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), r() * 6),
         new THREE.Vector3(s, s * 1.1, s),
-      ));
+      ) });
     }
   }
 }
@@ -671,13 +687,18 @@ function makeSeaWall() {
   return inst;
 }
 
-function makeTrees(mats: THREE.Matrix4[]) {
+function makeTrees(spots: TreeSpot[]) {
   const g = new THREE.Group();
   const trunkGeo = new THREE.CylinderGeometry(0.25, 0.35, 2.4, 6).translate(0, 1.2, 0);
   const topGeo = new THREE.IcosahedronGeometry(2.2, 0).translate(0, 3.6, 0);
-  const trunks = new THREE.InstancedMesh(trunkGeo, toon({ color: 0x6b4a2f }), mats.length);
-  const tops = new THREE.InstancedMesh(topGeo, toon({ color: 0x4f8f45 }), mats.length);
-  mats.forEach((mm, i) => { trunks.setMatrixAt(i, mm); tops.setMatrixAt(i, mm); });
+  const trunks = new THREE.InstancedMesh(trunkGeo, toon({ color: 0x6b4a2f }), spots.length);
+  const tops = new THREE.InstancedMesh(topGeo, toon({ color: 0x4f8f45 }), spots.length);
+  spots.forEach(({ m, c }, i) => {
+    trunks.setMatrixAt(i, m);
+    tops.setMatrixAt(i, m);
+    treeRefs.set(c, { circle: c, base: m.clone(), meshes: [trunks, tops], index: i });
+  });
+  trunks.frustumCulled = tops.frustumCulled = false;
   tops.castShadow = trunks.castShadow = true;
   g.add(trunks, tops);
   return g;

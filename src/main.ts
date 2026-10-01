@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Game } from './game';
+import { treeRefs } from './world';
 import { loadCab, loadPeople } from './models';
 import { Pedestrians } from './pedestrians';
 import { loadPassengerSprites } from './spritepeople';
@@ -30,4 +31,5 @@ renderer.setAnimationLoop((now) => {
 });
 
 // Handy for poking at the game from the console.
-(window as unknown as { game: Game }).game = game;
+(window as unknown as { game: Game; treeRefs: typeof treeRefs }).game = game;
+(window as unknown as { treeRefs: typeof treeRefs }).treeRefs = treeRefs;

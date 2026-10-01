@@ -94,5 +94,6 @@ export const sfx = {
   smash: () => { noise(0.12, 0.18, 1800); tone(140, 0.1, 'square', 0.06, 0, 70); },
   splash: () => { noise(0.7, 0.35, 1500); tone(300, 0.4, 'sine', 0.08, 0, 80); },
   geyser: () => noise(1.2, 0.2, 5000),
+  timber: () => { noise(0.5, 0.3, 700); tone(160, 0.5, 'sawtooth', 0.08, 0, 50); noise(0.6, 0.12, 3500); },
   yelp: () => tone(700 + Math.random() * 400, 0.22, 'triangle', 0.07, 0, 1300 + Math.random() * 500),
 };
