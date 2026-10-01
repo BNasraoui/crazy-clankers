@@ -12,6 +12,7 @@ import { BLOCKS_SIDES, WATER, buildWorld, curb, landmarks, N, type Curb, type La
 import { buildFeatures, groundAt } from './features';
 import { Geysers, Particles, Props, type PropKind } from './props';
 import type { Pedestrians } from './pedestrians';
+import { SpritePerson, type SpriteSet } from './spritepeople';
 
 const STEP = 1 / 120;
 const START_TIME = 75;
@@ -84,6 +85,7 @@ export class Game {
   private particles: Particles;
   private geysers: Geysers;
   peds: Pedestrians | null = null;
+  paxSprites: Record<string, SpriteSet> = {};
   private maxAir = 0;
   private underwaterView = false;
   private sky = makeSky();
@@ -95,6 +97,7 @@ export class Game {
 
   constructor(public renderer: THREE.WebGLRenderer, cab: CarModel, private people: Partial<Record<string, THREE.Object3D>> = {}) {
     this.look = new Look(renderer);
+    this.look.onChange = () => this.refreshPassengers();
     this.scene.background = new THREE.Color(SKY.horizon);
     this.scene.fog = new THREE.Fog(SKY.horizon, 170, 560);
     this.scene.add(this.sky);
@@ -472,6 +475,8 @@ export class Game {
   }
 
   private makePassenger(type: PassengerType): PersonModel {
+    const sprite = this.paxSprites[type.id];
+    if (sprite && this.look.settings.paxSprites) return new SpritePerson(sprite);
     const template = this.people[type.id];
     if (template) return personFrom(template);
     const person = makePerson(type.person);
@@ -485,6 +490,22 @@ export class Game {
       const p = w.person;
       p.armR.rotation.z = p.raise + Math.sin(w.phase * 8) * p.raise * 0.15;
       w.person.root.position.y = w.curb.walk.y + Math.abs(Math.sin(w.phase * 4)) * 0.12;
+      if (p instanceof SpritePerson) {
+        // Hail the cab when it's close enough to matter.
+        p.hailing = !this.ride && Math.hypot(w.curb.walk.x - this.car.pos.x, w.curb.walk.z - this.car.pos.z) < 80;
+        p.tick(this.camera, this.clock, this.look.settings.people);
+      }
+    }
+  }
+
+  // Swap waiting passengers between sprites and 3D models (look panel toggle).
+  refreshPassengers() {
+    for (const w of this.waiting) {
+      this.scene.remove(w.person.root);
+      w.person = this.makePassenger(w.type);
+      w.person.root.position.copy(w.curb.walk);
+      w.person.root.rotation.y = w.curb.facing;
+      this.scene.add(w.person.root);
     }
   }
 
@@ -521,6 +542,7 @@ export class Game {
     if (r.firedT > 0) {
       r.firedT -= dt;
       if (r.ejected) r.ejected.armR.rotation.z = r.ejected.raise + Math.sin(this.clock * 9) * r.ejected.raise * 0.15;
+      if (r.ejected instanceof SpritePerson) r.ejected.tick(this.camera, this.clock, this.look.settings.people);
       if (r.firedT <= 0) {
         if (r.ejected) this.scene.remove(r.ejected.root);
         r.ejected = undefined;

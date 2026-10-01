@@ -62,8 +62,8 @@ export function makeSky() {
   return sky;
 }
 
-export interface LookSettings { height: number; grain: number; outline: boolean; speedLines: boolean; people: number; camBack: number; camUp: number; fov: number }
-const DEFAULTS: LookSettings = { height: 480, grain: 0.07, outline: true, speedLines: true, people: 1.2, camBack: 6.5, camUp: 3, fov: 60 };
+export interface LookSettings { height: number; grain: number; outline: boolean; speedLines: boolean; people: number; camBack: number; camUp: number; fov: number; paxSprites: boolean }
+const DEFAULTS: LookSettings = { height: 480, grain: 0.07, outline: true, speedLines: true, people: 1.2, camBack: 6.5, camUp: 3, fov: 60, paxSprites: true };
 const STORE = 'clankers.look.v2'; // bump when defaults change, so old saved tweaks don't hide them
 
 function loadSettings(): LookSettings {
@@ -241,6 +241,7 @@ export class Look {
       <label>Camera distance <input id="lk-back" type="range" min="4" max="12" step="0.25"><output id="lk-back-v"></output></label>
       <label>Camera height <input id="lk-up" type="range" min="1.5" max="7" step="0.1"><output id="lk-up-v"></output></label>
       <label>Field of view <input id="lk-fov" type="range" min="45" max="90" step="1"><output id="lk-fov-v"></output></label>
+      <label><input id="lk-pax" type="checkbox"> Passengers as sprites</label>
       <button id="lk-reset" type="button">Reset</button>`;
     document.body.appendChild(panel);
     const res = panel.querySelector<HTMLSelectElement>('#lk-res')!;
@@ -251,6 +252,7 @@ export class Look {
     const peopleV = panel.querySelector<HTMLOutputElement>('#lk-people-v')!;
     const slider = (id: string) => [panel.querySelector<HTMLInputElement>(`#lk-${id}`)!, panel.querySelector<HTMLOutputElement>(`#lk-${id}-v`)!] as const;
     const [back, backV] = slider('back'), [up, upV] = slider('up'), [fov, fovV] = slider('fov');
+    const pax = panel.querySelector<HTMLInputElement>('#lk-pax')!;
     const show = () => {
       peopleV.value = `${this.settings.people.toFixed(2)}×`;
       backV.value = `${this.settings.camBack.toFixed(1)} m`;
@@ -266,6 +268,7 @@ export class Look {
       back.value = String(this.settings.camBack);
       up.value = String(this.settings.camUp);
       fov.value = String(this.settings.fov);
+      pax.checked = this.settings.paxSprites;
       show();
     };
     res.value = String(this.settings.height);
@@ -276,22 +279,25 @@ export class Look {
     const apply = () => {
       this.settings = {
         height: +res.value, grain: +grain.value, outline: outline.checked, speedLines: speed.checked,
-        people: +people.value, camBack: +back.value, camUp: +up.value, fov: +fov.value,
+        people: +people.value, camBack: +back.value, camUp: +up.value, fov: +fov.value, paxSprites: pax.checked,
       };
       show();
+      this.onChange();
       try { localStorage.setItem(STORE, JSON.stringify(this.settings)); } catch { /* storage unavailable */ }
       this.setSize(this.w, this.h);
     };
-    for (const el of [res, grain, outline, speed, people, back, up, fov]) el.addEventListener('input', apply);
+    for (const el of [res, grain, outline, speed, people, back, up, fov, pax]) el.addEventListener('input', apply);
     panel.querySelector('#lk-reset')!.addEventListener('click', () => {
       this.settings = { ...DEFAULTS };
       try { localStorage.removeItem(STORE); } catch { /* storage unavailable */ }
       fill();
       this.setSize(this.w, this.h);
+      this.onChange();
     });
     addEventListener('keydown', (e) => { if (e.code === 'Backquote') panel.hidden = !panel.hidden; });
     this.togglePanel = () => { panel.hidden = !panel.hidden; };
   }
 
   togglePanel = () => {};
+  onChange = () => {};
 }
