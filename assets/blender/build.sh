@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Rebuild Tech Bro v6 and its measured turnaround acceptance artifacts, the cab, or the robotaxis.
+# Rebuild Tech Bro v6 and its measured turnaround acceptance artifacts, the cab, the robotaxis,
+# or the San Francisco street kit.
 set -euo pipefail
 cd "$(dirname "$0")"
 if [[ -z "${BLENDER:-}" ]]; then
@@ -24,8 +25,15 @@ case "${1:-techbro}" in
       "$BLENDER" --background --factory-startup --python-exit-code 1 --python sheet_robotaxis.py -- "$step"
     done
     exit ;;
+  street)
+    # Every street prop to public/models/street with a close-up sheet each, the strip
+    # render with the Wayfarer for scale, then a reimport check of nodes and budgets.
+    for step in all strip check; do
+      "$BLENDER" --background --factory-startup --python-exit-code 1 --python street_kit.py -- "$step"
+    done
+    exit ;;
   techbro) ;;
-  *) echo 'Usage: build.sh [techbro|cab|robotaxis|sheet-robotaxis]' >&2; exit 2 ;;
+  *) echo 'Usage: build.sh [techbro|cab|robotaxis|sheet-robotaxis|street]' >&2; exit 2 ;;
 esac
 "$ASSET_PYTHON" test_sheets.py
 "$ASSET_PYTHON" test_profile.py
