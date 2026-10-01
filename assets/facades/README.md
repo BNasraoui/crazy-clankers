@@ -30,3 +30,14 @@ All eight drop-off drawings were redrawn to match the key art. `refs/pass2/` has
   gaps between merlons are backed by a stone wall; the Painted Ladies' gables sit against the slate roof behind.
 - `process_drops.py <workdir> public/facades` trims the odd sliver of sky or sidewalk, keeps 3:2, writes 960x640 JPEGs
   and updates only the drop entries of `manifest.json`.
+
+## Crypto Castle redo (2026-10-02)
+
+Ben: "Crypto Castle should NOT be a castle." Satirical drop-offs are real San Francisco building types gone wrong, so
+Crypto Castle is now a white Pacific Heights Edwardian mansion after a crypto bro's makeover (gold mirror glass in the
+bays, an LED candlestick ticker, a laser-eyed robot-bull mural, a glass penthouse, a velvet rope and a gold statue).
+"CRYPTO CASTLE" is what the neighbours call it. Same recipe as the second pass; the prompt says outright that it is
+not a castle, and asks for cool midday light so the white paint and gold glass don't drift into golden hour.
+Pick: `drop-crypto-b1.png` from the fourth of four tries. `wall` was sampled by hand from the sunlit siding,
+because body_colour picks the shaded blue. `process_drops.py` now takes optional ids, so a single drawing can be
+reprocessed. `refs/crypto-redo/` has the before/after and the in-game shot.

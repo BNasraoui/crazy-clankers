@@ -15,8 +15,8 @@
   {
    "id": "drop-crypto",
    "kind": "drop",
-   "wall": "#f7e2b0",
-   "base": "#bdaa91"
+   "wall": "#dfdde2",
+   "base": "#c4c4c9"
   },
   {
    "id": "drop-lab",
