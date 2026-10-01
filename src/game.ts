@@ -258,7 +258,7 @@ export class Game {
       <div class="controls">
         <b>Gas</b> RT / W &nbsp; <b>Brake / reverse</b> LT / S &nbsp; <b>Steer</b> stick / A D<br>
         <b>Drift</b> B or RB / Space (hold) &nbsp; <b>Hop</b> A / E &nbsp; <b>Pause</b> Start / Esc<br>
-        <b>Crazy Dash</b> tap brake, then gas &nbsp; Smash junk, hit hydrants, jump off the piers.<br>
+        <b>Launch Mode</b> from a stop, hold handbrake + gas, release handbrake &nbsp; Smash junk, hit hydrants, jump off the piers.<br>
         Stop in a ring to pick up. Stop in the beam to drop off.<br>
         Jumps, near misses and drifts earn tips but cost your <b>DMV permit</b>.
       </div>
@@ -270,7 +270,7 @@ export class Game {
     this.quips.update(this.clock);
 
     this.acc = Math.min(this.acc + dt, 0.1);
-    let impact = 0, landed = 0, hop = false, dash = false, splash = false;
+    let impact = 0, landed = 0, hop = false, launch = -1, armed = false, splash = false;
     let first = true;
     while (this.acc >= STEP) {
       // Edge-triggered buttons only count on the first physics step of the frame.
@@ -279,14 +279,19 @@ export class Game {
       impact = Math.max(impact, ev.impact);
       landed = Math.max(landed, ev.landed);
       hop ||= ev.hop;
-      dash ||= ev.dash;
+      if (ev.launch >= 0) launch = ev.launch;
+      armed ||= ev.armed;
       splash ||= ev.splash;
       this.acc -= STEP;
     }
     if (hop) sfx.hop();
-    if (dash) {
+    if (armed) {
+      sfx.armed();
+      this.popup('LAUNCH MODE');
+    }
+    if (launch >= 0) {
       sfx.dash();
-      this.popup('CRAZY DASH!');
+      this.popup(launch > 0.95 ? 'FULL LAUNCH!!' : 'LAUNCH!', launch > 0.95 ? 'big' : '');
       this.quips.say('cab', 'dash');
     }
     if (splash) {
@@ -727,6 +732,10 @@ export class Game {
     $('#permit').classList.toggle('low', this.safety < 30);
     $('#speed').innerHTML = `${Math.round(this.car.speed * 2.237)} <small>MPH</small>`;
     $('#combo').textContent = this.combo > 1 ? `COMBO x${this.combo}` : '';
+    const lc = this.car.launchCharge;
+    $('#launch').hidden = lc <= 0;
+    $('#launch .fill').style.width = `${Math.min(100, (lc / 0.8) * 100)}%`;
+    $('#launch').classList.toggle('armed', lc >= 0.35);
     const fare = $('#fare');
     const r = this.ride;
     fare.classList.toggle('hidden', !r);

@@ -30,7 +30,7 @@ export const LINES: Record<Speaker, Partial<Record<QuipEvent, string[]>>> = {
     dropoff: ['Thank you for riding. Please rate me five stars. Or else.', 'Arrived. Your data has been lovingly retained.'],
     walkout: ['Rating lowered. Feelings: none.', 'Another satisfied customer. Statistically.'],
     idle: ['Lidar spinning. Vibes immaculate.', 'I can see in 360 degrees. I choose not to.', 'Updating terms of service... done.'],
-    dash: ['Engaging ludicrous mode.', 'Acceleration profile: unhinged.'],
+    dash: ['Launch Mode engaged. Please brace for disruption.', 'Acceleration profile: unhinged.', 'Cheetah stance: complete.'],
     smash: ['Street furniture reclassified as projectiles.', 'That was in the way. It is no longer in the way.', 'Cone detected. Cone ignored.'],
     geyser: ['Water feature unlocked.', 'I have created a fountain. You are welcome.'],
     underwater: ['I am now a submarine. Please remain seated.', 'Waterproofing: untested. Now tested.', 'Recalculating route via the ocean floor.'],

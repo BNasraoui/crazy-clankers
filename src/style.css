@@ -107,3 +107,12 @@ body { font-family: Inter, system-ui, sans-serif; color: #fff; user-select: none
   border: 3px solid #000; background: #fff; margin: -18px 0 -18px -26px; box-shadow: 3px 3px 0 #000;
 }
 #quip .face[hidden] { display: none; }
+
+#launch {
+  position: absolute; bottom: 86px; right: 24px; text-align: right;
+  font: 16px Bungee, Impact, sans-serif; color: #ffe14a; text-shadow: 2px 2px 0 #000;
+}
+#launch[hidden] { display: none; }
+#launch .bar { width: 170px; height: 12px; margin-top: 4px; background: #0008; border: 2px solid #000; }
+#launch .fill { height: 100%; background: #8a8a8a; }
+#launch.armed .fill { background: #ff4fa8; }

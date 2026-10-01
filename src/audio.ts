@@ -89,6 +89,7 @@ export const sfx = {
   whoosh: () => noise(0.4, 0.12, 2200),
   land: (power: number) => noise(0.18, Math.min(0.3, power * 0.05), 400),
   hop: () => tone(220, 0.18, 'square', 0.08, 0, 520),
+  armed: () => [440, 660, 880].forEach((f, i) => tone(f, 0.09, 'square', 0.06, i * 0.05)),
   dash: () => { tone(180, 0.25, 'sawtooth', 0.08, 0, 720); noise(0.3, 0.1, 3000); },
   smash: () => { noise(0.12, 0.18, 1800); tone(140, 0.1, 'square', 0.06, 0, 70); },
   splash: () => { noise(0.7, 0.35, 1500); tone(300, 0.4, 'sine', 0.08, 0, 80); },
