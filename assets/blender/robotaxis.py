@@ -1,29 +1,29 @@
-"""Parody robotaxis, built hard-surface to sit next to the Clanker Cab (see docs/CREDITS.md).
+"""Parody robotaxis built from Sketchfab source models (see docs/CREDITS.md).
 
-    blender --background --factory-startup --python robotaxis.py -- wayfarer|cybercab|lineup|style|silhouettes|trace
+    blender --background --factory-startup --python robotaxis.py -- wayfarer|cybercab|lineup|style
 
-Each body is built like cab.py, from flat planes: a side profile polygon (traced from the
-Sketchfab source, see `trace`, then given toy proportions: shorter overhangs, more height,
-bigger wheels) is extruded across the car and cut by a handful of planes that set the
-front section (tuck-under, flat side, shoulder crease, tumblehome, roof edge), the plan
-(nose and tail corners) and the corner facets around the lights. Every edge between
-two planes gets a one-segment chamfer and the body is flat shaded, so it reads as hard
-panels with crisp creases. Wheel arches are octagonal cuts with a lip; colour blocks are
-cut along planes, and the chamfers framing the glass stay paint, so the glass reads as
-real windows. Seams inside the silhouette (door cuts, hood and bumper lines, tailgate)
-get thin dark ink strips laid on the panels, since the game's outline only draws the
-silhouette. Lights, grille, stripes and sensors are chunky plates and primitives on top.
+Run fetch_sources.py first; the raw downloads live in sources/ and are not committed.
 
-- wayfarer: a Waymo-style cab with the Jaguar I-PACE's profile, our sensor kit (roof
-  plinth and lidar puck, fender and rear-corner pods) and teal stripes.
+The cars keep the real shapes of their sources at real size; only the rendering is ours:
+flat role colours with straight colour borders, normals split at real creases (about
+38 degrees) so the game's two-tone shader puts hard shadow shapes on flat panels, and a
+few thin ink lines along the seams an artist would draw.
+
+- wayfarer: a Waymo-style cab from a Jaguar I-PACE. The interior, brakes, lamp internals,
+  badges, script and plate are dropped and every other part is decimated and recoloured
+  by role, so its colour borders are the source's own panel edges. The mesh grille becomes
+  a plain panel of the same outline, the wheels are the source's (scaled to the real
+  20-inch size), and our own sensor kit (roof tower with a spinning lidar, fender, nose
+  and rear-corner sensors) and teal swoosh are added.
   Nodes: wayfarer > body, lidar, wheel_FL/FR/RL/RR.
-- cybercab: a Cybercab-style two-seat teardrop, no mirrors.
+- cybercab: a Cybercab-style two-seater from a single fused, textured (AI-generated) mesh.
+  The texture is not used: the mesh is made symmetric, the mirrors, plate recess and
+  baked-in wheels are ironed away, it is decimated, then the colour borders (glass
+  canopy, light bars, cladding) are cut into it along planes, so they come out straight.
   Nodes: cybercab > body, wheel_FL/FR/RL/RR.
 - lineup: both side on next to the current cab.glb at the same scale.
-- style: each cab in a 3/4 view next to the robotaxi from docs/art/scene-target.jpg.
-- silhouettes: each car in black next to its previous (soft) version from sources/prev/.
-- trace: print the source measurements the profiles and sections were traced from
-  (needs fetch_sources.py).
+- style: the robotaxi from docs/art/scene-target.jpg next to both cars at a similar
+  front 3/4 view.
 
 Both follow cab.py's conventions: metres, the car faces -Y in Blender (+Z in the game),
 origin on the ground midway between the axles, left (wheel_FL, wheel_RL) at +X.
@@ -43,34 +43,14 @@ from mathutils.bvhtree import BVHTree  # noqa: E402
 import common as C  # noqa: E402
 
 SOURCES = Path(__file__).resolve().parent / "sources"
-TRI_RANGE = (4000, 8000)
+TRI_RANGE = (8000, 16000)
+SMOOTH_ANGLE = 38  # normals split at creases sharper than this
 TEAL = 0x2FD6BF
 
-# Shared role palette: white or steel paint, near-black glass and trim, teal accent.
-PALETTE = {
-    "body": 0xF2F2EE,
-    "glass": 0x1E2731,
-    "trim": 0x1C1D20,
-    "accent": TEAL,
-    "hub": 0xA6AAAF,
-    "light_head": 0xFFF4D6,
-    "light_tail": 0xE0303A,
-}
-ROLES = list(PALETTE)
 
-
-# Frames whose local XY is the game's front/back plane (x, y), side plane (z, y) and
-# Blender's plan (x, y), for laying plates onto the body.
-FACING = Matrix(((1, 0, 0, 0), (0, 0, -1, 0), (0, 1, 0, 0), (0, 0, 0, 1)))
+# Frames whose local XY is the game's side plane (z, y) and Blender's plan (x, y), for
+# laying ink and decals onto the body.
 SIDE = Matrix(((0, 0, 1, 0), (-1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 0, 1)))
-
-
-def front_frame():
-    return Matrix.Translation((0, -4.0, 0)) @ FACING
-
-
-def rear_frame():
-    return Matrix.Translation((0, 4.0, 0)) @ FACING
 
 
 def side_frame(sx):
@@ -81,6 +61,7 @@ def top_frame():
     return Matrix.Translation((0, 0, 4.0))
 
 
+# Ray directions into the body from the front, the back and the top.
 FORWARD, BACKWARD, DOWN = Vector((0, 1, 0)), Vector((0, -1, 0)), Vector((0, 0, -1))
 
 
@@ -88,11 +69,7 @@ def inward(sx):
     return Vector((-sx, 0, 0))
 
 
-def mirrored(pts):
-    return [(-x, y) for x, y in reversed(pts)]
-
-
-# --- sources (only for `trace`) ----------------------------------------------------
+# --- source import and cleanup -------------------------------------------------
 
 def import_source(name):
     """Import sources/<name>/scene.gltf; returns its meshes with transforms baked in."""
@@ -129,240 +106,213 @@ def transform_all(objs, m):
         o.data.transform(m)
 
 
-def source_bvh(objs, drop=None):
-    """One BVH over `objs`, minus faces whose centre satisfies drop(Vector)."""
+def edit(obj, fn):
+    """Run fn(bm) on the object's mesh."""
     bm = bmesh.new()
-    for o in objs:
-        bm.from_mesh(o.data)
-    if drop:
-        bmesh.ops.delete(bm, geom=[f for f in bm.faces if drop(f.calc_center_median())], context="FACES")
-    bvh = BVHTree.FromBMesh(bm)
+    bm.from_mesh(obj.data)
+    out = fn(bm)
+    bm.to_mesh(obj.data)
     bm.free()
-    return bvh
+    obj.data.update()
+    return out
 
 
-WAYFARER_LENGTH = 4.68
-IPACE_SKIN = ("Body", "Body_noir", "Body_blue", "Chrome", "Plastique_noir", "Partie_noir",
-              "Dessous", "Vitre", "Vitre_noir", "Vitre_toit", "Phare_vitre", "Phare_chrome",
-              "Phare_plastique", "Feux_glass_red", "Feux_rouge", "Grille_calandre", "LED_blanc")
-CYBERCAB_LENGTH = 4.4
+def islands(bm):
+    """Connected face sets, in a deterministic order."""
+    bm.faces.ensure_lookup_table()
+    seen, out = set(), []
+    for f in bm.faces:
+        if f.index in seen:
+            continue
+        island, stack = [], [f]
+        seen.add(f.index)
+        while stack:
+            cur = stack.pop()
+            island.append(cur)
+            for e in cur.edges:
+                for nb in e.link_faces:
+                    if nb.index not in seen:
+                        seen.add(nb.index)
+                        stack.append(nb)
+        out.append(island)
+    return out
 
 
-def ipace_bvh():
-    """The I-PACE's outer skin at real size, origin on the ground midway between the axles."""
-    src = import_source("ipace")
-    by_mat = {o.data.materials[0].name: o for o in src}
-    lo, hi = bounds([by_mat["Body"]])
-    s = WAYFARER_LENGTH / (hi[1] - lo[1])
-    tyre = mesh_co(by_mat["Pneu"])
-    axle_y = [tyre[tyre[:, 1] < 0][:, 1].mean(), tyre[tyre[:, 1] > 0][:, 1].mean()]
-    transform_all(src, Matrix.Diagonal((s, s, s, 1)) @ Matrix.Translation(
-        (-(lo[0] + hi[0]) / 2, -(axle_y[0] + axle_y[1]) / 2, -tyre[:, 2].min())))
-    mlo, mhi = bounds([by_mat["Miroir"]])
-
-    def mirror_housing(c):
-        return abs(c.x) > 0.88 and mlo[1] - 0.1 < c.y < mhi[1] + 0.1 and mlo[2] - 0.12 < c.z < mhi[2] + 0.1
-
-    return source_bvh([by_mat[m] for m in IPACE_SKIN], drop=mirror_housing)
+def drop_small_islands(obj, min_size):
+    """Delete loose parts whose bounding-box diagonal is under `min_size` (bolts, letters)."""
+    def run(bm):
+        doomed = []
+        for island in islands(bm):
+            co = np.array([v.co[:] for f in island for v in f.verts])
+            if np.linalg.norm(co.max(axis=0) - co.min(axis=0)) < min_size:
+                doomed += island
+        bmesh.ops.delete(bm, geom=doomed, context="FACES")
+    edit(obj, run)
 
 
-def cybercab_bvh():
-    (src,) = import_source("cybercab")
-    lo, hi = bounds([src])
-    s = CYBERCAB_LENGTH / (hi[1] - lo[1])
-    transform_all([src], Matrix.Diagonal((s, s, s, 1)) @ Matrix.Translation(
-        (-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, -lo[2])))
-    # Axles from the tyre contact patches (the lowest vertices, front and back).
-    co = mesh_co(src)
-    low = co[co[:, 2] < 0.02]
-    mid = (low[low[:, 1] < 0][:, 1].mean() + low[low[:, 1] > 0][:, 1].mean()) / 2
-    transform_all([src], Matrix.Translation((0, -mid, 0)))
-
-    def mirror(c):
-        return abs(c.x) > 0.92 and -0.9 < c.y < -0.5 and 0.86 < c.z < 1.16
-
-    return source_bvh([src], drop=mirror)
+def delete_faces(obj, pred):
+    """Delete faces whose centre satisfies pred(Vector)."""
+    edit(obj, lambda bm: bmesh.ops.delete(
+        bm, geom=[f for f in bm.faces if pred(f.calc_center_median())], context="FACES"))
 
 
-def trace():
-    """Print each source's roof line and half widths per station, and its nose and tail
-    per height: the numbers the profiles and sections below were read from (before the
-    toy proportions: overhangs x0.8, heights x1.1 + 0.04)."""
-    for name, make in (("ipace", ipace_bvh), ("cybercab", cybercab_bvh)):
-        C.reset_scene()
-        bvh = make()
-        print(f"== {name}: y, roof z, half width at z = 0.3 .. 1.5")
-        for y in np.arange(-2.4, 2.45, 0.1):
-            top = bvh.ray_cast(Vector((0, y, 5)), DOWN, 10)[0]
-            if top is None:
-                continue
-            ws = []
-            for z in np.arange(0.3, 1.55, 0.2):
-                hit = bvh.ray_cast(Vector((3, y, z)), Vector((-1, 0, 0)), 6)[0]
-                ws.append(f"{hit.x:.2f}" if hit else "  - ")
-            print(f"  y={y:5.2f} roof={top.z:.2f} w=[{' '.join(ws)}]")
-        for z in np.arange(0.3, 1.65, 0.1):
-            f = bvh.ray_cast(Vector((0, -4, z)), FORWARD, 8)[0]
-            r = bvh.ray_cast(Vector((0, 4, z)), BACKWARD, 8)[0]
-            print(f"  z={z:.1f} nose={f.y if f else float('nan'):.2f} tail={r.y if r else float('nan'):.2f}")
+def weld(obj, dist):
+    edit(obj, lambda bm: bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=dist))
 
 
-# --- hard-surface body ---------------------------------------------------------------
+def decimate(obj, target_tris):
+    tris = C.triangle_count([obj])
+    if tris <= target_tris:
+        return
+    mod = obj.modifiers.new("dec", "DECIMATE")
+    mod.decimate_type = "COLLAPSE"
+    mod.ratio = target_tris / tris
+    mod.use_collapse_triangulate = True
+    C.apply_modifiers(obj)
 
-INSIDE = Vector((0, 0, 0.8))  # a point inside every body, to orient the cutting planes
+
+def set_role(obj, role, mats):
+    obj.data.materials.clear()
+    obj.data.materials.append(mats[role])
+    obj.data.polygons.foreach_set("material_index", [0] * len(obj.data.polygons))
 
 
-def plane3(a, b, c):
-    """The plane through points a, b, c, its normal facing away from INSIDE."""
+def join_into(builder, objs):
+    for o in objs:
+        builder.merge_mesh(o.data, [m.name for m in o.data.materials])
+        bpy.data.objects.remove(o)
+
+
+def iron(bm, axis, zone, pad, keep=lambda v, fit: True):
+    """Replace a bump or hollow with the surrounding skin: fit the `axis` coordinate as a
+    quadratic in the other two over the ring of verts within `pad` of the zone, then move
+    every vert in zone(co, 0) with keep(v, fit) onto the fit."""
+    a, b = [i for i in range(3) if i != axis]
+
+    def terms(c):
+        return [1, c[a], c[b], c[a] * c[a], c[a] * c[b], c[b] * c[b]]
+    ring = [v for v in bm.verts if zone(v.co, pad) and not zone(v.co, 0.0)]
+    coef = np.linalg.lstsq(np.array([terms(v.co) for v in ring]),
+                           np.array([v.co[axis] for v in ring]), rcond=None)[0]
+    for v in bm.verts:
+        if zone(v.co, 0.0):
+            fit = float(np.dot(terms(v.co), coef))
+            if keep(v, fit):
+                v.co[axis] = fit
+
+
+# --- plane-cut colour regions ----------------------------------------------------
+
+def plane3(a, b, c, up):
+    """Plane through three points as (point, unit normal), the normal on the side of `up`."""
     a, b, c = Vector(a), Vector(b), Vector(c)
     n = (b - a).cross(c - a).normalized()
-    if (INSIDE - a).dot(n) > 0:
+    if n.dot(Vector(up)) < 0:
         n = -n
     return a, n
 
 
-def section(x0, z0, x1, z1, rise=0.0):
-    """A cut along the whole car through the front-section edge (x0, z0)-(x1, z1) on the
-    left side (mirrored to the right); `rise` tilts it up towards the back, per metre."""
-    return plane3((x0, 0, z0), (x1, 0, z1), (x0, 1, z0 + rise))
+def plane2(a, b, up):
+    """Plane through two (y, z) side-view points, extended across the car (along X)."""
+    pa, pb = Vector((0, *a)), Vector((0, *b))
+    return plane3(pa, pb, pa + Vector((1, 0, 0)), up)
 
 
-def plan(x0, y0, x1, y1):
-    """A vertical cut through the plan edge (x0, y0)-(x1, y1), mirrored."""
-    return plane3((x0, y0, 0), (x1, y1, 0), (x0, y0, 1))
+def plane_axis(axis, value, up):
+    """Plane `axis` = value; `up` (+1/-1) picks the side the region is on."""
+    n = Vector((0, 0, 0))
+    n[axis] = up
+    co = Vector((0, 0, 0))
+    co[axis] = value
+    return co, n
 
 
-def clip(bm, co, no):
-    """Keep the part of bm behind the plane and close the cut with a flat face."""
-    geom = list(bm.verts) + list(bm.edges) + list(bm.faces)
-    bmesh.ops.bisect_plane(bm, geom=geom, plane_co=co, plane_no=no, clear_outer=True, dist=1e-6)
-    edges = [e for e in bm.edges if e.is_boundary]
-    if edges:
-        bmesh.ops.holes_fill(bm, edges=edges, sides=0)
+def inside(c, planes, margin=0.0):
+    return all((c - co).dot(n) >= -margin for co, n in planes)
 
 
-def hull(profile, cuts, chamfer, crease=10.0):
-    """Extrude the side `profile` [(y, z)] across the car, clip it by each of `cuts`
-    (and its mirror) and chamfer every crease sharper than `crease` degrees with one
-    segment. Returns the bmesh and its int face layer marking the chamfers."""
-    b = C.Builder(ROLES)
-    b.prism("body", [(-y, z) for y, z in profile], 2.6, SIDE)
-    bm = b.bm
-    for co, no in cuts:
-        clip(bm, co, no)
-        if abs(no.x) > 1e-6:
-            clip(bm, Vector((-co.x, co.y, co.z)), Vector((-no.x, no.y, no.z)))
-    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
-    bmesh.ops.dissolve_degenerate(bm, dist=1e-5, edges=bm.edges)
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    bm.normal_update()
-    layer = bm.faces.layers.int.new("chamfer")
-    bm.edges.index_update()
-    edges = sorted((e for e in bm.edges if not e.is_boundary and e.calc_face_angle(0) > math.radians(crease)),
-                   key=lambda e: e.index)
-    res = bmesh.ops.bevel(bm, geom=edges, offset=chamfer, offset_type="OFFSET", segments=1,
-                          profile=0.5, affect="EDGES", clamp_overlap=True)
-    for f in res["faces"]:
-        f[layer] = 1
-    return bm, layer
+def cut_region(bm, planes, margin=0.12, snap=0.008):
+    """Cut every plane of the convex region into the faces near the region, so the faces
+    inside it can be picked exactly by their centres afterwards."""
+    for co, n in planes:
+        others = [p for p in planes if p[0] is not co]
+        faces = [f for f in bm.faces if inside(f.calc_center_median(), others, margin)
+                 and abs((f.calc_center_median() - co).dot(n)) < margin]
+        if not faces:
+            continue
+        # Snap verts lying almost on the plane onto it, so the cut leaves no slivers.
+        for v in {v for f in faces for v in f.verts}:
+            d = (v.co - co).dot(n)
+            if abs(d) < snap:
+                v.co -= n * d
+        geom = faces + list({e for f in faces for e in f.edges}) + list({v for f in faces for v in f.verts})
+        bmesh.ops.bisect_plane(bm, geom=geom, dist=1e-5, plane_co=co, plane_no=n)
 
 
-def colour_block(bm, layer, planes, role):
-    """Cut along `planes` [(point, normal)] so colour borders are crisp edges, then give
-    each face the role role(centre, normal, is_chamfer) picks for it."""
-    for co, no in planes:
-        geom = list(bm.verts) + list(bm.edges) + list(bm.faces)
-        bmesh.ops.bisect_plane(bm, geom=geom, plane_co=co, plane_no=no)
-    bmesh.ops.dissolve_degenerate(bm, dist=1e-5, edges=bm.edges)
-    bm.normal_update()
+def paint_region(bm, planes, mat_index, where=lambda f: True):
     for f in bm.faces:
-        f.material_index = ROLES.index(role(f.calc_center_median(), f.normal, f[layer] == 1))
+        if inside(f.calc_center_median(), planes) and where(f):
+            f.material_index = mat_index
 
 
-def on_facet(c, n, plane):
-    """True for a face lying on `plane` or its mirror."""
-    co, no = plane
-    m = Vector((math.copysign(1, c.x) * math.copysign(1, co.x), 1, 1))
-    co, no = co * m, no * m
-    return n.dot(no) > 0.995 and abs((c - co).dot(no)) < 1e-3
+def calm_normals(obj, iterations):
+    """Shade the generated mesh's small lumps away without moving it: vertex normals are
+    averaged with their neighbours' across smooth edges a few times, so the two-tone
+    shadow edge runs in a clean curve; corners at sharp edges keep their split normals."""
+    me = obj.data
+    n_v = len(me.vertices)
+    vn = np.empty(n_v * 3)
+    me.vertices.foreach_get("normal", vn)
+    vn = vn.reshape(-1, 3)
+    ev = np.empty(len(me.edges) * 2, dtype=np.int64)
+    me.edges.foreach_get("vertices", ev)
+    ev = ev.reshape(-1, 2)
+    sharp = np.array([e.use_edge_sharp for e in me.edges], dtype=bool)
+    creased = np.zeros(n_v, dtype=bool)
+    creased[ev[sharp].ravel()] = True
+    soft = ev[~sharp]
+    for _ in range(iterations):
+        acc = vn.copy()
+        np.add.at(acc, soft[:, 0], vn[soft[:, 1]])
+        np.add.at(acc, soft[:, 1], vn[soft[:, 0]])
+        acc /= np.linalg.norm(acc, axis=1, keepdims=True)
+        vn = np.where(creased[:, None], vn, acc)
+    normals = []
+    for i, cn in enumerate(me.corner_normals):
+        v = me.loops[i].vertex_index
+        normals.append(cn.vector[:] if creased[v] else tuple(vn[v]))
+    me.normals_split_custom_set(normals)
 
 
-def facet_frame(plane, centre, up=Vector((0, 0, 1))):
-    """A frame on `plane` at `centre`, a metre out along its normal: local x runs level
-    across the facet, local y up it, so plates can be laid on it casting along -normal."""
-    no = plane[1]
-    co = Vector(centre) - no * (Vector(centre) - plane[0]).dot(no)
-    u = up.cross(no).normalized()
-    v = no.cross(u)
-    basis = Matrix((u, v, no)).transposed().to_4x4()
-    return Matrix.Translation(co + no) @ basis
+# --- surface details ---------------------------------------------------------------
+
+def rim_bands(bm, width, lift=0.003):
+    """Ink round a lamp: a band `width` wide lying on the surface just outside each open
+    edge of the lamp glass, as quads (lists of points)."""
+    bm.normal_update()
+    out = []
+    for e in bm.edges:
+        if not e.is_boundary:
+            continue
+        f = e.link_faces[0]
+        v0, v1 = e.verts
+        d = (v1.co - v0.co).normalized()
+        t = d.cross(f.normal).normalized()
+        if t.dot(f.calc_center_median() - v0.co) > 0:
+            t = -t
+        quad = [v0.co + v0.normal * lift, v1.co + v1.normal * lift,
+                v1.co + v1.normal * lift + t * width, v0.co + v0.normal * lift + t * width]
+        # Face the same way as the glass.
+        if (quad[1] - quad[0]).cross(quad[3] - quad[0]).dot(f.normal) < 0:
+            quad.reverse()
+        out.append([p.copy() for p in quad])
+    return out
 
 
-def mirror_plane(plane):
-    co, no = plane
-    return Vector((-co.x, co.y, co.z)), Vector((-no.x, no.y, no.z))
-
-
-def body_object(bm, name, mats):
-    me = bpy.data.meshes.new(name)
-    bm.to_mesh(me)
-    bm.free()
-    for n in ROLES:
-        me.materials.append(mats[n])
-    obj = bpy.data.objects.new(name, me)
-    bpy.context.scene.collection.objects.link(obj)
-    return obj
-
-
-def arch_outline(cy, cz, r, bottom):
-    """Octagonal arch (flat top, flat sides) of circumradius r about (cy, cz), in the
-    side plane (y, z), run from the bottom at the front round to the bottom at the back."""
-    k = math.cos(math.pi / 8)
-    pts = [(cy - r * k, bottom)]
-    for i in range(4):
-        a = math.pi * (7 - 2 * i) / 8
-        pts.append((cy + r * math.cos(a), cz + r * math.sin(a)))
-    return pts + [(cy + r * k, bottom)]
-
-
-def cut_arches(bm, mats, axles, r, cz, inner):
-    """Boolean four octagonal wheel wells into the body; the wells come out as trim."""
-    body = body_object(bm, "_hull", mats)
-    cutter = C.Builder(ROLES)
-    for ay in axles:
-        for sx in (1, -1):
-            cutter.tube("trim", Vector((sx * inner, ay, cz)), Vector((sx * 3.0, ay, cz)), r, r,
-                        sides=8, spin=math.pi / 8)
-    cut = body_object(cutter.bm, "_arch_cutter", mats)
-    mod = body.modifiers.new("arches", "BOOLEAN")
-    mod.operation = "DIFFERENCE"
-    mod.solver = "EXACT"
-    mod.material_mode = "TRANSFER"
-    mod.object = cut
-    C.apply_modifiers(body)
-    bpy.data.objects.remove(cut)
-    bm = bmesh.new()
-    bm.from_mesh(body.data)
-    bpy.data.objects.remove(body)
-    return bm
-
-
-def arch_lips(b, mat, axles, r, cz, bottom, width, x_in, x_out):
-    """A flat octagonal lip round each arch, from x_in to x_out (proud of the side)."""
-    for ay in axles:
-        outer = arch_outline(-ay, cz, r + width, bottom)
-        inner = arch_outline(-ay, cz, r, bottom)
-        ring = outer + inner[::-1]
-        for sx in (1, -1):
-            x0, x1 = sx * x_in, sx * x_out
-            frame = Matrix.Translation(((x0 + x1) / 2, 0, 0)) @ SIDE
-            b.prism(mat, ring, abs(x1 - x0), frame)
-
-
-def plate(b, mat, bvh, frame, pts, direction, depth=0.03, steps=(6, 2), sink=0.01):
-    """A solid plate on the surface: the quad `pts` (a, b, c, d) in the local XY of
+def plate(b, mat, bvh, frame, pts, direction, depth=0.012, steps=(6, 2), sink=0.012):
+    """A thin plate on the surface: the quad `pts` (a, b, c, d) in the local XY of
     `frame` is ray-cast along `direction` onto `bvh` on a grid; the plate stands `depth`
-    proud of the surface (along the ray) and reaches `sink` below it, so it gets its own ink outline."""
+    proud of the surface (along the ray) and reaches `sink` below it."""
     a, b_, c, d = (Vector(p) for p in pts)
     nu, nv = steps
     direction = direction.normalized()
@@ -372,11 +322,15 @@ def plate(b, mat, bvh, frame, pts, direction, depth=0.03, steps=(6, 2), sink=0.0
         for i in range(nu + 1):
             u, v = i / nu, j / nv
             p2 = a.lerp(b_, u).lerp(d.lerp(c, u), v)
-            origin = frame @ Vector((p2.x, p2.y, 0))
-            hit = bvh.ray_cast(origin, direction, 8.0)[0]
+            for nudge in (0.0, 0.012, -0.012, 0.024, -0.024):
+                # A ray down a panel gap passes through; nudge it onto the panel beside.
+                origin = frame @ Vector((p2.x + nudge, p2.y + nudge, 0))
+                hit = bvh.ray_cast(origin, direction, 8.0)[0]
+                if hit is not None:
+                    break
             assert hit is not None, f"plate point {p2[:]} missed the body"
-            # Offset along the ray, not the hit normal: flat face normals jump between
-            # faces and would crease the plate.
+            # Offset along the ray, not the hit normal: face normals jump between faces
+            # and would crease the plate.
             trow.append(b.bm.verts.new(hit - direction * depth))
             brow.append(b.bm.verts.new(hit + direction * sink))
         top.append(trow)
@@ -388,15 +342,14 @@ def plate(b, mat, bvh, frame, pts, direction, depth=0.03, steps=(6, 2), sink=0.0
             b.bm.faces.new((bot[j][i], bot[j + 1][i], bot[j + 1][i + 1], bot[j][i + 1]))
     rim = ([(j, 0) for j in range(nv)] + [(nv, i) for i in range(nu)]
            + [(j, nu) for j in range(nv, 0, -1)] + [(0, i) for i in range(nu, 0, -1)])
-    rim_next = rim[1:] + rim[:1]
-    for (j0, i0), (j1, i1) in zip(rim, rim_next):
+    for (j0, i0), (j1, i1) in zip(rim, rim[1:] + rim[:1]):
         b.bm.faces.new((top[j0][i0], top[j1][i1], bot[j1][i1], bot[j0][i0]))
     new = [f for f in b.bm.faces if f not in before]
     bmesh.ops.recalc_face_normals(b.bm, faces=new)
     return b._assign(before, mat)
 
 
-def ink(b, bvh, frame, pts, direction, width=0.024, depth=0.008, step=0.06):
+def ink(b, bvh, frame, pts, direction, width=0.016, depth=0.005, step=0.08):
     """A thin dark seam line along the polyline `pts` in the frame's local XY, laid on
     the body like a plate, each segment a little longer so the joints overlap."""
     for p0, p1 in zip(pts, pts[1:]):
@@ -406,41 +359,15 @@ def ink(b, bvh, frame, pts, direction, width=0.024, depth=0.008, step=0.06):
         n = Vector((-d.y, d.x)) * width / 2
         steps = (max(1, math.ceil((p1 - p0).length / step)), 1)
         plate(b, "trim", bvh, frame, [p0 - n, p1 - n, p1 + n, p0 + n], direction,
-              depth=depth, steps=steps, sink=0.012)
+              depth=depth, steps=steps)
 
 
-# --- wheels ----------------------------------------------------------------------
-
-def wheel(name, mats, root, x, y, r, width, rim_r):
-    """Chamfered tyre, flat rim face with five dark spoke gaps and a cap; pivot at the
-    axle centre."""
-    b = C.Builder(ROLES)
-    sx = 1 if x > 0 else -1
-    c = Vector((x, y, r))
-    ax = Vector((sx, 0, 0))
-    b.tube("trim", c - ax * width / 2, c + ax * width / 2, r, r, sides=18, bevel=0.05)
-    face = width / 2 + 0.012
-    b.tube("hub", c + ax * (width / 2 - 0.03), c + ax * face, rim_r, rim_r * 0.94, sides=10, bevel=0.012)
-    # Spoke gaps: dark trapezoids between five spokes, on the rim face.
-    frame = Matrix.Translation(c + ax * (face + 0.004)) @ Matrix(((0, 0, sx, 0), (-sx, 0, 0, 0), (0, 1, 0, 0), (0, 0, 0, 1)))
-    for i in range(5):
-        a0 = 2 * math.pi * i / 5 + 0.3
-        a1 = a0 + 2 * math.pi / 5 - 0.42
-        r0, r1 = rim_r * 0.36, rim_r * 0.8
-        quad = [(r0 * math.cos(a0 + 0.12), r0 * math.sin(a0 + 0.12)), (r1 * math.cos(a0), r1 * math.sin(a0)),
-                (r1 * math.cos(a1), r1 * math.sin(a1)), (r0 * math.cos(a1 - 0.12), r0 * math.sin(a1 - 0.12))]
-        b.prism("trim", quad, 0.012, frame)
-    b.tube("trim", c + ax * (face - 0.004), c + ax * (face + 0.022), rim_r * 0.24, rim_r * 0.18, sides=8)
-    return b.to_object(name, mats, pivot=c, parent=root)
-
-
-def build_wheels(root, mats, track_x, axles, r, width, rim_r):
-    """axles = (front_y, rear_y) in Blender; FL at +X."""
-    out = []
-    for name, x, y in (("wheel_FL", track_x, axles[0]), ("wheel_FR", -track_x, axles[0]),
-                       ("wheel_RL", track_x, axles[1]), ("wheel_RR", -track_x, axles[1])):
-        out.append(wheel(name, mats, root, x, y, r, width, rim_r))
-    return out
+def to_object(b, *args, **kw):
+    """Builder.to_object with coordinates snapped to 0.01 mm: some bmesh ops leave float
+    noise that differs from run to run, and the build must be byte-identical."""
+    for v in b.bm.verts:
+        v.co = Vector(round(c, 5) for c in v.co)
+    return b.to_object(*args, **kw)
 
 
 def finish(name, root, parts):
@@ -448,284 +375,517 @@ def finish(name, root, parts):
     tris = C.triangle_count(parts)
     assert TRI_RANGE[0] <= tris <= TRI_RANGE[1], f"{name} has {tris} triangles, outside {TRI_RANGE}"
     C.export_glb(name)
-    C.render_contact_sheet(root, name, outline=0.03)
+    C.render_contact_sheet(root, name, outline=0.02)
 
 
-# --- Wayfarer (Waymo-style, the Jaguar I-PACE's profile) ------------------------
+# --- Wayfarer (Waymo-style, from the Jaguar I-PACE) ----------------------------
 
-WF_AXLE = 1.5          # half wheelbase, measured
-WF_WHEEL_R = 0.418 * 1.13
-WF_TYRE_W = 0.34
-WF_TRACK = 0.83        # tyre centre, half track
-WF_ARCH_R = WF_WHEEL_R + 0.09
-WF_ARCH_INNER = 0.45   # wheel wells reach in to this half width
-WF_SILL = 0.3
-# Side profile, front bumper chin round over the roof to the rear bumper (Blender y, z):
-# a short hood rising into a steep, fast windscreen, a coupe roof sloping into a
-# cut-off tail. Traced from the I-PACE (hood 1.11 at the cowl, roof 1.61, tail 1.21).
-WF_PROFILE = [(-2.12, WF_SILL), (-2.2, 0.44), (-2.2, 0.94), (-2.07, 1.07), (-1.42, 1.23),
-              (-0.5, 1.72), (0.62, 1.8), (1.5, 1.68), (2.0, 1.44), (2.14, 1.32),
-              (2.17, 0.46), (2.1, WF_SILL)]
-WF_BELT = 1.26         # shoulder crease at the front; it rises towards the back
-# The corner facets that carry the head and tail lights.
-WF_HEAD_FACET = plane3((0.95, -1.5, 1.24), (0.95, -2.0, 0.78), (0.35, -2.2, 1.04))
-WF_TAIL_FACET = plane3((0.89, 1.88, 1.38), (0.95, 2.06, 1.06), (0.62, 2.15, 1.3))
-WF_RISE = 0.025
-WF_CUTS = [
-    section(0.84, WF_SILL, 0.95, 0.56),                        # tuck-under
-    section(0.95, 0.56, 0.95, 1.12),                           # flat door sides
-    section(0.95, 1.12, 0.89, WF_BELT, rise=WF_RISE),          # shoulder
-    section(0.89, WF_BELT, 0.69, 1.74, rise=WF_RISE),          # tumblehome
-    section(0.69, 1.74, 0.5, 1.86),                            # roof edge
-    plan(0.95, -1.88, 0.7, -2.2),                              # nose corners
-    plan(0.95, 1.92, 0.74, 2.17),                              # tail corners
-    WF_HEAD_FACET,
-    WF_TAIL_FACET,
-]
-WF_CLAD = 0.58         # black cladding below, on the sides
-WF_BUMPER = 0.4        # and on the bumper faces
-WF_COWL = -1.42        # windscreen base, Blender y
-WF_B = 0.1             # B-pillar centre, Blender y at the ground
-WF_B_LEAN = 0.12       # it leans back this much per metre up
-WF_C = ((1.62, 1.3), (1.3, 1.76))   # the side glass ends ahead of this line (y, z)
-
-
-def wf_planes():
-    c0, c1 = WF_C
-    return [
-        (Vector((0, 0, WF_CLAD)), Vector((0, 0, 1))),
-        (Vector((0, 0, WF_BUMPER)), Vector((0, 0, 1))),
-        (Vector((0, WF_B - 0.07, 0)), Vector((0, 1, -WF_B_LEAN)).normalized()),
-        (Vector((0, WF_B + 0.07, 0)), Vector((0, 1, -WF_B_LEAN)).normalized()),
-        plane3((0, *c0), (0, *c1), (1, *c0)),
-    ]
-
-
-def wf_role(c, n, chamfer):
-    if on_facet(c, n, WF_HEAD_FACET):
-        return "trim"
-    if on_facet(c, n, WF_TAIL_FACET):
-        return "light_tail"
-    if c.z < (WF_BUMPER if abs(n.y) > 0.9 else WF_CLAD) or n.z < -0.6:
-        return "trim"
-    if chamfer or n.z > 0.92:
-        return "body"
-    belt = WF_BELT + WF_RISE * c.y
-    if n.y < -0.25 and n.z > 0.3 and c.z > 1.24 and c.y < 0:
-        return "glass"                                         # windscreen
-    if n.y > 0.3 and n.z > 0.3 and c.y > 1.4 and abs(n.x) < 0.4:
-        return "glass"                                         # rear window
-    c0, c1 = WF_C
-    ahead = (c.y - c0[0]) * (c1[1] - c0[1]) - (c.z - c0[1]) * (c1[0] - c0[0]) < 0
-    if abs(n.x) > 0.5 and c.z > belt + 0.02 and WF_COWL < c.y and ahead and abs(c.y - WF_B_LEAN * c.z - WF_B) > 0.07:
-        return "glass"                                         # side windows
-    return "body"
+WAYFARER_LENGTH = 4.68
+WAYFARER_WHEEL_R = 0.38   # 245/50 R20; the source's tyres are about 10% oversize
+WAYFARER_PALETTE = {
+    "body": 0xF4F4F0,
+    "glass": 0x1E2731,
+    "trim": 0x1C1D20,
+    "accent": TEAL,
+    "light_head": 0xFFF6DE,
+    "light_tail": 0xE0303A,
+    "tyre": 0x232427,
+    "hub": 0xB4B8BD,
+}
+# Source material -> (role, triangle budget). Anything not listed is dropped: the
+# interior and seats, discs and calipers, lamp internals and chrome bezels, the mesh
+# grille (replaced by a plain panel), the side repeaters, the "I-PACE" side script and
+# the Jaguar badge (Ipace, Jaguar_bleu).
+IPACE_PARTS = {
+    "Body": ("body", 4300),
+    "Body_noir": ("trim", 1000),
+    "Body_blue": ("trim", 200),
+    "Chrome": ("trim", 500),
+    "Plastique_noir": ("trim", 900),
+    "Partie_noir": ("trim", 300),
+    "Dessous": ("trim", 200),
+    "Miroir": ("trim", 40),
+    "Vitre": ("glass", 420),
+    "Vitre_noir": ("glass", 420),
+    "Vitre_toit": ("glass", 80),
+    "Phare_vitre": ("light_head", 200),
+    "LED_blanc": ("trim", 80),  # bumper accent line, not a lamp
+    "Feux_glass_red": ("light_tail", 280),
+    "Feux_LED_red": ("light_tail", 40),
+}
+# The wheels: source material -> (role, triangle budget per wheel).
+IPACE_WHEEL = {"Pneu": ("tyre", 260), "Jante": ("hub", 460), "Jante_noir": ("trim", 120)}
 
 
 def build_wayfarer():
     C.reset_scene()
-    mats = C.make_materials(PALETTE)
+    mats = C.make_materials(WAYFARER_PALETTE)
+    roles = list(WAYFARER_PALETTE)
+    src = import_source("ipace")
     root = C.empty("wayfarer")
-    bm, layer = hull(WF_PROFILE, WF_CUTS, chamfer=0.045)
-    colour_block(bm, layer, wf_planes(), wf_role)
-    bm = cut_arches(bm, mats, (-WF_AXLE, WF_AXLE), WF_ARCH_R, WF_WHEEL_R, WF_ARCH_INNER)
-    b = C.Builder(ROLES)
-    b.bm = bm
-    bvh = BVHTree.FromBMesh(bm)
-    arch_lips(b, "trim", (-WF_AXLE, WF_AXLE), WF_ARCH_R, WF_WHEEL_R, WF_SILL + 0.06, 0.08, 0.8, 0.985)
+    by_mat = {o.data.materials[0].name: o for o in src}
+
+    # Scale to the real car and put the origin on the ground midway between the axles.
+    lo, hi = bounds([by_mat["Body"]])
+    s = WAYFARER_LENGTH / (hi[1] - lo[1])
+    tyre = mesh_co(by_mat["Pneu"])
+    axle_y = [tyre[tyre[:, 1] < 0][:, 1].mean(), tyre[tyre[:, 1] > 0][:, 1].mean()]
+    transform_all(src, Matrix.Diagonal((s, s, s, 1)) @ Matrix.Translation(
+        (-(lo[0] + hi[0]) / 2, -(axle_y[0] + axle_y[1]) / 2, -tyre[:, 2].min())))
+    tyre = mesh_co(by_mat["Pneu"])
+    src_r = (tyre[:, 2].max() - tyre[:, 2].min()) / 2
+    # Real-size wheels: shrink them about their axles and lower the car to stand on them.
+    drop = src_r - WAYFARER_WHEEL_R
+    transform_all(src, Matrix.Translation((0, 0, -drop)))
+    axles = (tyre[tyre[:, 1] < 0][:, 1].mean(), tyre[tyre[:, 1] > 0][:, 1].mean())
+    grille_lo, grille_hi = bounds([by_mat["Grille_calandre"]])
+    badge_lo, badge_hi = bounds([by_mat["Jaguar_bleu"]])
+    badge_lo, badge_hi = badge_lo - 0.03, badge_hi + 0.03
+
+    def in_badge(c):
+        return (badge_lo[0] < c.x < badge_hi[0] and badge_lo[2] < c.z < badge_hi[2]
+                and c.y < badge_hi[1] + 0.06)
+
+    wheel_parts = {m: by_mat.pop(m) for m in IPACE_WHEEL}
+    kept, rims = [], []
+    for o in src:
+        m = o.data.materials[0].name
+        if m in IPACE_WHEEL:
+            continue
+        if m not in IPACE_PARTS:
+            bpy.data.objects.remove(o)
+            continue
+        role, budget = IPACE_PARTS[m]
+        drop_small_islands(o, 0.03)
+        delete_faces(o, in_badge)
+        if m == "Body_blue":
+            # The blank licence plate on the rear bumper.
+            delete_faces(o, lambda c: abs(c.x) < 0.4 and c.y > 2.0 and 0.3 < c.z < 0.7)
+        if m == "Chrome":
+            # The leaper on the tailgate and the plate frame below it.
+            delete_faces(o, lambda c: abs(c.x) < 0.4 and c.y > 2.0 and c.z > 0.2)
+        weld(o, 1e-4)
+        decimate(o, budget)
+        set_role(o, role, mats)
+        if m in ("Phare_vitre", "Feux_glass_red"):
+            rims += edit(o, lambda bm: rim_bands(bm, 0.014))
+        kept.append(o)
+
+    b = C.Builder(roles)
+    join_into(b, kept)
+    before = b._begin()
+    for quad in rims:
+        b.bm.faces.new([b.bm.verts.new(p) for p in quad])
+    b._assign(before, "trim")
+    bvh = BVHTree.FromBMesh(b.bm)
+    grille_panel(b, bvh, grille_lo, grille_hi)
     wayfarer_details(b, bvh)
-    wayfarer_seams(b, bvh)
-    roof = bvh.ray_cast(Vector((0, WF_LIDAR_Y, 4)), DOWN, 8)[0].z
-    wayfarer_sensors(b, bvh, roof)
-    body = b.to_object("body", mats, parent=root)
-    lidar = build_lidar(mats, root, roof)
-    wheels = build_wheels(root, mats, WF_TRACK, (-WF_AXLE, WF_AXLE), WF_WHEEL_R, WF_TYRE_W, WF_WHEEL_R * 0.62)
+    roof = wayfarer_sensors(b, bvh)
+    body = to_object(b, "body", mats, parent=root, smooth_angle=SMOOTH_ANGLE)
+    calm_normals(body, iterations=4)
+    lidar = build_lidar(mats, roles, root, roof)
+    wheels = source_wheels(root, mats, roles, wheel_parts, axles, src_r)
     return root, [body, lidar, *wheels]
 
 
+def source_wheels(root, mats, roles, parts, axles, src_r):
+    """Split the source's four wheels into nodes, scaled about their axles to the real
+    size; the pivot is the axle centre."""
+    k = WAYFARER_WHEEL_R / src_r
+    out = []
+    for name, sx, ay in (("wheel_FL", 1, axles[0]), ("wheel_FR", -1, axles[0]),
+                         ("wheel_RL", 1, axles[1]), ("wheel_RR", -1, axles[1])):
+        b = C.Builder(roles)
+        centre = None
+        for m, (role, budget) in IPACE_WHEEL.items():
+            src = parts[m]
+            me = src.data.copy()
+            o = bpy.data.objects.new(f"{name}_{m}", me)
+            bpy.context.scene.collection.objects.link(o)
+            delete_faces(o, lambda c: c.x * sx < 0 or abs(c.y - ay) > 0.8)
+            drop_small_islands(o, 0.03)
+            if m == "Pneu":
+                co = mesh_co(o)
+                centre = Vector((co[:, 0].mean(), ay, (co[:, 2].max() + co[:, 2].min()) / 2))
+            weld(o, 1e-4)
+            decimate(o, budget)
+            set_role(o, role, mats)
+            # Scale about the axle, which the lowered car has put at the real radius.
+            o.data.transform(Matrix.Translation(centre) @ Matrix.Diagonal((k, k, k, 1))
+                             @ Matrix.Translation(-centre)
+                             @ Matrix.Translation((0, 0, WAYFARER_WHEEL_R - centre.z)))
+            join_into(b, [o])
+        pivot = Vector((centre.x, ay, WAYFARER_WHEEL_R))
+        # The hub caps carried the Jaguar badge: cover the centre with a plain cap.
+        face = max(v.co.x * sx for v in b.bm.verts)
+        b.tube("hub", Vector((sx * (face - 0.03), ay, pivot.z)), Vector((sx * (face - 0.005), ay, pivot.z)),
+               0.055, 0.05, sides=10)
+        out.append(to_object(b, name, mats, pivot=pivot, parent=root, smooth_angle=SMOOTH_ANGLE))
+    for o in parts.values():
+        bpy.data.objects.remove(o)
+    return out
+
+
+def grille_panel(b, bvh, lo, hi):
+    """A plain black panel in the outline of the mesh grille: the outline is the grille's
+    front silhouette, the panel follows its curve and sits just inside the surround."""
+    lo, hi = Vector(lo), Vector(hi)
+    cx, cz = (lo.x + hi.x) / 2, (lo.z + hi.z) / 2
+    w, h = (hi.x - lo.x) / 2, (hi.z - lo.z) / 2
+    # The I-PACE grille: a wide hexagon, its top edge straight, the lower corners cut.
+    outline = [(-1.0, 1.0), (1.0, 1.0), (1.0, -0.25), (0.62, -1.0), (-0.62, -1.0), (-1.0, -0.25)]
+    rings = (0.97, 0.6, 0.25)
+    y_back = hi.y + 0.02
+
+    def vert(u, v):
+        x, z = cx + u * w, cz + v * h
+        # The grille bows forward in plan: follow the bumper skin behind it.
+        hit = bvh.ray_cast(Vector((x, lo.y - 1.0, z)), FORWARD, 3.0)[0]
+        y = hit.y if hit is not None and hit.y < y_back else lo.y + (hi.y - lo.y) * abs(u) ** 2
+        return Vector((x, y + 0.015, z))
+    before = b._begin()
+    loops = [[b.bm.verts.new(vert(u * s, v * s)) for u, v in outline] for s in rings]
+    centre = b.bm.verts.new(vert(0, 0))
+    n = len(outline)
+    for r0, r1 in zip(loops, loops[1:]):
+        for i in range(n):
+            j = (i + 1) % n
+            b.bm.faces.new((r0[i], r0[j], r1[j], r1[i]))
+    for i in range(n):
+        b.bm.faces.new((loops[-1][i], loops[-1][(i + 1) % n], centre))
+    # Back it with a box so it closes.
+    new = [f for f in b.bm.faces if f not in before]
+    bmesh.ops.recalc_face_normals(b.bm, faces=new)
+    for f in new:
+        if f.normal.y > 0:
+            f.normal_flip()
+    b._assign(before, "trim")
+    # Two horizontal bars across it, as the artist draws a grille.
+    for v in (0.35, -0.25):
+        z = cz + v * h
+        b.box("hub", (w * 1.7 * (1 - abs(v) * 0.4), 0.02, 0.016), Vector((cx, vert(0, v).y - 0.01, z)), bevel=0.006)
+
+
+# Seams an artist would draw, in the side frame (forward, up) in metres, laid over the
+# source's own panel gaps (its open edges).
+WF_SEAMS = [
+    [(0.92, 1.12), (1.0, 0.9), (1.0, 0.62), (1.02, 0.4)],              # front door, front edge
+    [(-0.2, 1.12), (-0.2, 0.6), (-0.18, 0.4)],                         # B-pillar shut line
+    [(-1.42, 1.12), (-1.28, 0.96), (-1.2, 0.8), (-1.16, 0.6)],         # rear door, rear edge
+]
+
+
 def wayfarer_details(b, bvh):
-    """Big readable shapes: angular headlights, grille, tail lights, teal swooshes."""
-    f, r = front_frame(), rear_frame()
-    # The game's front plane, seen from the front: +x is the car's left.
-    # Headlights: a slim angular lamp on each black corner facet.
-    for sx in (1, -1):
-        plane = WF_HEAD_FACET if sx > 0 else mirror_plane(WF_HEAD_FACET)
-        fr = facet_frame(plane, (sx * 0.74, -1.92, 1.0))
-        lamp = [(-0.24, -0.02), (0.16, -0.12), (0.24, 0.0), (-0.18, 0.07)]
-        if sx < 0:
-            lamp = mirrored(lamp)
-        plate(b, "light_head", bvh, fr, lamp, -plane[1], depth=0.02, steps=(3, 1))
-    # One big dark grille with a cut-off top corner each side.
-    plate(b, "trim", bvh, f, [(-0.6, 0.5), (0.6, 0.5), (0.56, 0.78), (-0.56, 0.78)], FORWARD, steps=(6, 2))
-    # Teal swoosh on each front door, leaning forward (side frame: x = game z forward).
-    for sx in (1, -1):
-        plate(b, "accent", bvh, side_frame(sx), [(0.12, 0.6), (0.44, 0.6), (0.86, 1.18), (0.54, 1.18)],
-              inward(sx), steps=(4, 4))
-    # Teal slash on the tailgate, the cab's motif.
-    plate(b, "accent", bvh, r, [(-0.14, 0.8), (-0.34, 0.8), (-0.56, 1.16), (-0.36, 1.16)], BACKWARD, steps=(2, 3))
-
-
-def wayfarer_seams(b, bvh):
-    """Ink lines on the panel seams: doors, hood, bumpers, tailgate."""
+    """Door seams, the hood shut lines and the teal swoosh."""
     for sx in (1, -1):
         s = side_frame(sx)
-        # Side frame x = forward (= -Blender y).
-        ink(b, bvh, s, [(0.8, WF_CLAD + 0.02), (0.82, 1.22)], inward(sx))                  # front door, front
-        ink(b, bvh, s, [(-WF_B - WF_B_LEAN * 0.6, WF_CLAD + 0.02), (-WF_B - WF_B_LEAN * 1.26, 1.26)],
-            inward(sx))                                                                     # B-pillar door cut
-        ink(b, bvh, s, [(-0.82, WF_CLAD + 0.02), (-0.82, 1.0), (-1.1, 1.27)], inward(sx))   # rear door, rear
-    # Hood shut lines along the fenders and across the nose.
-    top = top_frame()
+        for pts in WF_SEAMS:
+            ink(b, bvh, s, pts, inward(sx))
+        # Teal swoosh: a wide band leaning forward across the front door, like the concept.
+        plate(b, "accent", bvh, s, [(0.12, 0.56), (0.38, 0.56), (0.86, 1.04), (0.6, 1.04)],
+              inward(sx), steps=(4, 6), depth=0.006)
+    # Clamshell hood: shut lines along the tops of the wings.
     for sx in (1, -1):
-        ink(b, bvh, top, [(sx * 0.74, WF_COWL + 0.04), (sx * 0.7, -2.0)], DOWN)
-    f = front_frame()
-    ink(b, bvh, f, [(-0.44, 1.04), (0.44, 1.04)], FORWARD)                                 # hood front
-    r = rear_frame()
-    ink(b, bvh, r, [(-0.66, 0.74), (-0.66, 1.34)], BACKWARD)                               # tailgate
-    ink(b, bvh, r, [(0.66, 0.74), (0.66, 1.34)], BACKWARD)
-    ink(b, bvh, r, [(-0.66, 0.74), (0.66, 0.74)], BACKWARD)
+        ink(b, bvh, top_frame(), [(sx * 0.8, -2.08), (sx * 0.8, -1.15)], DOWN)
 
 
-WF_LIDAR_Y = 0.25  # Blender y of the roof puck (behind the windscreen header)
+def roof_hit(bvh, x, y):
+    return bvh.ray_cast(Vector((x, y, 4.0)), DOWN, 6.0)[0]
 
 
-def wayfarer_sensors(b, bvh, roof):
-    """Clanker Cab-sized kit: a white roof plinth, chunky fender and rear-corner pods."""
-    ly = WF_LIDAR_Y
-    b.box("body", (0.86, 0.92, 0.2), Vector((0, ly, roof + 0.06)), bevel=0.04, seg=1, taper=(0.82, 0.82))
+WF_TOWER_Y = 0.15   # Blender y of the roof tower, over the B-pillars
+
+
+def wayfarer_sensors(b, bvh):
+    """A Waymo-style sensor kit: the roof tower (a white plinth, a black camera ring with
+    a teal band; the lidar dome on top is its own node), fender sensors ahead of the
+    mirrors, a nose lidar and rear-corner sensors, each with a teal ring."""
+    y = WF_TOWER_Y
+    # Rounded so float noise in the ray casts cannot change the build.
+    roof = round(max(roof_hit(bvh, x, y + dy).z for x in (-0.3, 0, 0.3) for dy in (-0.3, 0, 0.3)), 3)
+    # Plinth: a low white block, its sides raked, sunk into the curved roof.
+    b.box("body", (0.8, 0.9, 0.16), Vector((0, y, roof + 0.02)), bevel=0.035, seg=2, taper=(0.86, 0.84))
+    # Small camera bumps at the plinth's corners.
     for sx in (1, -1):
-        # Fender pods on the front wings, ahead of the A-pillars.
-        fx, fy = sx * 0.74, -1.25
-        fz = bvh.ray_cast(Vector((fx, fy, 4)), DOWN, 8)[0].z
-        b.box("trim", (0.18, 0.3, 0.2), Vector((fx, fy, fz + 0.07)), bevel=0.03, seg=1, taper=(0.85, 0.85))
-        b.tube("trim", Vector((fx, fy, fz + 0.16)), Vector((fx, fy, fz + 0.26)), 0.085, 0.075, sides=10)
-        b.tube("accent", Vector((fx, fy, fz + 0.2)), Vector((fx, fy, fz + 0.23)), 0.09, 0.09, sides=10)
-        # Rear-corner pods, sunk into the bumper corners.
-        hit = bvh.ray_cast(Vector((sx * 0.8, 4.0, 0.84)), BACKWARD, 8)[0]
-        b.box("trim", (0.16, 0.2, 0.22), hit + Vector((0, -0.04, 0)), bevel=0.03, seg=1)
+        for dy in (-0.38, 0.38):
+            b.box("trim", (0.07, 0.09, 0.06), Vector((sx * 0.36, y + dy, roof + 0.08)), bevel=0.012)
+    top = roof + 0.1
+    b.tube("trim", Vector((0, y, top)), Vector((0, y, top + 0.11)), 0.3, 0.28, sides=16, bevel=0.012)
+    b.tube("accent", Vector((0, y, top + 0.11)), Vector((0, y, top + 0.135)), 0.28, 0.28, sides=16)
+    b.tube("trim", Vector((0, y, top + 0.135)), Vector((0, y, top + 0.15)), 0.25, 0.25, sides=16)
+    for sx in (1, -1):
+        # Fender sensors on the wings, ahead of the A-pillars.
+        fx, fy = sx * 0.76, -1.12
+        h = roof_hit(bvh, fx, fy).z
+        b.box("body", (0.12, 0.16, 0.08), Vector((fx, fy, h + 0.02)), bevel=0.02, taper=(0.85, 0.85))
+        b.tube("trim", Vector((fx, fy, h + 0.05)), Vector((fx, fy, h + 0.15)), 0.055, 0.05, sides=12, bevel=0.008)
+        b.tube("accent", Vector((fx, fy, h + 0.105)), Vector((fx, fy, h + 0.12)), 0.057, 0.057, sides=12)
+        # Rear-corner sensors on the bumper corners.
+        hit = bvh.ray_cast(Vector((sx * 0.84, 4.0, 0.62)), BACKWARD, 4.0)[0]
+        c = hit + Vector((0, 0.01, 0))
+        b.box("trim", (0.12, 0.08, 0.14), c, bevel=0.02)
+        b.tube("accent", c + Vector((0, 0.035, 0.03)), c + Vector((0, 0.045, 0.03)), 0.022, 0.022, sides=8)
+    # Nose lidar under the grille.
+    hit = bvh.ray_cast(Vector((0, -4.0, 0.42)), FORWARD, 4.0)[0]
+    b.tube("trim", hit + Vector((0, 0.03, 0)), hit + Vector((0, -0.06, 0)), 0.07, 0.065, sides=12, bevel=0.01)
+    return top + 0.15
 
 
-def build_lidar(mats, root, roof):
-    """The Clanker Cab's puck: pivot on its axis so it spins about the game's Y."""
-    y, z0 = WF_LIDAR_Y, roof + 0.16
-    b = C.Builder(ROLES)
-    b.tube("trim", Vector((0, y, z0)), Vector((0, y, z0 + 0.42)), 0.3, 0.27, sides=14, bevel=0.02)
-    b.tube("accent", Vector((0, y, z0 + 0.14)), Vector((0, y, z0 + 0.22)), 0.315, 0.31, sides=14)
-    b.tube("trim", Vector((0, y, z0 + 0.42)), Vector((0, y, z0 + 0.48)), 0.21, 0.12, sides=14)
-    return b.to_object("lidar", mats, pivot=Vector((0, y, z0 + 0.24)), parent=root)
+def build_lidar(mats, roles, root, base):
+    """The spinning lidar dome on the tower; pivot on its axis so it spins about the
+    game's Y."""
+    y = WF_TOWER_Y
+    b = C.Builder(roles)
+    b.tube("trim", Vector((0, y, base)), Vector((0, y, base + 0.2)), 0.2, 0.19, sides=20, bevel=0.01)
+    b.tube("accent", Vector((0, y, base + 0.13)), Vector((0, y, base + 0.155)), 0.197, 0.196, sides=20)
+    b.sphere("trim", Vector((0, y, base + 0.2)), (0.19, 0.19, 0.07), u=20, v=6)
+    return to_object(b, "lidar", mats, pivot=Vector((0, y, base + 0.12)), parent=root, smooth_angle=50)
 
 
-# --- Cyber Cab (Cybercab-style teardrop) -----------------------------------------
+# --- Cyber Cab (Cybercab-style, from a fused AI mesh) --------------------------
 
-CC_AXLE = 1.27          # half wheelbase, measured off the source's baked-in wheels
-CC_WHEEL_R = 0.37 * 1.13
-CC_TYRE_W = 0.3
-CC_TRACK = 0.82
-CC_ARCH_R = CC_WHEEL_R + 0.08
-CC_ARCH_INNER = 0.45
-CC_SILL = 0.26
-# Teardrop side profile, faceted: flat nose face, hood, windscreen, a long roof that
-# sweeps down into a short cut-off tail. Traced from the source (hood 0.95, roof 1.51,
-# tail 1.03).
-CC_PROFILE = [(-1.92, CC_SILL), (-1.99, 0.4), (-1.99, 0.78), (-1.88, 0.88), (-1.06, 1.06),
-              (-0.36, 1.53), (0.22, 1.63), (1.0, 1.53), (1.6, 1.3), (1.95, 1.13), (2.03, 1.02),
-              (2.03, 0.42), (1.95, CC_SILL)]
-CC_BELT = 1.02
-CC_RISE = 0.05
-CC_CUTS = [
-    section(0.84, CC_SILL, 0.94, 0.46),
-    section(0.94, 0.46, 0.94, 0.9, rise=CC_RISE),
-    section(0.94, 0.9, 0.82, CC_BELT, rise=CC_RISE),           # the sharp shoulder
-    section(0.82, CC_BELT, 0.66, 1.52, rise=CC_RISE),
-    section(0.66, 1.52, 0.46, 1.66),
-    plan(0.94, -1.45, 0.8, -1.86),                             # two facets round the nose
-    plan(0.86, -1.72, 0.52, -1.99),
-    plan(0.94, 1.36, 0.72, 2.03),                              # the teardrop tail
-    plane3((0.66, 0.9, 1.53), (0.66, 1.5, 1.32), (0.4, 1.8, 1.25)),  # greenhouse tapers to the tail
-]
-CC_CLAD = 0.44
-CC_COWL = -1.06
-CC_STEEL = 0xC4C9CE
-CC_C = ((1.5, 1.08), (1.08, 1.5))   # side glass ends ahead of this line (y, z)
+CYBERCAB_LENGTH = 4.4
+CYBERCAB_PALETTE = {
+    "body": 0xC8B48C,       # champagne gold
+    "glass": 0x1E2731,
+    "trim": 0x141518,
+    "light_head": 0xF6F7F2,
+    "light_tail": 0xE0303A,
+    "tyre": 0x232427,
+    "hub": 0xC4C7CB,        # silver aero covers
+}
+CC_WHEEL_R = 0.37      # measured off the source's baked-in wheels
+CC_WHEEL_X = 0.84      # tyre centre, half track
+CC_TYRE_W = 0.24
+CC_HALF_TRIS = 4300
+CC_ARCH_R = CC_WHEEL_R + 0.06
+CC_ARCH_IN = 0.5      # the arch liners reach in to this half width
+CC_LINER_Z = 0.2      # and down to this height
 
 
-def cc_planes():
-    c0, c1 = CC_C
-    return [(Vector((0, 0, CC_CLAD)), Vector((0, 0, 1))), plane3((0, *c0), (0, *c1), (1, *c0))]
+def band(plane, half):
+    """The slab within `half` of a plane, as two planes."""
+    co, n = plane
+    return [(co - n * half, n), (co + n * half, -n)]
 
 
-def cc_role(c, n, chamfer):
-    if c.z < CC_CLAD or n.z < -0.6:
-        return "trim"
-    if chamfer or n.z > 0.95:
-        return "body"
-    belt = CC_BELT + CC_RISE * c.y
-    if n.y < -0.25 and n.z > 0.3 and c.z > 1.08 and c.y < 0:
-        return "glass"                                         # windscreen
-    c0, c1 = CC_C
-    ahead = (c.y - c0[0]) * (c1[1] - c0[1]) - (c.z - c0[1]) * (c1[0] - c0[0]) < 0
-    if abs(n.x) > 0.45 and c.z > belt + 0.02 and CC_COWL < c.y and ahead:
-        return "glass"                                         # side glass
-    if n.y > 0.25 and 0.3 < n.z < 0.95 and 1.0 < c.y < 1.75 and abs(n.x) < 0.45:
-        return "glass"                                         # rear glass on the fastback
-    return "body"
+def cc_regions():
+    """The colour regions of the right half (x >= 0), each a convex set of planes
+    (point, normal pointing inside). Read off the source's texture in orthographic views."""
+    belt = plane2((-1.35, 0.9), (1.25, 1.22), (0, 0, 1))
+    cowl = plane3((0, -1.2, 0.95), (0.62, -1.06, 0.98), (0.62, -0.7, 1.4), (0, 1, 0))
+    tail = plane3((0, 0.98, 1.4), (0.74, 1.24, 1.2), (0.74, 1.24, 0.6), (0, -1, 0))
+    return {
+        "glass": [[belt, cowl, tail]],
+        # Front light bar: a slim band across the nose, wrapping a little round the corners.
+        "light_head": [[plane_axis(2, 0.655, 1), plane_axis(2, 0.705, -1),
+                        plane_axis(1, -1.62, -1), plane_axis(0, 0.9, -1)]],
+        # Rear light bar across the full width of the tail.
+        "light_tail": [[plane_axis(2, 0.885, 1), plane_axis(2, 0.945, -1),
+                        plane_axis(1, 1.86, 1), plane_axis(0, 0.95, -1)]],
+        "trim": [
+            [plane_axis(2, 0.27, -1)],                                        # sills, underside
+            [plane_axis(2, 0.42, -1), plane_axis(1, 1.86, 1)],                # rear diffuser
+            # Window frames on the canopy: the A-pillar running into the roof rail ...
+            [belt, cowl, tail, *band(plane3((0.66, -1.1, 0), (0.57, 1.0, 0), (0.57, 1.0, 1), (1, 0, 0)), 0.035)],
+            # ... and the B-pillar between the door glass and the rear quarter glass.
+            [belt, tail, plane_axis(0, 0.6, 1), *band(plane2((0.44, 1.0), (0.54, 1.5), (0, -1, 0)), 0.028)],
+        ],
+    }
 
 
 def build_cybercab():
     C.reset_scene()
-    mats = C.make_materials({**PALETTE, "body": CC_STEEL})
+    mats = C.make_materials(CYBERCAB_PALETTE)
+    roles = list(CYBERCAB_PALETTE)
+    (src,) = import_source("cybercab")
     root = C.empty("cybercab")
-    bm, layer = hull(CC_PROFILE, CC_CUTS, chamfer=0.045)
-    colour_block(bm, layer, cc_planes(), cc_role)
-    bm = cut_arches(bm, mats, (-CC_AXLE, CC_AXLE), CC_ARCH_R, CC_WHEEL_R, CC_ARCH_INNER)
-    b = C.Builder(ROLES)
-    b.bm = bm
-    bvh = BVHTree.FromBMesh(bm)
-    arch_lips(b, "trim", (-CC_AXLE, CC_AXLE), CC_ARCH_R, CC_WHEEL_R, CC_SILL + 0.06, 0.035, 0.85, 0.955)
-    cybercab_details(b, bvh)
+    lo, hi = bounds([src])
+    s = CYBERCAB_LENGTH / (hi[1] - lo[1])
+    transform_all([src], Matrix.Diagonal((s, s, s, 1)) @ Matrix.Translation(
+        (-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, -lo[2])))
+    # Axles from the tyre contact patches (the lowest vertices, front and back).
+    co = mesh_co(src)
+    low = co[co[:, 2] < 0.02]
+    axles = [low[low[:, 1] < 0][:, 1].mean(), low[low[:, 1] > 0][:, 1].mean()]
+    mid = (axles[0] + axles[1]) / 2
+    transform_all([src], Matrix.Translation((0, -mid, 0)))
+    axles = [a - mid for a in axles]
+
+    # Work on the right half and mirror it: the generated mesh is not quite symmetric.
+    edit(src, keep_right)
+    edit(src, lambda bm: cc_iron(bm, axles))
+    edit(src, mirror_x)
+    # Rebuild its tangled topology (folds, slivers, stray inner shells) as one clean
+    # watertight surface on a 1 cm grid; the shape does not change.
+    mod = src.modifiers.new("remesh", "REMESH")
+    mod.mode = "VOXEL"
+    mod.voxel_size = 0.01
+    C.apply_modifiers(src)
+    edit(src, keep_right)
+    edit(src, cc_relax)
+    decimate(src, CC_HALF_TRIS)
+    weld(src, 0.004)
+    src.data.materials.clear()
+    for n in roles:
+        src.data.materials.append(mats[n])
+    skin = edit(src, lambda bm: BVHTree.FromBMesh(bm))
+    edit(src, lambda bm: cc_arches(bm, axles))
+    edit(src, cc_paint)
+
+    edit(src, mirror_x)
+
+    b = C.Builder(roles)
+    join_into(b, [src])
+    bvh = BVHTree.FromBMesh(b.bm)
+    arch_liners(b, axles, skin)
     cybercab_seams(b, bvh)
-    body = b.to_object("body", mats, parent=root)
-    wheels = build_wheels(root, mats, CC_TRACK, (-CC_AXLE, CC_AXLE), CC_WHEEL_R, CC_TYRE_W, CC_WHEEL_R * 0.74)
+    body = to_object(b, "body", mats, parent=root, smooth_angle=SMOOTH_ANGLE)
+    calm_normals(body, iterations=10)
+    wheels = cc_wheels(root, mats, roles, axles)
     return root, [body, *wheels]
 
 
-def cybercab_details(b, bvh):
-    """Full-width light bars set in black recesses front and back, teal door accents."""
-    f, r = front_frame(), rear_frame()
-    plate(b, "trim", bvh, f, [(-0.9, 0.62), (0.9, 0.62), (0.9, 0.78), (-0.9, 0.78)], FORWARD,
-          depth=0.012, steps=(14, 1))
-    plate(b, "light_head", bvh, f, [(-0.86, 0.66), (0.86, 0.66), (0.86, 0.74), (-0.86, 0.74)], FORWARD,
-          depth=0.024, steps=(14, 1))
-    plate(b, "trim", bvh, r, [(-0.8, 0.94), (0.8, 0.94), (0.8, 1.08), (-0.8, 1.08)], BACKWARD,
-          depth=0.012, steps=(12, 1))
-    plate(b, "light_tail", bvh, r, [(-0.76, 0.97), (0.76, 0.97), (0.76, 1.05), (-0.76, 1.05)], BACKWARD,
-          depth=0.024, steps=(12, 1))
+def keep_right(bm):
+    bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], dist=1e-6,
+                           plane_co=(0, 0, 0), plane_no=(1, 0, 0), clear_inner=True)
+
+
+def mirror_x(bm):
+    """Mirror the right half into the left and weld the centre line."""
+    bmesh.ops.mirror(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], axis="X",
+                     matrix=Matrix(), merge_dist=0.002)
+
+
+def cc_relax(bm):
+    """Relax the skin where the mirror was ironed off, so no dent is left."""
+    zone = [v for v in bm.verts if -0.95 < v.co.y < -0.25 and 0.78 < v.co.z < 1.2 and v.co.x > 0.6]
+    for _ in range(80):
+        bmesh.ops.smooth_vert(bm, verts=zone, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+
+
+def cc_iron(bm, axles):
+    """Iron away what the real car hasn't, or what we rebuild: the mirrors, the plate
+    recess in the tail, and the baked-in wheels (pressed into flat wells)."""
+    # Mirrors: everything standing proud of the door skin around the mirror.
+    def mirror_zone(c, pad):
+        return -0.9 - pad < c.y < -0.3 + pad and 0.8 - pad < c.z < 1.18 + pad and c.x > 0.5
+    iron(bm, 0, mirror_zone, 0.12, keep=lambda v, fit: v.co.x > fit - 0.08)
+    # Plate recess: the tail skin, flat across.
+    rear = max(v.co.y for v in bm.verts)
+
+    def plate_zone(c, pad):
+        return c.x < 0.5 + pad and c.y > rear - 0.45 and 0.5 - pad < c.z < 0.86 + pad
+    iron(bm, 1, plate_zone, 0.12, keep=lambda v, fit: abs(v.co.y - fit) < 0.15)
+    # The lumpy diffuser "tips" below it.
+    def diffuser_zone(c, pad):
+        return c.x < 0.75 + pad and c.y > rear - 0.4 and 0.12 - pad < c.z < 0.48 + pad
+    iron(bm, 1, diffuser_zone, 0.06, keep=lambda v, fit: abs(v.co.y - fit) < 0.2)
+
+
+def cc_paint(bm):
+    """Cut the colour regions along their planes and paint them: straight borders."""
+    names = list(CYBERCAB_PALETTE)
+    regions = cc_regions()
+    for role in ("trim", "glass", "light_head", "light_tail"):
+        for planes in regions[role]:
+            cut_region(bm, planes)
+    for f in bm.faces:
+        f.material_index = names.index("body")
+    for role in ("glass", "trim", "light_head", "light_tail"):
+        for planes in regions[role]:
+            where = (lambda f: f.normal.y < -0.25) if role == "light_head" else (
+                (lambda f: f.normal.y > 0.25) if role == "light_tail" else (lambda f: True))
+            paint_region(bm, planes, names.index(role), where)
+
+
+ARCH_SIDES = 24
+
+
+def arch_planes(ay):
+    """The wheel arch as a convex region: a 24-sided cylinder about the axle (along X),
+    outboard of the liner."""
+    planes = [plane_axis(0, CC_ARCH_IN, 1)]
+    for i in range(ARCH_SIDES):
+        a = 2 * math.pi * (i + 0.5) / ARCH_SIDES
+        d = Vector((0, math.cos(a), math.sin(a)))
+        planes.append((Vector((0, ay, CC_WHEEL_R)) + d * CC_ARCH_R, -d))
+    return planes
+
+
+def cc_arches(bm, axles):
+    """Cut round wheel arches through the body and the baked-in wheels."""
+    for ay in axles:
+        planes = arch_planes(ay)
+        cut_region(bm, planes, margin=0.08)
+        bmesh.ops.delete(bm, geom=[f for f in bm.faces if inside(f.calc_center_median(), planes)],
+                         context="FACES")
+
+
+def arch_liners(b, axles, skin):
+    """Dark liners inside the arches, reaching out to the uncut body skin (`skin`, the
+    right half), and a wall closing each at the inboard end."""
     for sx in (1, -1):
-        plate(b, "accent", bvh, side_frame(sx), [(0.26, 0.47), (0.58, 0.47), (0.24, 0.98), (-0.08, 0.98)],
-              inward(sx), steps=(4, 4))
+        for ay in axles:
+            before = b._begin()
+            ring = []
+            # The arc above the sill line; below it there is no body to line.
+            a0 = math.asin((CC_LINER_Z - CC_WHEEL_R) / CC_ARCH_R)
+            n = ARCH_SIDES // 2 + 2
+            for i in range(n + 1):
+                a = -a0 + (math.pi + 2 * a0) * i / n
+                p = Vector((0, ay + math.cos(a) * CC_ARCH_R, CC_WHEEL_R + math.sin(a) * CC_ARCH_R))
+                hit = skin.ray_cast(Vector((2.0, p.y, p.z)), Vector((-1, 0, 0)), 2.0 - CC_ARCH_IN)[0]
+                x_out = hit.x - 0.004 if hit is not None else CC_WHEEL_X
+                ring.append((b.bm.verts.new((sx * CC_ARCH_IN, p.y, p.z)),
+                             b.bm.verts.new((sx * x_out, p.y, p.z))))
+            for (p0, p1), (q0, q1) in zip(ring, ring[1:]):
+                b.bm.faces.new((p0, p1, q1, q0))
+            b.bm.faces.new([r[0] for r in ring])
+            new = [f for f in b.bm.faces if f not in before]
+            centre = Vector((sx * 0.8, ay, CC_WHEEL_R))
+            for f in new:
+                f.normal_update()
+                c = f.calc_center_median()
+                inner = (centre - c).dot(f.normal) < 0 if len(f.verts) == 4 else f.normal.x * sx < 0
+                if inner:
+                    f.normal_flip()
+            b._assign(before, "trim")
 
 
 def cybercab_seams(b, bvh):
+    """Butterfly-door shut lines."""
     for sx in (1, -1):
         s = side_frame(sx)
-        ink(b, bvh, s, [(0.66, CC_CLAD + 0.02), (0.68, 0.96)], inward(sx))                 # door, front
-        ink(b, bvh, s, [(-0.7, CC_CLAD + 0.02), (-0.7, 0.86), (-0.95, 1.1)], inward(sx))   # door, rear
-    top = top_frame()
-    ink(b, bvh, top, [(-0.6, -1.12), (0.6, -1.12)], DOWN)                                  # frunk lid
-    for sx in (1, -1):
-        ink(b, bvh, top, [(sx * 0.6, -1.12), (sx * 0.56, -1.84)], DOWN)
-    f = front_frame()
-    ink(b, bvh, f, [(-0.5, 0.52), (0.5, 0.52)], FORWARD)
-    r = rear_frame()
-    ink(b, bvh, r, [(-0.7, 0.62), (0.7, 0.62)], BACKWARD)                                  # bumper line
-    ink(b, bvh, r, [(-0.7, 0.62), (-0.66, 1.12)], BACKWARD)                                # boot lid
-    ink(b, bvh, r, [(0.7, 0.62), (0.66, 1.12)], BACKWARD)
+        ink(b, bvh, s, [(0.8, 0.3), (0.84, 0.62), (0.86, 0.94)], inward(sx))         # door front
+        ink(b, bvh, s, [(-0.3, 0.29), (-0.38, 0.7), (-0.47, 1.08)], inward(sx))      # door rear
 
 
-# --- lineup, style and silhouette sheets -------------------------------------------
+def cc_wheels(root, mats, roles, axles):
+    """Aero-covered wheels like the real car's: a tyre with a rounded shoulder, a flat
+    cover with a dark ring and a small cap; pivot at the axle centre."""
+    out = []
+    for name, sx, ay in (("wheel_FL", 1, axles[0]), ("wheel_FR", -1, axles[0]),
+                         ("wheel_RL", 1, axles[1]), ("wheel_RR", -1, axles[1])):
+        b = C.Builder(roles)
+        c = Vector((sx * CC_WHEEL_X, ay, CC_WHEEL_R))
+        ax = Vector((sx, 0, 0))
+        w, r = CC_TYRE_W, CC_WHEEL_R
+        b.tube("tyre", c - ax * w / 2, c + ax * w / 2, r, r, sides=20, bevel=0.045)
+        face = w / 2 + 0.006
+        rim = r * 0.74
+        b.tube("hub", c + ax * (w / 2 - 0.04), c + ax * face, rim, rim * 0.97, sides=20, bevel=0.01)
+        b.tube("trim", c + ax * (face - 0.004), c + ax * (face + 0.004), rim * 0.82, rim * 0.82, sides=20)
+        b.tube("hub", c + ax * (face - 0.002), c + ax * (face + 0.008), rim * 0.78, rim * 0.6, sides=20)
+        b.tube("trim", c + ax * (face + 0.006), c + ax * (face + 0.014), rim * 0.12, rim * 0.1, sides=10)
+        out.append(to_object(b, name, mats, pivot=c, parent=root, smooth_angle=SMOOTH_ANGLE))
+    return out
 
-def import_cab(name, root, offset, path=None):
-    bpy.ops.import_scene.gltf(filepath=str(path or C.MODELS_DIR / f"{name}.glb"))
+
+# --- lineup and style sheets -------------------------------------------------------
+
+def import_cab(name, root, offset, smooth=SMOOTH_ANGLE):
+    bpy.ops.import_scene.gltf(filepath=str(C.MODELS_DIR / f"{name}.glb"))
     for o in bpy.context.selected_objects:
         if o.parent is None:
             o.parent = root
@@ -738,7 +898,7 @@ def import_cab(name, root, offset, path=None):
             bm.to_mesh(o.data)
             bm.free()
             o.data.shade_smooth()
-            o.data.set_sharp_from_angle(angle=math.radians(1))  # flat panels, as exported
+            o.data.set_sharp_from_angle(angle=math.radians(1 if name == "cab" else smooth))
 
 
 def build_lineup():
@@ -747,7 +907,7 @@ def build_lineup():
     root = C.empty("lineup")
     for name, y in (("wayfarer", -5.2), ("cab", 0.0), ("cybercab", 5.0)):
         import_cab(name, root, y)
-    C.render_contact_sheet(root, "robotaxis-lineup", outline=0.03, size=1800, fill=1.0,
+    C.render_contact_sheet(root, "robotaxis-lineup", outline=0.02, size=1800, fill=1.0,
                            elevation=6.0, views=(("side", -90),))
     crop_to_content(C.RENDERS_DIR / "robotaxis-lineup.png", margin=40)
 
@@ -758,14 +918,14 @@ CONCEPT_CROP = (752, 205, 1218, 612)
 
 
 def build_style():
-    """Concept-art robotaxi, then each cab from a similar front 3/4 view."""
+    """Concept-art robotaxi, then each robotaxi from a similar front 3/4 view, from above."""
     tiles = []
-    for name in ("wayfarer", "cybercab", "cab"):
+    for name in ("wayfarer", "cybercab"):
         C.reset_scene()
         root = C.empty("style")
         import_cab(name, root, 0.0)
-        C.render_contact_sheet(root, f".style-{name}", outline=0.03, size=700, fill=0.85,
-                               elevation=16.0, views=(("3/4 front", 35),))
+        C.render_contact_sheet(root, f".style-{name}", outline=0.02, size=800, fill=0.78,
+                               elevation=4.0, views=(("3/4 front", 32),))
         path = C.RENDERS_DIR / f".style-{name}.png"
         tiles.append(load_rgb(path))
         path.unlink()
@@ -813,42 +973,10 @@ def save_rgb(px, path):
 
 def crop_to_content(path, margin):
     px = load_rgb(path)
-    ink = np.abs(px - np.array(C.BG, dtype=np.float32)).sum(axis=2) > 0.02
-    rows = np.where(ink.any(axis=1))[0]
+    ink_px = np.abs(px - np.array(C.BG, dtype=np.float32)).sum(axis=2) > 0.02
+    rows = np.where(ink_px.any(axis=1))[0]
     lo, hi = max(rows.min() - margin, 0), min(rows.max() + margin, px.shape[0] - 1)
     save_rgb(px[lo:hi + 1], path)
-
-
-# The previous, shrink-wrapped versions (PR #16), for the silhouette comparison.
-PREV = SOURCES / "prev"
-
-
-def build_silhouettes():
-    """Each car as a flat black shape, side on and front 3/4: previous version, then new."""
-    rows = []
-    for name in ("wayfarer", "cybercab"):
-        row = []
-        for label, path in (("prev", PREV / f"{name}.glb"), ("new", C.MODELS_DIR / f"{name}.glb")):
-            if not path.exists():
-                sys.exit(f"missing {path}: see build.sh robotaxis")
-            C.reset_scene()
-            root = C.empty("silhouette")
-            import_cab(name, root, 0.0, path)
-            for m in bpy.data.materials:
-                m.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0, 0, 0, 1)
-            for o in bpy.context.scene.objects:
-                o.visible_shadow = False
-            tmp = f".silhouette-{name}-{label}"
-            C.render_contact_sheet(root, tmp, outline=0.0, size=560, fill=0.95, elevation=8.0,
-                                   views=(("side", -90), ("3/4 front", 35)))
-            path = C.RENDERS_DIR / f"{tmp}.png"
-            row.append(load_rgb(path))
-            path.unlink()
-        gap = np.ones((row[0].shape[0], 40, 3), np.float32) * 0.75
-        rows.append(np.concatenate([row[0], gap, row[1]], axis=1))
-    gap = np.ones((12, rows[0].shape[1], 3), np.float32) * np.array(C.BG, np.float32)
-    # Blender images are bottom-up: the last row in the array is the top of the picture.
-    save_rgb(np.concatenate([rows[1], gap, rows[0]], axis=0), C.RENDERS_DIR / "robotaxis-silhouettes.png")
 
 
 def main():
@@ -857,10 +985,6 @@ def main():
         build_lineup()
     elif car == "style":
         build_style()
-    elif car == "silhouettes":
-        build_silhouettes()
-    elif car == "trace":
-        trace()
     else:
         root, parts = {"wayfarer": build_wayfarer, "cybercab": build_cybercab}[car]()
         finish(car, root, parts)
