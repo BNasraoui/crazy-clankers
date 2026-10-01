@@ -232,12 +232,23 @@ body { font-family: var(--body); color: var(--paper); user-select: none; }
 .rating-sticker b { font: 34px var(--num); font-variant-numeric: tabular-nums; }
 .rating-sticker .star { font-size: 30px; color: var(--yellow); -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; margin-left: 4px; }
 
-.glyph { display: inline-grid; place-items: center; width: 1.45em; height: 1.45em; margin: 0 0.25em; border-radius: 50%;
-  font: 0.8em/1 var(--num); font-style: normal; color: #fff; border: 3px solid var(--ink); vertical-align: middle; padding-top: 0.08em; }
+.glyph { display: inline-grid; place-items: center; width: 1.5em; height: 1.5em; margin: 0 0.25em; border-radius: 50%; flex: none;
+  font: 0.78em/1 var(--num); font-style: normal; color: #fff; border: 3px solid var(--ink); vertical-align: middle;
+  box-shadow: 2px 2px 0 var(--ink), inset 0 -0.2em 0 #0000002e, inset 0 0.14em 0 #ffffff5c; }
+/* Trim the font's uneven top and bottom space so the letter sits dead centre. */
+.glyph b, .keycap b { display: block; font: inherit; line-height: 1; text-box: trim-both cap alphabetic; }
 .glyph.a { background: var(--teal); color: var(--ink); }
 .glyph.b { background: var(--magenta); }
+.glyph.x { background: #3f7fe0; }
 .glyph.y { background: var(--yellow); color: var(--ink); }
-.glyph.pad { background: var(--ink); color: #fff; border-radius: 6px; font: 900 0.95em system-ui, sans-serif; }
+.glyph.pad { background: var(--ink); color: #fff; border-radius: 7px; font: 900 0.95em system-ui, sans-serif; }
+.keycap { display: inline-grid; place-items: center; min-width: 1.6em; height: 1.5em; padding: 0 0.5em; margin: 0 0.25em; flex: none;
+  font: 800 0.6em/1 var(--body); font-style: normal; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink);
+  background: var(--paper); border: 2.5px solid var(--ink); border-radius: 0.4em; vertical-align: middle;
+  box-shadow: 0 0.18em 0 var(--ink), inset 0 -0.16em 0 #0000001f; transform: translateY(-0.09em); }
+/* Prompts follow the last thing you touched: a pad, the keyboard, or the screen. */
+html:not([data-input="pad"]) .k-pad, html:not([data-input="kb"]) .k-kb, html:not([data-input="touch"]) .k-touch { display: none !important; }
+.key { display: inline-flex; align-items: center; }
 .prompt { display: inline-flex; align-items: center; gap: 2px; margin: 0 14px; font: 20px var(--num); }
 
 .press-start { position: absolute; bottom: 12%; left: 50%; transform: translateX(-50%) rotate(-1deg); padding: 10px 26px;
@@ -457,3 +468,6 @@ body { font-family: var(--body); color: var(--paper); user-select: none; }
   100% { transform: translate(-50%, -50%) rotate(-6deg) scale(1.05); opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) { #want.new, #stamp.show { animation: none; } }
+.glyph, .keycap { -webkit-text-stroke: 0; text-shadow: none; }
+#overlay .press .prompt { font-size: 26px; }
+#overlay .pad .prompt { font-size: 14px; margin: 0 8px; }

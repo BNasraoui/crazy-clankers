@@ -1,3 +1,4 @@
+import { useDevice } from './prompts';
 export interface Input {
   radioNext: boolean;
   radioSkip: boolean;
@@ -143,6 +144,7 @@ export function readInput(dt: number): Input {
     stickNav = { x: fx, y: fy };
     prevButtons.set(p.index, st.buttons);
     const busy = stick !== 0 || st.throttle > 0.05 || st.brake > 0.05 || st.buttons.some(Boolean);
+    if (busy) useDevice('pad');
     if (busy || !active) active = p;
     debug.push(`#${p.index} ${p.id.slice(0, 40)} [${p.mapping || 'unmapped'}] ` +
       `axes ${p.axes.map((a) => a.toFixed(1)).join(' ')} | buttons ${p.buttons.map((b, i) => (b.pressed ? i : '')).filter(String).join(',') || '-'}`);

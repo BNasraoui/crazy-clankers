@@ -23,7 +23,8 @@ import { SpritePerson, type SpriteSet } from './spritepeople';
 import { Trees } from './trees';
 import { CableCars } from './cablecar';
 import { BAY, Rank, snapshotCabs } from './rank';
-import { burst, howToHTML, pickerHTML, titleHTML } from './menus';
+import { btn, burst, howToHTML, pickerHTML, titleHTML } from './menus';
+import { key } from './prompts';
 
 const STEP = 1 / 120;
 const START_TIME = 75;
@@ -343,7 +344,7 @@ export class Game {
     if (s === 'play') ov.innerHTML = '';
     if (s === 'paused') {
       ov.className = 'dim';
-      ov.innerHTML = `<h2>PAUSED</h2><div class="press">A / ENTER TO RESUME</div><div class="pad">Y / R to restart · B / Backspace for the main menu</div><button class="radio-menu-button" data-radio-open>Radio · M / X</button>`;
+      ov.innerHTML = `<h2>PAUSED</h2><div class="press">${btn('confirm', 'RESUME')}</div><div class="pad">${btn('restart', 'Restart')}${btn('menu', 'Main menu')}</div><button class="radio-menu-button" data-radio-open>${key('radio')} Radio</button>`;
     }
   }
 
@@ -861,7 +862,7 @@ export class Game {
         ${starLine}${airLine}${equityLine}${promiseLine}
         <div class="total">${money(this.cash)}</div>
       </div>
-      <div class="press">A / ENTER TO DRIVE AGAIN</div><div class="pad">B / Esc to change cab</div>`;
+      <div class="press">${btn('confirm', 'DRIVE AGAIN')}</div><div class="pad">${btn('back', 'Change cab')}</div>`;
     sfx.bad();
   }
 

@@ -1,4 +1,5 @@
 import { CABS } from './models';
+import { glyph, key, keycap, phrase, type Act } from './prompts';
 
 // Title screen and cab picker overlays (the 3D taxi rank sits behind them).
 
@@ -11,8 +12,7 @@ const CARDS: Record<string, CabCard> = {
   apollo: { price: '$4.80', eta: '1 min', stats: [['LIDAR COUNT', 5, 'a crown'], ['APOLOGY RATE', 0, 'n/a'], ['TOP SPEED', 4, 'relentless']] },
 };
 
-const btn = (k: 'A' | 'B' | 'Y' | 'pad', text: string) =>
-  `<span class="prompt"><i class="glyph ${k === 'pad' ? 'pad' : k.toLowerCase()}">${k === 'pad' ? '✚' : k}</i>${text}</span>`;
+const btn = (act: Act, text: string) => `<span class="prompt">${key(act)}${text}</span>`;
 
 const LOGO = `<h1 class="logo">CRAZY<span>CLANKERS</span></h1>`;
 
@@ -26,12 +26,14 @@ export function titleHTML(padName: string) {
     <div class="menu title-screen">
       <img class="keyart" src="/keyart/${art}.jpg" alt="">
       <div class="logo-block">${LOGO}<div class="tag">You are AGI. Drive like it.</div></div>
-      <div class="press-start">PRESS <i class="glyph a">A</i> TO START</div>
-      <button class="radio-menu-button" data-radio-open>Radio · M / X</button>
-      <div class="corner-prompts">${btn('Y', 'HOW TO PLAY')}${btn('B', 'OPTIONS')}</div>
+      <div class="press-start">${phrase(`PRESS ${glyph('a', 'A')} TO START`, `PRESS ${keycap('Enter')} TO START`, 'TAP TO START')}</div>
+      <button class="radio-menu-button" data-radio-open>${key('radio')} Radio</button>
+      <div class="corner-prompts">${btn('alt', 'HOW TO PLAY')}${btn('back', 'OPTIONS')}</div>
       <div class="pad-note">${padName ? `🎮 ${padName}` : 'Press any button on a controller to use it.'}</div>
     </div>`;
 }
+
+export { btn };
 
 export function howToHTML() {
   return `
@@ -74,9 +76,9 @@ export function pickerHTML(selected: number, thumbs: Record<string, string>) {
         <h2>CHOOSE YOUR AUTONOMOUS VEHICLE</h2>
         <div class="cab-list">${rows}</div>
         <div class="stats">${stats}</div>
-        <div class="confirm">${btn('A', 'CONFIRM CAB')}</div>
+        <div class="confirm">${btn('confirm', 'CONFIRM CAB')}</div>
       </div>
-      <div class="prompt-strip">${btn('pad', 'CHOOSE')}${btn('A', 'DRIVE')}${btn('B', 'BACK')}</div>
+      <div class="prompt-strip">${btn('choose', 'CHOOSE')}${btn('confirm', 'DRIVE')}${btn('back', 'BACK')}</div>
     </div>`;
 }
 
