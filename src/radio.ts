@@ -2,13 +2,34 @@ import { RadioWheel } from './radiowheel';
 import type { Input } from './input';
 import { voiceActive } from './audio';
 
-export interface Station { name: string; source: string }
-// PLACEHOLDERS — Ben: replace these official NCS video stations with your playlists.
+export interface Station { name: string; source: string; genre?: string; credit?: string }
+// Internet radio: licensed stations streaming over HTTPS. They play through a plain
+// audio element, so they need nothing on screen. Credit goes to each broadcaster.
 export const DEFAULT_STATIONS: Station[] = [
-  { name: 'NCS · On & On', source: 'K4DyBUG242c' },
-  { name: 'NCS · Cartoon & Friends', source: 'Dr8xAycPpYw' },
+  { name: "Punk's Not Dead", genre: 'Punk', credit: 'Polygon.FM', source: 'https://eu6.fastcast4u.com/proxy/pnd?mp=/stream' },
+  { name: 'Alt Rock', genre: 'Alternative', credit: 'Best Of Rock.FM', source: 'https://bestofrockfm.stream.vip/altrock/mp3-256/bestofrock.fm/' },
+  { name: 'Hip Hop Mixtape', genre: 'Hip hop', credit: 'NTS', source: 'https://stream-mixtape-geo.ntslive.net/mixtape2' },
+  { name: 'US Rap', genre: 'Rap', credit: 'REYFM', source: 'https://listen.reyfm.de/usrap_192kbps.mp3' },
+  { name: 'Nightride', genre: 'Synthwave', credit: 'Nightride FM', source: 'https://stream.nightride.fm/nightride.mp3' },
+  { name: 'Drum & Bass', genre: 'Drum & bass', credit: 'Technolovers', source: 'https://stream.technolovers.fm/drummnbass' },
+  { name: 'House Party', genre: 'House', credit: 'REYFM', source: 'https://listen.reyfm.de/houseparty_192kbps.mp3' },
+  { name: 'Funky Radio', genre: 'Funk', credit: 'Funky Radio', source: 'https://funkyradio.streamingmedia.it/play.mp3' },
+  { name: 'Yumi Co.', genre: 'City pop / future funk', credit: 'Yumi Co. Radio', source: 'https://yumicoradio.net/stream' },
+  { name: 'Cumbia 90s', genre: 'Cumbia', credit: 'Emite Radio', source: 'https://emiteradio.com/proxy/cumbia90s?mp=/stream' },
+  { name: 'Lo-fi', genre: 'Lo-fi', credit: 'REYFM', source: 'https://listen.reyfm.de/lofi_320kbps.mp3' },
 ];
-const STORAGE_KEY = 'clankers.radio.v1';
+const STORAGE_KEY = 'clankers.radio.v2';
+const OLD_STORAGE_KEY = 'clankers.radio.v1';
+const OLD_DEFAULTS = ['K4DyBUG242c', 'Dr8xAycPpYw']; // the first build's placeholder stations
+
+// An internet radio stream: any https URL that isn't YouTube.
+export function streamSource(value: string): string | null {
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'https:' && !youtubeSource(value) ? url.href : null;
+  } catch { return null; }
+}
+const validSource = (source: string) => !!(youtubeSource(source) || streamSource(source));
 
 export function youtubeSource(value: string): { kind: 'video' | 'playlist'; id: string } | null {
   let id = value.trim();
@@ -121,10 +142,14 @@ export class Radio {
   constructor() {
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-      if (saved && Array.isArray(saved.stations)) {
-        this.stations = saved.stations.filter((s: Station) => s && typeof s.name === 'string' && typeof s.source === 'string' && youtubeSource(s.source)).map((s: Station) => ({ name: s.name.slice(0, 80), source: s.source }));
-        if (typeof saved.volume === 'number' && Number.isFinite(saved.volume)) this.volume = Math.max(0, Math.min(1, saved.volume));
-      }
+      const old = saved ? null : JSON.parse(localStorage.getItem(OLD_STORAGE_KEY) || 'null');
+      const keep = (list: unknown[]) => list.filter((s): s is Station => !!s && typeof (s as Station).name === 'string' && typeof (s as Station).source === 'string' && validSource((s as Station).source))
+        .map((s) => ({ name: s.name.slice(0, 80), source: s.source, genre: s.genre, credit: s.credit }));
+      if (saved && Array.isArray(saved.stations)) this.stations = keep(saved.stations);
+      // From the first build: keep anything Ben added, drop its two placeholders, add the new defaults.
+      else if (old && Array.isArray(old.stations)) this.stations = [...this.stations, ...keep(old.stations).filter((s) => !OLD_DEFAULTS.includes(s.source))];
+      const vol = (saved ?? old)?.volume;
+      if (typeof vol === 'number' && Number.isFinite(vol)) this.volume = Math.max(0, Math.min(1, vol));
     } catch { /* Storage is optional, including in private browsing. */ }
     this.dashboard.id = 'radio-dashboard';
     this.dashboard.setAttribute('aria-label', 'Dashboard radio');
@@ -132,8 +157,14 @@ export class Radio {
     this.playerSlot.className = 'radio-player';
     this.trackLabel.className = 'radio-track';
     const controls = document.createElement('div'); controls.className = 'radio-controls';
-    controls.append(button('◀ Station', () => this.nextStation(-1)), this.toggle, button('Skip ▶', () => this.nextTrack()), button('Station ▶', () => this.nextStation(1)), button('Off / collapse', () => this.off()));
-    this.dashboard.append(this.stationLabel, this.trackLabel, this.playerSlot, controls, this.volumeControl());
+    controls.append(button('◀ Station', () => this.nextStation(-1)), this.toggle, button('Skip ▶', () => this.nextTrack()), button('Station ▶', () => this.nextStation(1)), button('Collapse', () => this.setMini(true)), button('Off', () => this.off()));
+    controls.classList.add('radio-full');
+    const volume = this.volumeControl(); volume.classList.add('radio-full');
+    // Compact by default: just the station sticker (and YouTube's tile, which must stay visible). Click it for the controls.
+    this.stationLabel.onclick = () => this.setMini(!this.dashboard.classList.contains('mini'));
+    this.stationLabel.title = 'Show or hide the radio controls';
+    this.dashboard.classList.add('mini');
+    this.dashboard.append(this.stationLabel, this.trackLabel, this.playerSlot, controls, volume);
     this.collapsed.id = 'radio-collapsed';
     this.toast.id = 'radio-toast'; this.toast.setAttribute('role', 'status'); this.toast.hidden = true;
     this.screen.id = 'radio-screen'; this.screen.hidden = true;
@@ -141,35 +172,29 @@ export class Radio {
     this.screen.innerHTML = `<header><span>CLANKERS FM / YOUR AIRWAVES</span><h2>RADIO</h2></header><p>T / LB: next station · N / X: skip (driving)<br>D-pad: focus · A: select · B / Esc: back</p>`;
     this.note.setAttribute('role', 'status');
     const form = document.createElement('form');
-    form.innerHTML = `<label>YouTube URL or ID<input name="source" required placeholder="Paste a playlist or video URL"></label><label>Station name (optional)<input name="name" maxlength="80" placeholder="Late-night fares"></label><button type="submit">Add station</button>`;
+    form.innerHTML = `<label>YouTube or radio stream URL<input name="source" required placeholder="A YouTube playlist, or an https stream"></label><label>Station name (optional)<input name="name" maxlength="80" placeholder="Late-night fares"></label><button type="submit">Add station</button>`;
     form.onsubmit = e => {
       e.preventDefault();
       const data = new FormData(form), source = String(data.get('source')).trim();
-      const parsed = youtubeSource(source);
-      if (!parsed) { this.message('Paste a valid YouTube playlist or video URL / ID.'); return; }
+      const parsed = youtubeSource(source), stream = streamSource(source);
+      if (!parsed && !stream) { this.message('Paste a YouTube playlist or video, or an https radio stream URL.'); return; }
       if (this.selected === this.stations.length) ++this.selected;
-      this.stations.push({ source, name: String(data.get('name')).trim() || `YouTube ${parsed.kind} ${parsed.id}` });
+      this.stations.push({ source, name: String(data.get('name')).trim() || (parsed ? `YouTube ${parsed.kind} ${parsed.id}` : new URL(stream!).hostname) });
       this.save(); this.renderStations(); form.reset();
     };
     const local = document.createElement('div'); local.className = 'radio-local';
     local.append(button('Play my own files', () => this.pickFiles(false)), button('Choose folder', () => this.pickFiles(true)));
-    const privacy = document.createElement('p'); privacy.textContent = 'Local files stay on this device. Choose them again after reloading. YouTube streams directly in its visible player.';
+    const privacy = document.createElement('p'); privacy.textContent = 'Radio stations stream straight from their broadcasters; YouTube plays through its own embedded player. Local files stay on this device; choose them again after reloading.';
     const transport = document.createElement('div'); transport.className = 'radio-controls';
     transport.append(button('Previous station', () => this.nextStation(-1)), button('Play / pause', () => this.playPause()), button('Skip track', () => this.nextTrack()), button('Next station', () => this.nextStation(1)), button('Radio off', () => this.off()), this.volumeControl());
     this.screen.append(transport, this.rows, form, local, privacy, this.note, button('Back to game', () => this.close()));
     document.body.append(this.dashboard, this.collapsed, this.screen, this.toast);
     this.renderStations();
-    this.audio.onended = () => this.nextTrack();
-    this.audio.onerror = () => this.trackFailed();
+    this.audio.onended = () => (this.isStream() ? this.tune(this.selected, true) : this.nextTrack());
+    this.audio.onerror = () => (this.isStream() ? this.stationFailed() : this.trackFailed());
     document.addEventListener('click', e => {
       if ((e.target as Element).closest('[data-radio-open]')) this.open();
       else if (!this.interacted && e.isTrusted) this.gesture();
-    });
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden && this.selected < this.stations.length) this.off();
-    });
-    addEventListener('resize', () => {
-      if (this.enabled && !this.hasRoom()) { this.off(); this.message('Radio off: enlarge the window to show the YouTube player.'); }
     });
   }
 
@@ -227,7 +252,9 @@ export class Radio {
     if (this.stations.length) this.tune(0);
   }
 
-  private hasRoom() { return innerWidth >= 660 && innerHeight >= 600; }
+  private isStream() { const s = this.stations[this.selected]; return !!s && !!streamSource(s.source); }
+  private isYouTube() { const s = this.stations[this.selected]; return !!s && !!youtubeSource(s.source); }
+  private setMini(mini: boolean) { this.dashboard.classList.toggle('mini', mini); }
 
   private save() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ stations: this.stations, volume: this.volume })); } catch { /* Play without persistence. */ }
@@ -265,14 +292,19 @@ export class Radio {
     this.stopSource();
     this.selected = index; this.failedTracks.clear(); this.failedAttempts = 0;
     const station = this.stations[index];
-    if (station && (!this.hasRoom() || document.hidden)) { this.off(); this.message('Radio off: the YouTube player needs a visible window (660 × 600 or larger).'); return; }
     this.enabled = this.playing = true;
     this.dashboard.hidden = false; this.collapsed.hidden = true;
     this.toggle.textContent = 'Pause';
     this.stationLabel.textContent = station?.name || 'Play my own files';
     this.trackLabel.textContent = 'Tuning…';
-    this.playerSlot.hidden = !station;
+    this.playerSlot.hidden = !station || !this.isYouTube();
     this.message(`📻 ${this.stationLabel.textContent}`);
+    if (station && this.isStream()) {
+      this.trackLabel.textContent = [station.genre, station.credit && `via ${station.credit}`].filter(Boolean).join(' · ') || 'Internet radio';
+      this.audio.src = streamSource(station.source)!;
+      this.applyVolume(); this.startLocalAudio();
+      return;
+    }
     if (!station) {
       if (this.files.length) this.playFile();
       else { this.off(); this.message('Choose files or a folder in the Radio screen (M / X in a menu).'); }
@@ -369,7 +401,7 @@ export class Radio {
     this.playing = !this.playing;
     this.toggle.textContent = this.playing ? 'Pause' : 'Play';
     clearTimeout(this.watchdog);
-    if (this.selected === this.stations.length) {
+    if (this.selected === this.stations.length || this.isStream()) {
       if (this.playing) this.startLocalAudio(); else this.audio.pause();
     } else if (this.ready) {
       if (this.playing) this.player?.playVideo(); else this.player?.pauseVideo();
@@ -379,7 +411,8 @@ export class Radio {
   nextTrack() {
     if (!this.enabled) return;
     clearTimeout(this.retry);
-    if (this.selected === this.stations.length) {
+    if (this.isStream()) this.nextStation(1); // live radio has no next track
+    else if (this.selected === this.stations.length) {
       this.fileIndex = (this.fileIndex + 1) % this.files.length; this.playFile();
     } else if (this.ready) {
       if (youtubeSource(this.stations[this.selected].source)?.kind === 'playlist') {
@@ -434,7 +467,7 @@ export class Radio {
     void this.audio.play().catch(error => {
       if (token !== this.generation || error.name === 'AbortError') return;
       if (error.name === 'NotAllowedError') {
-        this.playing = false; this.toggle.textContent = 'Play'; this.message('Press Play to start your files.');
+        this.playing = false; this.toggle.textContent = 'Play'; this.message('Press Play to start the radio.');
       } else this.trackFailed();
     });
   }

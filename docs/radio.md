@@ -1,13 +1,21 @@
 # Dashboard radio
 
-Open **Radio** on the title or pause menu with **M / X** or the on-screen button. Paste a YouTube playlist/video URL or ID, optionally name it, then select **Add station**. Each card supports tuning, renaming, removing and moving up/down. Stations and radio volume persist when localStorage is available. `DEFAULT_STATIONS` in `src/radio.ts` contains two clearly marked official NCS video placeholders; replace these with the desired playlists. Both returned official-channel embed HTML from YouTube oEmbed during implementation.
+Three kinds of station: **internet radio** (the defaults), **YouTube** playlists or videos, and **your own files**. All of them play with the radio collapsed to a small sticker in the lower-left corner; click the sticker for the controls.
 
-While driving, **T / LB** changes station and **N / X** skips the track. These were unused by the existing driving controls. Inside Radio, D-pad/stick moves focus, A activates, B/Esc returns; left/right adjusts a focused volume slider. Playback, previous/next station, skip, volume and Off are also available in the Radio screen. Keyboard users can Tab through its native controls. Browser file choosers may require a click/tap rather than a gamepad event.
+## Stations
 
-**Play my own files** accepts multiple audio files; **Choose folder** uses `webkitdirectory`. Files play through a plain audio element and blob URLs, with no upload or persistence of their contents. Choose them again after reload. Files and YouTube playlists are shuffled. A single-video station advances to the next station when it ends or is skipped.
+`DEFAULT_STATIONS` in `src/radio.ts` is eleven internet radio stations, one per genre: punk, alt rock, hip hop, US rap, synthwave, drum & bass, house, funk, city pop / future funk, cumbia and lo-fi. Each is a licensed broadcaster's public HTTPS MP3 stream, played through a plain audio element and credited by name ("Punk · via Polygon.FM"). They were found through the [Radio Browser](https://www.radio-browser.info/) directory and checked to stream on 2026-10-01. Streams come and go: if one fails, the radio skips to the next station; replace dead ones in `DEFAULT_STATIONS`. SomaFM's streams refuse requests from other sites' players, so they aren't used.
 
-The official YouTube iframe loads lazily after the first menu interaction. The 288×216 player sits inside a dashboard frame above the lower-left corner, clear of the 1280×800 HUD; no game UI covers the iframe. Controls and branding remain intact. Off destroys the iframe before collapsing the dashboard. Hiding the tab or shrinking the window below 660×600 also switches YouTube off. The station screen reserves space for the dashboard. There is no audio extraction, music proxy, hosted music or YouTube Data API key.
+Open **Radio** on the title or pause menu with **M / X** to add a station (a YouTube playlist or video URL, or any `https://` stream URL), rename, reorder or remove stations. Stations and volume persist in localStorage (`clankers.radio.v2`; anything added under the first build's `v1` key is carried over, minus its two placeholder stations).
 
-Browsers may still require pressing Play in the visible player, especially after controller input; autoplay blocking produces a prompt. Recognized unplayable-video errors skip tracks; station exhaustion advances with a note, and exhausting stations switches off. API/network failure leaves the game usable and suggests local files/reload. Radio volume ducks to 60% during the game's synthesized voice blips. There is no existing user-facing master/music volume setting to inherit.
+YouTube stations play through the official IFrame API from a player kept off screen, so they behave like the others. That is outside YouTube's terms for embedded players (which want the player visible); it's Ben's call for a personal site. YouTube's own ads still play.
 
-Player sizing and playback use the [YouTube IFrame API](https://developers.google.com/youtube/iframe_api_reference) and retain its [required player functionality](https://developers.google.com/youtube/terms/required-minimum-functionality). See [browser checks](../tests/README.md) for validation and remaining device checks.
+**Play my own files** / **Choose folder** play local audio through blob URLs; nothing is uploaded. Choose them again after a reload.
+
+## Controls
+
+- **Tap LB / T:** next station. **Hold LB / T:** the station wheel opens and the game slows; aim with the right stick (or left/right) and release to tune. The wheel includes My files and Off.
+- **X / N:** next track (on a live radio station, the next station).
+- In the Radio screen: D-pad/stick moves focus, A activates, B/Esc returns, left/right adjusts a focused volume slider.
+
+The radio ducks to 60% while the game's voice blips play. See [browser checks](../tests/README.md) for the automated tests.

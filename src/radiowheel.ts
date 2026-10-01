@@ -25,6 +25,8 @@ export class RadioWheel {
 
   // Returns the chosen item's index on release, 'tap' for a quick press, or null.
   update(dt: number, input: Input, items: () => WheelItem[], current: number): number | 'tap' | null {
+    // Pressed and released between two frames: still a tap.
+    if (!input.radioHold && input.radioNext && !this.open && this.held === 0) return 'tap';
     if (input.radioHold) {
       this.held += dt;
       if (!this.open && this.held >= HOLD) {
@@ -63,7 +65,7 @@ export class RadioWheel {
 
   private render() {
     const n = this.items.length;
-    const r = 34; // % of the wheel's size
+    const r = 39; // % of the wheel's size
     this.el.innerHTML = `<div class="ring">${this.items.map((it, i) => {
       const a = (i / n) * Math.PI * 2;
       const x = 50 + r * Math.sin(a), y = 50 - r * Math.cos(a);
