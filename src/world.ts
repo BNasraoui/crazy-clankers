@@ -297,6 +297,7 @@ export function buildWorld(scene: THREE.Scene) {
   const streetTrees: TreeSpot[] = [];
   const gables: { m: THREE.Matrix4; c: THREE.Color }[] = [];
   const facadeCards: FacadeCard[] = [];
+  const facadeFronts = { n: 0 };
 
   for (const b of blocks) {
     const { x0, x1, z0, z1 } = b;
@@ -331,7 +332,7 @@ export function buildWorld(scene: THREE.Scene) {
     if (b.kind === 'landmark') continue;
     const dist = districtOf(b.bi, b.bj);
     const ladies = b.kind === 'ladies';
-    buildFrontages(b, ladies ? PAINTED_LADIES : dist, ladies ? LADIES : dist.colors, r, addBox, addPart, gables, walls, facadeCards);
+    buildFrontages(b, ladies ? PAINTED_LADIES : dist, ladies ? LADIES : dist.colors, r, addBox, addPart, gables, walls, facadeCards, facadeFronts);
     addStreetTrees(b, r, streetTrees);
   }
 
@@ -477,7 +478,7 @@ const TRIM = 0xf6f1e6;
 const FACADE_BLOCKS = new Set(['3,4', '4,4']);
 export interface FacadeCard { cx: number; cz: number; nx: number; nz: number; width: number; lo: number; hi: number; top: number; pick: number }
 // Per drawing: the wall colour (for the plain sides of painted houses) and the base colour (foundation band on slopes).
-const FACADE_WALL = [0xb7bba1, 0xdbcca8, 0xa1a8a9, 0xcdb496, 0xb9aec4, 0x9b8f7a];
+const FACADE_WALL = [0x9ebb9d, 0xf1d493, 0x708b9d, 0xc56644, 0xb6a9c9, 0xd39e7d]; // each drawing's body paint
 const FACADE_BASE = [0xb5b59c, 0xaab0a3, 0x909ca2, 0xb97f61, 0x968ba5, 0x98907a];
 
 type AddBox = (x0: number, x1: number, z0: number, z1: number, height: number, color: THREE.ColorRepresentation, tower?: boolean, style?: number) => number;
@@ -491,6 +492,7 @@ function buildFrontages(
   gables: { m: THREE.Matrix4; c: THREE.Color }[],
   walls: { x: number; z: number; nx: number; nz: number }[],
   cards: FacadeCard[] = [],
+  frontCount = { n: 0 },
 ) {
   const { x0, x1, z0, z1 } = b;
   const painted = FACADE_BLOCKS.has(`${b.bi},${b.bj}`);
@@ -533,7 +535,7 @@ function buildFrontages(
       const width = la1 - la0;
       if (painted) {
         // Painted lot: a full-width plain box, with the drawing carrying the bays, doors and cornice.
-        const pick = cards.length % FACADE_WALL.length;
+        const pick = (frontCount.n++) % FACADE_WALL.length;
         const top = addBox(...box(la0, la1, 0, DEPTH), floors * 3.3 + 0.5, FACADE_WALL[pick], false, 2);
         const ends = [groundAtLot(la0), groundAtLot(la1)];
         cards.push({ cx: (fx0 + fx1) / 2, cz: (fz0 + fz1) / 2, nx, nz, width: width + 0.02, lo: Math.min(...ends), hi: Math.max(...ends), top, pick });
@@ -546,8 +548,9 @@ function buildFrontages(
             const [ax0, , az0] = box(end, end, k0 * DEPTH, k0 * DEPTH);
             const [bx0, , bz0] = box(end, end, k1 * DEPTH, k1 * DEPTH);
             const g0 = heightAt(ax0, az0), g1 = heightAt(bx0, bz0);
+            // Same drawing as the front, so the whole house is one colour.
             cards.push({ cx: (ax0 + bx0) / 2, cz: (az0 + bz0) / 2, nx: sx, nz: sz, width: DEPTH / 2 + 0.02,
-              lo: Math.min(g0, g1), hi: Math.max(g0, g1), top, pick: cards.length % FACADE_WALL.length });
+              lo: Math.min(g0, g1), hi: Math.max(g0, g1), top, pick });
           }
         }
         return;
