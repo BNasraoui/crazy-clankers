@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Car, MAX_SPEED } from './car';
+import { Car, MAX_SPEED, handlingOf } from './car';
 import { readInput, padName, padDebug, type Input } from './input';
 import { CABS, EXTRA_CARS, makeCar, makePerson, makeLabel, personFrom, type PersonModel } from './models';
 import { Look, SKY, makeSky } from './look';
@@ -9,7 +9,7 @@ import { pickPassenger, type PassengerType } from './passengers';
 import { QuipDirector, SPEAKERS } from './quips';
 import { Traffic } from './traffic';
 import { sfx, setEngine, unlockAudio } from './audio';
-import { BLOCKS_SIDES, WATER, buildWorld, curb, landmarks, N, type Curb, type Landmark } from './world';
+import { BLOCKS_SIDES, CELL, HALF, WATER, buildWorld, curb, landmarks, N, type Curb, type Landmark } from './world';
 import { buildFeatures, groundAt } from './features';
 import { Geysers, Particles, Props, type PropKind } from './props';
 import type { Pedestrians } from './pedestrians';
@@ -22,7 +22,7 @@ import { burst, howToHTML, pickerHTML, titleHTML } from './menus';
 const STEP = 1 / 120;
 const START_TIME = 75;
 const START = BAY; // every shift starts by pulling out of the robotaxi rank
-const WAITING_COUNT = 7;
+const WAITING_COUNT = 16;
 
 interface Waiting {
   type: PassengerType;
@@ -140,6 +140,7 @@ export class Game {
     this.geysers = new Geysers(this.scene, this.particles);
     this.scene.add(cab.root);
     this.car = new Car(cab);
+    this.car.h = handlingOf(CABS[this.cabIndex].id);
     this.traffic = new Traffic(this.scene, 46, this.rivals());
     this.rank = new Rank(this.scene, this.cabIndex);
     this.cableCars = new CableCars(this.scene);
@@ -334,6 +335,7 @@ export class Game {
     try { localStorage.setItem('clankers.cab', CABS[this.cabIndex].id); } catch { /* storage unavailable */ }
     this.scene.remove(this.car.model.root);
     this.car.model = makeCar(CABS[this.cabIndex].id);
+    this.car.h = handlingOf(CABS[this.cabIndex].id);
     this.scene.add(this.car.model.root);
     this.traffic.setRivals(this.scene, this.rivals());
     this.car.model.root.visible = this.state === 'play';
@@ -542,12 +544,19 @@ export class Game {
   // ---------- passengers ----------
 
   private spawnWaiting() {
+    // Keep about half the fares within a short drive of the cab, so one is usually in view.
+    const near = this.waiting.filter((w) => flat(w.curb.road, this.car.pos) < 220).length < WAITING_COUNT / 2;
     for (let tries = 0; tries < 50; tries++) {
-      const bi = Math.floor(this.rand() * N), bj = Math.floor(this.rand() * N);
+      let bi = Math.floor(this.rand() * N), bj = Math.floor(this.rand() * N);
+      if (near) {
+        const ci = Math.floor((this.car.pos.x + HALF) / CELL), cj = Math.floor((this.car.pos.z + HALF) / CELL);
+        bi = Math.min(N - 1, Math.max(0, ci + Math.floor(this.rand() * 7) - 3));
+        bj = Math.min(N - 1, Math.max(0, cj + Math.floor(this.rand() * 7) - 3));
+      }
       const side = BLOCKS_SIDES[Math.floor(this.rand() * 4)];
       const c = curb(bi, bj, side, this.rand());
-      if (flat(c.road, this.car.pos) < 60) continue;
-      if (this.waiting.some((w) => flat(w.curb.road, c.road) < 45)) continue;
+      if (flat(c.road, this.car.pos) < 40) continue;
+      if (this.waiting.some((w) => flat(w.curb.road, c.road) < 28)) continue;
       if (landmarks.some((l) => flat(l.curb.road, c.road) < 12)) continue;
       const type = pickPassenger(this.rand);
       const far = landmarks.filter((l) => blocks(l.curb.road, c.road) > 160);

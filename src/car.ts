@@ -27,8 +27,35 @@ const KICK_MAX = 16; // speed added by a full launch out of a drift
 const OVERSPEED = 52; // launches may briefly beat MAX_SPEED, up to this
 const STEP_UP = 1.1; // anything taller than this is a wall, not a slope
 
+// Each cab drives differently. Multipliers on the shared tuning above.
+export interface Handling {
+  top: number; // top speed
+  accel: number;
+  brake: number;
+  steer: number;
+  grip: number; // sideways grip on the ground
+  driftGrip: number; // sideways grip with the handbrake on (lower slides more)
+  hop: number;
+  launch: number; // Launch Mode speed
+  reverse: number; // reverse top speed
+  mass: number; // how much speed survives a collision (1 = default)
+}
+const BASE: Handling = { top: 1, accel: 1, brake: 1, steer: 1, grip: 1, driftGrip: 1, hop: 1, launch: 1, reverse: 1, mass: 1 };
+export const HANDLING: Record<string, Handling> = {
+  // Polite and planted: sticks to the road, hard to unstick, a little slower.
+  wayfarer: { ...BASE, top: 0.95, accel: 0.95, grip: 1.25, driftGrip: 1.3, steer: 0.95, hop: 0.95 },
+  // Fastest and lightest: loose, slides easily, the biggest launches.
+  cybercab: { ...BASE, top: 1.12, accel: 1.15, grip: 0.85, driftGrip: 0.75, hop: 1.05, launch: 1.15, mass: 0.85 },
+  // Both ends are the front: reverses at full speed, turns tightest, bounces highest.
+  zoox: { ...BASE, top: 0.92, steer: 1.2, hop: 1.2, reverse: 2.2 }, // nearly as fast backwards
+  // Heavy and relentless: slow off the line, strong brakes, low hop, ploughs through hits.
+  apollo: { ...BASE, top: 0.98, accel: 0.85, brake: 1.15, steer: 0.9, grip: 1.1, hop: 0.8, mass: 1.35 },
+};
+export const handlingOf = (id: string) => HANDLING[id] ?? BASE;
+
 // Arcade physics: grip-based steering on the ground, ballistic in the air.
 export class Car {
+  h: Handling = BASE;
   pos = new THREE.Vector3();
   vel = new THREE.Vector2(); // x/z
   vy = 0;
@@ -94,10 +121,10 @@ export class Car {
         // Releasing the handbrake with the gas still down fires the launch; letting go of the gas cancels it.
         if (this.launchCharge >= LAUNCH_ARM && inp.throttle > 0.5 && !inp.handbrake) {
           const t = (this.launchCharge - LAUNCH_ARM) / (LAUNCH_FULL - LAUNCH_ARM);
-          if (vf < 4) vf = LAUNCH_MIN + (LAUNCH_MAX - LAUNCH_MIN) * t;
+          if (vf < 4) vf = (LAUNCH_MIN + (LAUNCH_MAX - LAUNCH_MIN) * t) * this.h.launch;
           else {
             // Out of a drift: straighten up and kick forward along the nose.
-            vf = Math.min(OVERSPEED, Math.max(vf, this.speed) + KICK_MIN + (KICK_MAX - KICK_MIN) * t);
+            vf = Math.min(OVERSPEED * this.h.top, Math.max(vf, this.speed) + (KICK_MIN + (KICK_MAX - KICK_MIN) * t) * this.h.launch);
             vs *= 0.3;
           }
           ev.launch = t;
@@ -105,25 +132,25 @@ export class Car {
         this.launchCharge = 0;
       }
       const holding = charging && standing;
-      const top = wet ? MAX_SPEED * 0.5 : MAX_SPEED;
-      if (!holding && inp.throttle > 0 && vf >= -0.5) vf += ACCEL * (wet ? 0.5 : 1) * inp.throttle * Math.max(0, 1 - (vf / top) ** 2) * dt;
+      const top = MAX_SPEED * this.h.top * (wet ? 0.5 : 1);
+      if (!holding && inp.throttle > 0 && vf >= -0.5) vf += ACCEL * this.h.accel * (wet ? 0.5 : 1) * inp.throttle * Math.max(0, 1 - (vf / top) ** 2) * dt;
       if (wet) vf -= vf * 0.5 * dt;
       if (!holding && inp.brake > 0) {
-        if (vf > 0.5) vf -= BRAKE * inp.brake * dt;
-        else vf = Math.max(-REVERSE_MAX, vf - 14 * inp.brake * dt);
+        if (vf > 0.5) vf -= BRAKE * this.h.brake * inp.brake * dt;
+        else vf = Math.max(-REVERSE_MAX * this.h.reverse, vf - 14 * Math.max(1, this.h.reverse * 0.6) * inp.brake * dt);
       }
-      if (!holding && inp.throttle > 0 && vf < -0.5) vf += BRAKE * inp.throttle * dt;
+      if (!holding && inp.throttle > 0 && vf < -0.5) vf += BRAKE * this.h.brake * inp.throttle * dt;
       vf -= vf * 0.35 * dt + Math.sign(vf) * Math.min(Math.abs(vf), 1.5 * dt);
       // Hills slow you going up and speed you up going down.
       const slope = (groundAt(this.pos.x + fx, this.pos.z + fz) - groundAt(this.pos.x - fx, this.pos.z - fz)) / 2;
       vf -= 10 * (slope / Math.sqrt(1 + slope * slope)) * dt;
 
-      const grip = inp.handbrake ? 1.3 : 7;
+      const grip = inp.handbrake ? 1.3 * this.h.driftGrip : 7 * this.h.grip;
       vs *= Math.exp(-grip * dt);
       if (inp.handbrake && !holding) vf -= Math.sign(vf) * Math.min(Math.abs(vf), 5 * dt);
 
       const s = Math.abs(vf);
-      const turn = STEER * Math.min(1, s / 6) * (1 - 0.4 * Math.min(1, s / MAX_SPEED)) * (inp.handbrake ? 1.5 : 1);
+      const turn = STEER * this.h.steer * Math.min(1, s / 6) * (1 - 0.4 * Math.min(1, s / MAX_SPEED)) * (inp.handbrake ? 1.5 : 1);
       this.yaw -= inp.steer * turn * Math.sign(vf) * dt;
     } else {
       this.yaw -= inp.steer * 0.8 * dt;
@@ -136,7 +163,14 @@ export class Car {
     const px = this.pos.x, pz = this.pos.z;
     this.pos.x += this.vel.x * dt;
     this.pos.z += this.vel.y * dt;
+    const before = this.speed;
     ev.impact = collide(this.pos, this.vel, CAR_RADIUS);
+    if (ev.impact > 0 && this.h.mass !== 1) {
+      // Heavy cabs keep more of their speed through a hit; light ones lose more.
+      const after = this.speed;
+      const target = THREE.MathUtils.clamp(after + (before - after) * (this.h.mass - 1), 0, before);
+      if (after > 0.01) this.vel.multiplyScalar(target / after);
+    }
 
     // A sudden rise (a ramp's side, a pier from below, the sea wall from the water) is a wall.
     if (groundAt(this.pos.x, this.pos.z) - this.pos.y > STEP_UP) {
@@ -149,7 +183,7 @@ export class Car {
     // Crazy Hop.
     if (inp.hop && this.grounded && this.clock - this.lastHop > 0.5) {
       this.lastHop = this.clock;
-      this.vy = Math.max(this.vy, 0) + HOP;
+      this.vy = Math.max(this.vy, 0) + HOP * this.h.hop;
       this.grounded = false;
       this.airTime = 0;
       ev.hop = true;
