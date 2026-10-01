@@ -5,7 +5,7 @@ import { pool, retry } from './scenery';
 // Painted facades: generated drawings of SF buildings (public/facades/), set on the
 // street faces of houses. One merged mesh per drawing keeps draw calls low.
 
-export interface FacadeImage { id: string; kind: 'house' | 'tile' | 'towerbase'; wall: string; base: string }
+export interface FacadeImage { id: string; kind: 'house' | 'tile' | 'towerbase' | 'drop'; wall: string; base: string }
 export let facadeSets: Record<string, FacadeImage[]> = {};
 const textures = new Map<string, THREE.Texture>();
 
@@ -18,14 +18,14 @@ export async function loadFacades() {
     return;
   }
   const loader = new THREE.TextureLoader();
-  const tiles = new Set(Object.values(facadeSets).flat().filter((f) => f.kind === 'tile').map((f) => f.id));
+  const repeats = new Set(Object.values(facadeSets).flat().filter((f) => f.kind !== 'house').map((f) => f.id));
   const ids = [...new Set(Object.values(facadeSets).flat().map((f) => f.id))];
   await pool(ids, 4, async (id) => {
     try {
       const tex = await retry(() => loader.loadAsync(`/facades/${id}.jpg`));
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = 8;
-      if (tiles.has(id)) tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      if (repeats.has(id)) tex.wrapS = tex.wrapT = THREE.RepeatWrapping; // tiles and lobbies repeat
       textures.set(id, tex);
     } catch (err) {
       console.warn(`No facade ${id}:`, err);

@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { CELL, HALF, N, SEA_FLOOR, blocks, heightAt, terrainAt } from './world';
-import { makeLabel } from './models';
 import { toon } from './look';
 
 // Set pieces: drivable ramps layered on top of the terrain. The car, traffic
@@ -93,26 +92,18 @@ function addRamp(scene: THREE.Scene, r: Ramp, color: number) {
   return mesh;
 }
 
-function sign(scene: THREE.Scene, text: string, x: number, z: number, y?: number) {
-  const s = makeLabel(text, { bg: '#1d2a3a', fg: '#ffe14a', height: 2.4 });
-  s.position.set(x, (y ?? heightAt(x, z)) + 7, z);
-  scene.add(s);
-}
-
 const EAST = Math.PI / 2, WEST = -Math.PI / 2, SOUTH = 0;
 
 export function buildFeatures(scene: THREE.Scene) {
   // Twin Peaks: a kicker on the summit that throws you east, over two of the
   // steepest blocks in the city (56.9 m at the top, 11.7 m two blocks down).
   addRamp(scene, { x: -186, z: 192, yaw: EAST, length: 16, width: 10, height: (t) => 10 * t }, 0xd8d2c4);
-  sign(scene, 'TWIN PEAKS SUMMIT', -200, 182);
   addSutroTower(scene);
 
   // Lombard: the crooked street, which a robotaxi simply flies over. A lip at
   // the top of the steepest block on Russian Hill (37 m down to 15.5 m, heading west).
   addRamp(scene, { x: -130, z: -256, yaw: WEST, length: 7, width: 12, height: (t) => 1.8 * t }, 0xb04a3a);
   addCrookedStreet(scene);
-  sign(scene, 'LOMBARD ST', -126, -268);
 
   // Piers along the Embarcadero, either side of the Ferry Building, each with a
   // kicker at the end that launches you into the bay.
@@ -125,7 +116,6 @@ export function buildFeatures(scene: THREE.Scene) {
     addRamp(scene, r, 0x9a7650);
     addPilings(scene, r);
   }
-  sign(scene, 'PIER 1', HALF + 8, -262, heightAt(HALF, -256));
 
   // Boat ramps: the only way back out of the bay.
   for (const [x, z, yaw] of [[HALF + 60, -64, WEST], [192, -HALF - 60, SOUTH]] as const) {
@@ -135,7 +125,6 @@ export function buildFeatures(scene: THREE.Scene) {
       height: (t) => t * (shore - SEA_FLOOR),
     }, 0xa9a69c);
   }
-  sign(scene, 'BOAT RAMP', HALF + 6, -76, heightAt(HALF, -64));
 }
 
 function addPilings(scene: THREE.Scene, r: Ramp) {

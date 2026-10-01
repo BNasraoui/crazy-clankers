@@ -1,9 +1,8 @@
 import * as THREE from 'three';
-import { makeLabel } from './models';
 import { glslColor, toon } from './look';
 import { districtOf, type District } from './districts';
 import { instance, kit, sag, wirePoints } from './scenery';
-import { FacadeBuilder, facadeSets, houseSet } from './facades';
+import { FacadeBuilder, facadeSets, houseSet, type FacadeImage } from './facades';
 
 // The city is a 10x10 grid of blocks. Street centerlines sit every CELL units.
 // SF-style hills: intersections are flat and the streets between them are
@@ -249,6 +248,27 @@ const LANDMARK_SPOTS: [string, number, number, Side, number][] = [
   ['Crypto Castle', 8, 6, 'N', 0.5],
   ['Burrito Spot', 3, 6, 'E', 0.5],
 ];
+// One-of-a-kind buildings, painted from their own drawing (public/facades/drop-*.jpg),
+// so every drop-off is recognisable without a sign. [drawing, block bi, bj, face, t, width]
+// t places the lot's centre along the face, as for curb().
+const SPECIAL_LOTS: [string, number, number, Side, number, number][] = [
+  ['drop-phlz', 5, 3, 'N', 0.3, 14],
+  ['drop-barris', 6, 6, 'E', 0.6, 16],
+  ['drop-lab', 6, 4, 'E', 0.4, 16],
+  ['drop-crypto', 8, 6, 'N', 0.5, 18],
+  ['drop-burrito', 3, 6, 'E', 0.5, 16],
+  ['drop-ladies-b', 5, 5, 'W', 0.5, 16], // Postcard Row, facing Alamo Square
+  ['drop-ladies-a', 5, 5, 'N', 0, 21],
+];
+// Drawings for the base of a downtown tower: [drawing, block bi, bj, face, t].
+const SPECIAL_BASES: [string, number, number, Side, number][] = [
+  ['drop-seriesa', 7, 3, 'S', 0.7],
+];
+// Where along a face (world x for N/S, world z for W/E) a curb t falls.
+const alongFace = (bi: number, bj: number, side: Side, t: number) =>
+  (side === 'N' || side === 'S' ? -HALF + bi * CELL : -HALF + bj * CELL) + BUILD_INSET + 4 + t * (CELL - 2 * BUILD_INSET - 8);
+const dropImage = (id: string) => (facadeSets.drops ?? []).find((f) => f.id === id);
+
 export const landmarks: Landmark[] = LANDMARK_SPOTS.map(([name, bi, bj, side, t]) => ({
   name,
   curb: curb(bi, bj, side, t),
@@ -330,13 +350,34 @@ export function buildWorld(scene: THREE.Scene) {
         const tile = tiles.length ? tiles[Math.floor(r() * tiles.length)] : null;
         const top = addBox(a0, a1, c0, c1, height, tile ? tile.wall : GLASS[Math.floor(r() * GLASS.length)], true, tile ? 2 : undefined);
         if (!tile) return;
-        const base = bases.length ? bases[Math.floor(r() * bases.length)] : null;
+        const randomBase = bases.length ? bases[Math.floor(r() * bases.length)] : null;
         // Paint all four sides: the tile repeats every 4 floors (14.4 m), with a lobby at street level.
-        for (const [cx, cz, fnx, fnz, w] of [[(a0 + a1) / 2, c0, 0, -1, a1 - a0], [(a0 + a1) / 2, c1, 0, 1, a1 - a0], [a0, (c0 + c1) / 2, -1, 0, c1 - c0], [a1, (c0 + c1) / 2, 1, 0, c1 - c0]] as const) {
+        for (const [cx, cz, fnx, fnz, w, face] of [[(a0 + a1) / 2, c0, 0, -1, a1 - a0, 'N'], [(a0 + a1) / 2, c1, 0, 1, a1 - a0, 'S'], [a0, (c0 + c1) / 2, -1, 0, c1 - c0, 'W'], [a1, (c0 + c1) / 2, 1, 0, c1 - c0, 'E']] as const) {
+          // A landmark lobby replaces the usual one on the face (and tower) it stands on.
+          const spec = SPECIAL_BASES.find(([id, bi, bj, f, t]) => {
+            if (bi !== b.bi || bj !== b.bj || f !== face || !dropImage(id)) return false;
+            const at = alongFace(bi, bj, f, t), onEdge = f === 'N' ? c0 === z0 : f === 'S' ? c1 === z1 : f === 'W' ? a0 === x0 : a1 === x1;
+            return onEdge && (f === 'N' || f === 'S' ? at > a0 && at < a1 : at > c0 && at < c1);
+          });
+          const base = spec ? dropImage(spec[0])! : randomBase;
           const g = heightAt(cx, cz) - 1;
           const y0 = base ? g + 8.5 : g;
           facades.add({ image: tile.id, cx, cz, nx: fnx, nz: fnz, width: w + 0.02, y0, y1: top, repeatU: Math.max(1, Math.round(w / 14.4)), repeatV: (top - y0) / 14.4 });
-          if (base) facades.add({ image: base.id, cx, cz, nx: fnx, nz: fnz, width: w + 0.02, y0: g - 1.5, y1: y0 + 0.05, lift: 0.05 });
+          const lobby = { nx: fnx, nz: fnz, y0: g - 1.5, y1: y0 + 0.05, lift: 0.05 };
+          // Ordinary lobbies repeat along the face; a landmark gets 15 m of its own, centred on the drop-off.
+          const rx = fnz, rz = -fnx; // along the face, left to right
+          const paintBase = (img: FacadeImage, from: number, to: number) => {
+            if (to - from < 0.5) return;
+            const m = (from + to) / 2;
+            facades.add({ ...lobby, image: img.id, cx: cx + rx * m, cz: cz + rz * m, width: to - from + 0.02, repeatU: img === base && spec ? 1 : Math.max(1, Math.round((to - from) / 15)) });
+          };
+          if (spec && base) {
+            const at = alongFace(b.bi, b.bj, face, spec[4]) - (face === 'N' || face === 'S' ? cx : cz);
+            const off = (face === 'N' || face === 'S' ? rx : rz) * at; // signed offset along the right vector
+            const c = clamp(off, -w / 2 + 7.5, w / 2 - 7.5);
+            paintBase(base, c - 7.5, c + 7.5);
+            if (randomBase) { paintBase(randomBase, -w / 2, c - 7.5); paintBase(randomBase, c + 7.5, w / 2); }
+          } else if (base) paintBase(base, -w / 2, w / 2);
         }
       };
       const split = r() < 0.5;
@@ -380,14 +421,6 @@ export function buildWorld(scene: THREE.Scene) {
   addLandmarks(scene);
   addGoldenGate(scene);
 
-  for (const lm of landmarks) {
-    const sign = makeLabel(lm.name, { bg: '#1d2a3a', fg: '#ffe14a', height: 2.2 });
-    sign.position.copy(lm.curb.walk).add(new THREE.Vector3(0, 9, 0));
-    scene.add(sign);
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 8), toon({ color: 0x333333 }));
-    pole.position.copy(lm.curb.walk).add(new THREE.Vector3(0, 4, 0));
-    scene.add(pole);
-  }
 }
 
 // Windows, frames and a white cornice painted per pixel, so houses read as
@@ -521,15 +554,30 @@ function buildFrontages(
     { a0: z0 + DEPTH, a1: z1 - DEPTH, face: 'E', corners: false },
   ];
   for (const row of rows) {
-    // Split the frontage into lots.
-    const lots: [number, number][] = [];
-    let a = row.a0;
-    while (row.a1 - a > 0.5) {
-      let w = d.lot[0] + r() * (d.lot[1] - d.lot[0]);
-      if (row.a1 - a - w < d.lot[0] * 0.75) w = row.a1 - a;
-      lots.push([a, a + w]);
-      a += w;
+    // Split the frontage into lots, keeping room for a one-of-a-kind building.
+    const special = facades ? SPECIAL_LOTS.find(([id, bi, bj, face]) => bi === b.bi && bj === b.bj && face === row.face && dropImage(id)) : undefined;
+    let s0 = row.a1, s1 = row.a1;
+    if (special) {
+      const width = Math.min(special[5], row.a1 - row.a0);
+      s0 = clamp(alongFace(b.bi, b.bj, row.face, special[4]) - width / 2, row.a0, row.a1 - width);
+      s1 = s0 + width;
+      if (s0 - row.a0 < 3) s0 = row.a0; // no slivers
+      if (row.a1 - s1 < 3) s1 = row.a1;
     }
+    const lots: [number, number][] = [];
+    const split = (from: number, to: number) => {
+      let a = from;
+      while (to - a > 0.5) {
+        let w = d.lot[0] + r() * (d.lot[1] - d.lot[0]);
+        if (to - a - w < d.lot[0] * 0.75) w = to - a;
+        lots.push([a, a + w]);
+        a += w;
+      }
+    };
+    split(row.a0, s0);
+    const specialIndex = lots.length;
+    if (special) lots.push([s0, s1]);
+    split(s1, row.a1);
     lots.forEach(([la0, la1], i) => {
       const corner = row.corners && (i === 0 || i === lots.length - 1);
       // Local frame → world box. along: la0..la1; depth: 0 at the face, positive inward.
@@ -549,6 +597,17 @@ function buildFrontages(
       const floors = Math.round(d.floors[0] + r() * (d.floors[1] - d.floors[0])) + (corner ? d.cornerFloors : 0);
       const color = colors[Math.floor(r() * colors.length)];
       const width = la1 - la0;
+      if (special && i === specialIndex && facades) {
+        // The landmark lot: as tall as its drawing, which keeps its proportions.
+        const img = dropImage(special[0])!;
+        const g0 = groundAtLot(la0), g1 = groundAtLot(la1), hi = Math.max(g0, g1), lo = Math.min(g0, g1);
+        const [bx0, bx1, bz0, bz1] = box(la0, la1, 0, DEPTH);
+        const maxGround = Math.max(heightAt(bx0, bz0), heightAt(bx1, bz0), heightAt(bx0, bz1), heightAt(bx1, bz1));
+        const top = addBox(bx0, bx1, bz0, bz1, hi + width / 1.5 - maxGround, img.wall, false, 2);
+        facades.add({ image: img.id, cx: (fx0 + fx1) / 2, cz: (fz0 + fz1) / 2, nx, nz, width: width + 0.02, y0: hi, y1: top });
+        facades.addColour(img.base, { cx: (fx0 + fx1) / 2, cz: (fz0 + fz1) / 2, nx, nz, width: width + 0.02, y0: lo - 0.6, y1: hi });
+        return;
+      }
       if (painted && facades) {
         // Painted lot: a full-width box in the drawing's body colour; the drawing carries
         // the bays, doors and cornice. Neighbours never repeat a drawing.
@@ -664,6 +723,33 @@ function makeGables(list: { m: THREE.Matrix4; c: THREE.Color }[]) {
 const SURFACE_GLSL = /* glsl */ `
 uniform sampler2D uParks;
 varying vec3 vWPos;
+float swHash(vec2 q) { return fract(sin(dot(q, vec2(41.3, 289.1))) * 43758.5453); }
+// Concrete slabs with scored joints, a pale curb with an ink line at the gutter, and
+// brick paver bands downtown.
+vec3 sidewalk(vec2 p, vec2 d, float e, bool brick) {
+  const float SH = ${STREET_HALF.toFixed(1)}, SW = ${SIDEWALK_EDGE.toFixed(1)};
+  float across = e - SH;
+  if (across < 0.1) return ${glslColor(0x2a2630)}; // ink at the gutter
+  if (across < 0.38) return across < 0.13 ? ${glslColor(0xa39d92)} : ${glslColor(0xe4ded2)}; // curb face, curb top
+  bool corner = d.x < SW && d.y < SW;
+  vec2 q = corner ? p : vec2(d.x < d.y ? p.y : p.x, across); // (along, across)
+  vec3 base = ${glslColor(0xbcb4a5)};
+  if (brick && !corner && across < 1.7) {
+    // Running-bond red brick, like Market Street.
+    vec2 b = vec2(q.x / 0.42, (across - 0.38) / 0.21);
+    b.x += 0.5 * mod(floor(b.y), 2.0);
+    vec2 f = fract(b);
+    float mortar = step(f.x, 0.08) + step(f.y, 0.12);
+    vec3 c = ${glslColor(0xa65640)} * (0.9 + 0.14 * swHash(floor(b)));
+    return mix(c, ${glslColor(0x8a7f74)}, clamp(mortar, 0.0, 1.0));
+  }
+  vec2 slab = vec2(1.6, corner ? 1.6 : (SW - SH - 0.38) / 2.0);
+  vec2 sq = corner ? q / slab : vec2(q.x / slab.x, (across - 0.38) / slab.y);
+  vec2 f = fract(sq);
+  float joint = step(f.x, 0.04) + (corner ? step(f.y, 0.04) : step(f.y, 0.05) * step(0.5, sq.y));
+  base *= 0.95 + 0.07 * swHash(floor(sq));
+  return mix(base, base * 0.68, clamp(joint, 0.0, 1.0));
+}
 vec3 surface(vec2 p) {
   const float HALF = ${HALF.toFixed(1)}, CELL = ${CELL.toFixed(1)}, SH = ${STREET_HALF.toFixed(1)}, SW = ${SIDEWALK_EDGE.toFixed(1)}, BI = ${BUILD_INSET.toFixed(1)};
   float m = max(abs(p.x), abs(p.y));
@@ -683,7 +769,7 @@ vec3 surface(vec2 p) {
   float e = min(d.x, d.y);
   vec2 cell = floor((p + HALF) / CELL);
   vec4 kind = texture(uParks, (cell + 0.5) / ${N.toFixed(1)});
-  if (e < SW || (e < BI && kind.g > 0.5)) return e < SH + 0.4 ? ${glslColor(0x8f8a80)} : ${glslColor(0xbdb7ab)};
+  if (e < SW || (e < BI && kind.g > 0.5)) return sidewalk(p, d, e, kind.b > 0.5);
   vec3 grass = ${glslColor(0x6fa04f)} * (0.94 + 0.06 * sin(p.x * 0.7) * cos(p.y * 0.6));
   if (e < BI) return e < SW + 0.3 ? ${glslColor(0x8a8478)} : grass; // low wall, then the front yard
   if (kind.r > 0.5) return grass;
@@ -704,6 +790,7 @@ function makeTerrain() {
   for (const b of blocks) {
     if (b.kind === 'park') parks[(b.bj * N + b.bi) * 4] = 255;
     if (b.kind !== 'park' && !districtOf(b.bi, b.bj).yard) parks[(b.bj * N + b.bi) * 4 + 1] = 255; // paved to the building line
+    if (b.kind === 'downtown' || b.kind === 'landmark') parks[(b.bj * N + b.bi) * 4 + 2] = 255; // brick paver bands
   }
   const tex = new THREE.DataTexture(parks, N, N);
   tex.magFilter = tex.minFilter = THREE.NearestFilter;
