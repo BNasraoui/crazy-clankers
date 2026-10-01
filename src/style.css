@@ -213,3 +213,5 @@ body { font-family: var(--body); color: var(--paper); user-select: none; }
 @media (prefers-reduced-motion: reduce) {
   .popup, #clock.low, #fare.urgent .clock, #overlay .press { animation: none; }
 }
+
+#lookpanel pre { margin: 0; max-width: 360px; white-space: pre-wrap; font: 11px/1.4 ui-monospace, monospace; }

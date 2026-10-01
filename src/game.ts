@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Car, MAX_SPEED } from './car';
-import { readInput, padName, type Input } from './input';
+import { readInput, padName, padDebug, type Input } from './input';
 import { CABS, makeCar, makePerson, makeLabel, personFrom, type PersonModel } from './models';
 import { Look, SKY, makeSky } from './look';
 import { CHARACTER_LAYER, makeCharacter, sunDir } from './anime';
@@ -235,6 +235,7 @@ export class Game {
     this.car.sync(dt);
     this.traffic.sync(dt);
     if (inp.debug) this.look.togglePanel();
+    this.look.setPadDebug(padDebug);
     this.sky.position.copy(this.camera.position);
     const under = this.camera.position.y < WATER;
     if (under !== this.underwaterView) {

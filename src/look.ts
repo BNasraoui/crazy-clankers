@@ -245,7 +245,9 @@ export class Look {
       <label>Camera height <input id="lk-up" type="range" min="1.5" max="7" step="0.1"><output id="lk-up-v"></output></label>
       <label>Field of view <input id="lk-fov" type="range" min="45" max="90" step="1"><output id="lk-fov-v"></output></label>
       <label><input id="lk-pax" type="checkbox"> Passengers as sprites</label>
-      <button id="lk-reset" type="button">Reset</button>`;
+      <button id="lk-reset" type="button">Reset</button>
+      <b>CONTROLLERS</b>
+      <pre id="lk-pads"></pre>`;
     document.body.appendChild(panel);
     const res = panel.querySelector<HTMLSelectElement>('#lk-res')!;
     const grain = panel.querySelector<HTMLInputElement>('#lk-grain')!;
@@ -302,5 +304,9 @@ export class Look {
   }
 
   togglePanel = () => {};
+  setPadDebug(text: string) {
+    const el = document.getElementById('lk-pads');
+    if (el && !el.closest('[hidden]') && el.textContent !== text) el.textContent = text;
+  }
   onChange = () => {};
 }
