@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Car, MAX_SPEED } from './car';
 import { readInput, padName, type Input } from './input';
-import { makePerson, makeLabel, personFrom, type CarModel, type PersonModel } from './models';
+import { CABS, makeCar, makePerson, makeLabel, personFrom, type PersonModel } from './models';
 import { Look, SKY, makeSky } from './look';
 import { CHARACTER_LAYER, makeCharacter, sunDir } from './anime';
 import { pickPassenger, type PassengerType } from './passengers';
@@ -97,7 +97,13 @@ export class Game {
   private quipTimer = 0;
   private rand = Math.random;
 
-  constructor(public renderer: THREE.WebGLRenderer, cab: CarModel, private people: Partial<Record<string, THREE.Object3D>> = {}) {
+  private cabIndex = (() => {
+    try { return Math.max(0, CABS.findIndex((c) => c.id === localStorage.getItem('clankers.cab'))); } catch { return 0; }
+  })();
+  private steerLatch = false;
+
+  constructor(public renderer: THREE.WebGLRenderer, private people: Partial<Record<string, THREE.Object3D>> = {}) {
+    const cab = makeCar(CABS[this.cabIndex].id);
     this.look = new Look(renderer);
     this.look.onChange = () => this.refreshPassengers();
     this.scene.background = new THREE.Color(SKY.horizon);
@@ -126,7 +132,7 @@ export class Game {
     this.geysers = new Geysers(this.scene, this.particles);
     this.scene.add(cab.root);
     this.car = new Car(cab);
-    this.traffic = new Traffic(this.scene, 46);
+    this.traffic = new Traffic(this.scene, 46, this.rivals());
 
     // Flat, chunky arrow like the original's.
     this.arrowMat = new THREE.MeshLambertMaterial({ color: 0x7dff6a, emissive: 0x7dff6a, emissiveIntensity: 0.55 });
@@ -207,6 +213,10 @@ export class Game {
     const inp = readInput(dt);
     if (this.state === 'title') {
       if (inp.confirm) this.start();
+      // Pick a cab with left / right.
+      const dir = inp.steer > 0.6 ? 1 : inp.steer < -0.6 ? -1 : 0;
+      if (dir && !this.steerLatch) this.chooseCab(this.cabIndex + dir);
+      this.steerLatch = dir !== 0;
       this.titleCamera(dt);
       this.traffic.update(dt, this.car);
       this.peds?.update(dt, this.car, this.camera);
@@ -259,11 +269,33 @@ export class Game {
     }
   }
 
+  private rivals() {
+    return CABS.map((c) => c.id).filter((id) => id !== CABS[this.cabIndex].id);
+  }
+
+  private chooseCab(i: number) {
+    this.cabIndex = (i + CABS.length) % CABS.length;
+    try { localStorage.setItem('clankers.cab', CABS[this.cabIndex].id); } catch { /* storage unavailable */ }
+    this.scene.remove(this.car.model.root);
+    this.car.model = makeCar(CABS[this.cabIndex].id);
+    this.scene.add(this.car.model.root);
+    this.traffic.setRivals(this.scene, this.rivals());
+    this.renderCabPicker();
+  }
+
+  private renderCabPicker() {
+    const el = document.getElementById('cabpick');
+    if (!el) return;
+    const c = CABS[this.cabIndex];
+    el.innerHTML = `<span class="arrow">◀</span><div><b>${c.name}</b><small>${c.tagline}</small></div><span class="arrow">▶</span>`;
+  }
+
   private showTitle() {
     this.setState('title');
     $('#overlay').innerHTML = `
       <h1>CRAZY<span>CLANKERS</span></h1>
       <div class="tag">You are the robotaxi. Drive like it.</div>
+      <div id="cabpick"></div>
       <div class="press">PRESS A / ENTER</div>
       <div class="controls">
         <b>Gas</b> RT / W &nbsp; <b>Brake / reverse</b> LT / S &nbsp; <b>Steer</b> stick / A D<br>
@@ -273,6 +305,7 @@ export class Game {
         Jumps, near misses and drifts earn tips but cost you <b>rating</b>. Below 4.00, you're deactivated.
       </div>
       <div class="pad" id="padstatus"></div>`;
+    this.renderCabPicker();
   }
 
   simulate(dt: number, inp: Input) {

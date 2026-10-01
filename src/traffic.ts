@@ -3,7 +3,7 @@ import { Car } from './car';
 import { CELL, HALF, N, rng } from './world';
 import { groundAt, movingRamps, rampGeometry, type Ramp } from './features';
 import { toon } from './look';
-import { makeSedan, makeToaster, makeWedge, type CarModel } from './models';
+import { makeCar, makeSedan, makeToaster, makeWedge, type CarModel } from './models';
 
 // Car carriers: the ramp starts at the back and rises over the flatbed.
 const CARRIER_RAMP = { back: 4.6, length: 6.2, width: 2.6, lift: 2.3 };
@@ -42,6 +42,7 @@ function makeCarrier(): CarModel {
 
 interface TCar {
   model: CarModel;
+  rival: string | null;
   carrier: boolean;
   ramp?: Ramp;
   axis: 'x' | 'z';
@@ -72,12 +73,14 @@ export class Traffic {
   cars: TCar[] = [];
   private clock = 0;
 
-  constructor(scene: THREE.Scene, count: number) {
+  // rivals: ids of the robotaxis you aren't driving; some traffic is drawn as them.
+  constructor(scene: THREE.Scene, count: number, private rivals: string[] = []) {
     const r = rng(5);
     for (let k = 0; k < count; k++) {
       const pick = r();
       const carrier = k < 6;
-      const model = carrier ? makeCarrier() : pick < 0.12 ? makeWedge() : pick < 0.27 ? makeToaster() : makeSedan(COLORS[Math.floor(r() * COLORS.length)]);
+      const rival = !carrier && this.rivals.length > 0 && pick > 0.82 ? this.rivals[k % this.rivals.length] : null;
+      const model = carrier ? makeCarrier() : rival ? makeCar(rival) : pick < 0.12 ? makeWedge() : pick < 0.27 ? makeToaster() : makeSedan(COLORS[Math.floor(r() * COLORS.length)]);
       scene.add(model.root);
       const cruise = carrier ? 8 : 9 + r() * 4;
       let ramp: Ramp | undefined;
@@ -86,12 +89,26 @@ export class Traffic {
         movingRamps.push(ramp);
       }
       this.cars.push({
-        model, carrier, ramp, axis: r() < 0.5 ? 'x' : 'z', line: -HALF + Math.floor(r() * (N + 1)) * CELL,
+        model, carrier, ramp, rival, axis: r() < 0.5 ? 'x' : 'z', line: -HALF + Math.floor(r() * (N + 1)) * CELL,
         dir: r() < 0.5 ? 1 : -1, s: 0, speed: cruise, cruise, stopped: 0, blockedFor: 0,
         near: false, hitAt: -99, honkAt: -99, x: 0, z: 0,
       });
     }
     this.scatter();
+  }
+
+  // Re-skin rival robotaxis so none of them matches the cab you chose.
+  setRivals(scene: THREE.Scene, rivals: string[]) {
+    let k = 0;
+    for (const c of this.cars) {
+      if (!c.rival) continue;
+      const id = rivals[k++ % rivals.length];
+      if (id === c.rival) continue;
+      scene.remove(c.model.root);
+      c.model = makeCar(id);
+      c.rival = id;
+      scene.add(c.model.root);
+    }
   }
 
   scatter() {
@@ -203,6 +220,7 @@ export class Traffic {
       root.rotation.y = Math.atan2(fx, fz);
       body.rotation.x = -Math.atan(slope);
       for (const w of wheels) w.rotation.x += (c.speed * dt) / 0.42;
+      if (c.model.spinner) c.model.spinner.rotation.y += dt * 10;
     }
   }
 }

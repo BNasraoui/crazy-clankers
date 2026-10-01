@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Game } from './game';
 import { treeRefs } from './world';
-import { loadCab, loadPeople } from './models';
+import { loadCars, loadPeople } from './models';
 import { Pedestrians } from './pedestrians';
 import { loadPassengerSprites } from './spritepeople';
 import './style.css';
@@ -12,8 +12,8 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 
-const [cab, people] = await Promise.all([loadCab(), loadPeople()]);
-const game = new Game(renderer, cab, people);
+const [, people] = await Promise.all([loadCars(), loadPeople()]);
+const game = new Game(renderer, people);
 loadPassengerSprites().then((s) => { game.paxSprites = s; game.refreshPassengers(); }).catch((err) => console.warn('No passenger sprites:', err));
 Pedestrians.load(game.scene).then((p) => { game.peds = p; }).catch((err) => console.warn('No pedestrians:', err));
 const fit = () => {

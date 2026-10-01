@@ -63,30 +63,50 @@ export function personFrom(template: THREE.Object3D): PersonModel {
   return { root, armL: part('arm_L'), armR: part('arm_R'), raise: 0.3 };
 }
 
-// The player's cab, built in Blender (assets/blender/cab.py). Falls back to the
-// box version if the file can't be loaded.
-export async function loadCab(): Promise<CarModel> {
-  try {
-    const gltf = await new GLTFLoader().loadAsync('/models/cab.glb');
-    const root = new THREE.Group();
-    const body = new THREE.Group();
-    root.add(body);
-    body.add(gltf.scene);
-    makeCharacter(root);
-    const node = (name: string) => {
-      const o = gltf.scene.getObjectByName(name);
-      if (!o) throw new Error(`cab.glb is missing node ${name}`);
-      o.rotation.order = 'YXZ'; // steer about Y, then spin about the axle
-      return o;
-    };
-    const wheels = ['wheel_FL', 'wheel_FR', 'wheel_RL', 'wheel_RR'].map(node);
-    return { root, body, wheels, steer: wheels.slice(0, 2), spinner: node('lidar') };
-  } catch (err) {
-    console.warn('Using the box cab:', err);
+// Playable robotaxis, built in Blender (assets/blender/). Each glb has nodes
+// body, wheel_FL/FR/RL/RR and optionally lidar.
+export interface CabInfo { id: string; name: string; tagline: string }
+export const CABS: CabInfo[] = [
+  { id: 'cab', name: 'CLANKER CAB', tagline: 'The original. Polite. Chunky. Spins its puck.' },
+  { id: 'wayfarer', name: 'WAYFARER', tagline: 'Jaguar-based. Sensors everywhere. Apologises a lot.' },
+  { id: 'cybercab', name: 'CYBER CAB', tagline: 'Two seats, no wheel, delivery date TBC.' },
+];
+
+const carTemplates = new Map<string, THREE.Object3D>();
+
+export async function loadCars(): Promise<void> {
+  const loader = new GLTFLoader();
+  await Promise.all(CABS.map(async ({ id }) => {
+    try {
+      const gltf = await loader.loadAsync(`/models/${id}.glb`);
+      carTemplates.set(id, gltf.scene);
+    } catch (err) {
+      console.warn(`No ${id}.glb:`, err);
+    }
+  }));
+}
+
+// A fresh, independently animated instance of a car (player or traffic).
+export function makeCar(id: string): CarModel {
+  const template = carTemplates.get(id);
+  if (!template) {
     const cab = makeCab();
     makeCharacter(cab.root);
     return cab;
   }
+  const scene = template.clone(true);
+  const root = new THREE.Group();
+  const body = new THREE.Group();
+  root.add(body);
+  body.add(scene);
+  makeCharacter(root);
+  const node = (name: string) => {
+    const o = scene.getObjectByName(name);
+    if (o) o.rotation.order = 'YXZ'; // steer about Y, then spin about the axle
+    return o;
+  };
+  const wheels = ['wheel_FL', 'wheel_FR', 'wheel_RL', 'wheel_RR'].map(node).filter((o): o is THREE.Object3D => !!o);
+  return { root, body, wheels, steer: wheels.slice(0, 2), spinner: node('lidar') };
 }
 
 // The placeholder cab: a polite white robotaxi with a spinning lidar puck.

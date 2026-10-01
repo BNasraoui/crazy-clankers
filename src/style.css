@@ -177,6 +177,14 @@ body { font-family: var(--body); color: var(--paper); user-select: none; }
   margin: 22px 0 26px; padding: 2px 12px; font: 22px var(--pen); color: var(--ink);
   background: var(--paper); border: 3px solid var(--ink); border-radius: 6px; box-shadow: 4px 4px 0 var(--ink); transform: rotate(2deg);
 }
+#cabpick {
+  display: flex; align-items: center; gap: 14px; margin: -6px 0 20px; padding: 8px 14px;
+  background: var(--ink); color: #fff; border: 3px solid var(--ink); border-radius: 10px; box-shadow: 5px 5px 0 var(--teal);
+  transform: rotate(-1deg); max-width: min(560px, 92vw); text-align: center;
+}
+#cabpick b { display: block; font: 24px var(--num); color: var(--yellow); }
+#cabpick small { display: block; font: 600 13px var(--body); opacity: 0.85; }
+#cabpick .arrow { font: 22px var(--num); color: var(--teal); animation: blink 1.2s steps(2) infinite; }
 #overlay .press { font: 26px var(--num); color: #fff; -webkit-text-stroke: 0.08em var(--ink); paint-order: stroke fill; text-shadow: 4px 4px 0 var(--ink); animation: blink 1s steps(2) infinite; }
 @keyframes blink { 50% { opacity: 0.25; } }
 #overlay .controls, #overlay .stats {
