@@ -198,6 +198,9 @@ body { font-family: var(--body); color: var(--paper); user-select: none; }
 #lookpanel b { font: 16px var(--pen); color: var(--magenta); }
 #lookpanel label { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
 #lookpanel[hidden] { display: none; }
+#lookpanel output { min-width: 3.5em; text-align: right; font-variant-numeric: tabular-nums; }
+#lookpanel button { font: 15px var(--pen); padding: 2px 10px; border: 2px solid var(--ink); border-radius: 6px; background: var(--yellow); cursor: pointer; }
+#lookpanel { pointer-events: auto; }
 
 @media (prefers-reduced-motion: reduce) {
   .popup, #clock.low, #fare.urgent .clock, #overlay .press { animation: none; }

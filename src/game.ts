@@ -312,6 +312,7 @@ export class Game {
     }
     this.particles.update(dt);
     if (this.peds) {
+      this.peds.size = this.look.settings.people;
       const pev = this.peds.update(dt, this.car, this.camera);
       if (pev.dives.length) {
         sfx.yelp();
@@ -678,7 +679,8 @@ export class Game {
     diff = Math.atan2(Math.sin(diff), Math.cos(diff));
     this.camYaw += diff * (1 - Math.exp(-4 * dt));
     const speedT = Math.min(1, car.speed / MAX_SPEED);
-    const back = 8.5 + speedT * 2, up = 4.3 + speedT * 0.6;
+    const tune = this.look.settings;
+    const back = tune.camBack + speedT * 2, up = tune.camUp + speedT * 0.6;
     const want = new THREE.Vector3(car.pos.x - Math.sin(this.camYaw) * back, car.pos.y + up, car.pos.z - Math.cos(this.camYaw) * back);
     want.y = Math.max(want.y, groundAt(want.x, want.z) + 1.5);
     this.camera.position.lerp(want, 1 - Math.exp(-10 * dt));
@@ -687,7 +689,7 @@ export class Game {
     this.shake *= Math.exp(-6 * dt);
     if (this.shake > 0.01) this.camera.position.add(new THREE.Vector3((this.rand() - 0.5) * this.shake, (this.rand() - 0.5) * this.shake, 0));
     this.camera.lookAt(car.pos.x + Math.sin(this.camYaw) * 4, car.pos.y + 1.6, car.pos.z + Math.cos(this.camYaw) * 4);
-    const fov = 68 + speedT * 14;
+    const fov = tune.fov + speedT * 14;
     if (Math.abs(this.camera.fov - fov) > 0.1) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
     this.sun.position.set(car.pos.x + 60, car.pos.y + 110, car.pos.z + 35);
     this.sun.target.position.copy(car.pos);
