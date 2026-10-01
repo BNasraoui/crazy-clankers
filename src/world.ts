@@ -267,8 +267,8 @@ export function buildWorld(scene: THREE.Scene) {
 
   // style: 0 = house windows, 1 = glass tower bands, 2 = plain trim (cornices, doors, awnings)
   const boxes: { x: number; y: number; z: number; sx: number; sy: number; sz: number; c: THREE.Color; ground: number; top: number; style: number }[] = [];
-  const addBox = (x0: number, x1: number, z0: number, z1: number, height: number, color: THREE.ColorRepresentation, tower = false) => {
-    const style = tower ? 1 : 0;
+  const addBox = (x0: number, x1: number, z0: number, z1: number, height: number, color: THREE.ColorRepresentation, tower = false, styleOverride?: number) => {
+    const style = styleOverride ?? (tower ? 1 : 0);
     const hs = [heightAt(x0, z0), heightAt(x1, z0), heightAt(x0, z1), heightAt(x1, z1)];
     const ground = Math.min(...hs);
     const base = ground - 2;
@@ -475,9 +475,12 @@ const TRIM = 0xf6f1e6;
 // Painted facade prototype: these blocks get drawn facades on their street faces
 // (the robotaxi rank street, x = -64 between z = -64 and 0).
 const FACADE_BLOCKS = new Set(['3,4', '4,4']);
-export interface FacadeCard { cx: number; cz: number; nx: number; nz: number; width: number; bottom: number; top: number; pick: number }
+export interface FacadeCard { cx: number; cz: number; nx: number; nz: number; width: number; lo: number; hi: number; top: number; pick: number }
+// Per drawing: the wall colour (for the plain sides of painted houses) and the base colour (foundation band on slopes).
+const FACADE_WALL = [0xb7bba1, 0xdbcca8, 0xa1a8a9, 0xcdb496, 0xb9aec4, 0x9b8f7a];
+const FACADE_BASE = [0xb5b59c, 0xaab0a3, 0x909ca2, 0xb97f61, 0x968ba5, 0x98907a];
 
-type AddBox = (x0: number, x1: number, z0: number, z1: number, height: number, color: THREE.ColorRepresentation, tower?: boolean) => number;
+type AddBox = (x0: number, x1: number, z0: number, z1: number, height: number, color: THREE.ColorRepresentation, tower?: boolean, style?: number) => number;
 type AddPart = (x0: number, x1: number, z0: number, z1: number, y0: number, y1: number, color: THREE.ColorRepresentation, style: number, ground?: number) => void;
 
 // Row houses along each side of a block: narrow lots, flush to the sidewalk, with
@@ -528,25 +531,29 @@ function buildFrontages(
       const floors = Math.round(d.floors[0] + r() * (d.floors[1] - d.floors[0])) + (corner ? d.cornerFloors : 0);
       const color = colors[Math.floor(r() * colors.length)];
       const width = la1 - la0;
-      const gabled = !painted && !corner && r() < d.gables;
-      const top = addBox(...box(la0 + 0.15, la1 - 0.15, 0, DEPTH), floors * 3.3 + 0.5, color);
       if (painted) {
-        // The drawing carries the bays, doors and cornice; just place the card on the face.
-        const lo = Math.min(groundAtLot(la0), groundAtLot(la1));
-        cards.push({ cx: (fx0 + fx1) / 2, cz: (fz0 + fz1) / 2, nx, nz, width: width - 0.3, bottom: lo - 0.4, top, pick: cards.length });
+        // Painted lot: a full-width plain box, with the drawing carrying the bays, doors and cornice.
+        const pick = cards.length % FACADE_WALL.length;
+        const top = addBox(...box(la0, la1, 0, DEPTH), floors * 3.3 + 0.5, FACADE_WALL[pick], false, 2);
+        const ends = [groundAtLot(la0), groundAtLot(la1)];
+        cards.push({ cx: (fx0 + fx1) / 2, cz: (fz0 + fz1) / 2, nx, nz, width: width + 0.02, lo: Math.min(...ends), hi: Math.max(...ends), top, pick });
         if (corner) {
-          // A corner lot also shows its side wall to the cross street: paint that too, as two narrow fronts.
+          // A corner lot also shows its side wall to the cross street: paint it as two narrow fronts.
           const end = i === 0 ? la0 : la1;
           const sx = (row.face === 'N' || row.face === 'S') ? (i === 0 ? -1 : 1) : 0;
           const sz = (row.face === 'W' || row.face === 'E') ? (i === 0 ? -1 : 1) : 0;
-          for (const k of [0.25, 0.75]) {
-            const [ax0, ax1, az0, az1] = box(end, end, k * DEPTH, k * DEPTH);
-            const gx = (ax0 + ax1) / 2, gz = (az0 + az1) / 2;
-            cards.push({ cx: gx, cz: gz, nx: sx, nz: sz, width: DEPTH / 2 - 0.3, bottom: heightAt(gx, gz) - 2.4, top, pick: cards.length });
+          for (const [k0, k1] of [[0, 0.5], [0.5, 1]]) {
+            const [ax0, , az0] = box(end, end, k0 * DEPTH, k0 * DEPTH);
+            const [bx0, , bz0] = box(end, end, k1 * DEPTH, k1 * DEPTH);
+            const g0 = heightAt(ax0, az0), g1 = heightAt(bx0, bz0);
+            cards.push({ cx: (ax0 + bx0) / 2, cz: (az0 + bz0) / 2, nx: sx, nz: sz, width: DEPTH / 2 + 0.02,
+              lo: Math.min(g0, g1), hi: Math.max(g0, g1), top, pick: cards.length % FACADE_WALL.length });
           }
         }
         return;
       }
+      const gabled = !corner && r() < d.gables;
+      const top = addBox(...box(la0 + 0.15, la1 - 0.15, 0, DEPTH), floors * 3.3 + 0.5, color);
       const shop = corner && r() < d.shops;
       if (gabled) {
         // A prism along the lot's depth, peak over the middle of the facade.
@@ -623,14 +630,22 @@ function makeFacadeCards(cards: FacadeCard[]) {
     tex.anisotropy = 8;
     return toon({ map: tex });
   });
+  const baseMats = FACADE_BASE.map((c) => toon({ color: c }));
   for (const c of cards) {
-    const h = c.top - c.bottom;
-    // Consecutive cards cycle through the drawings, so neighbours never repeat.
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(c.width, h), mats[c.pick % mats.length]);
-    mesh.position.set(c.cx + c.nx * 0.04, c.bottom + h / 2, c.cz + c.nz * 0.04);
-    mesh.rotation.y = Math.atan2(c.nx, c.nz);
+    // The drawing starts at the uphill end of the lot, so its ground floor is never buried;
+    // a plain foundation band fills down to the street on the downhill side (very SF).
+    const yaw = Math.atan2(c.nx, c.nz);
+    const h = c.top - c.hi;
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(c.width, h), mats[c.pick]);
+    mesh.position.set(c.cx + c.nx * 0.03, c.hi + h / 2, c.cz + c.nz * 0.03);
+    mesh.rotation.y = yaw;
     mesh.receiveShadow = true;
     g.add(mesh);
+    const fb = c.hi - (c.lo - 0.6);
+    const base = new THREE.Mesh(new THREE.PlaneGeometry(c.width, fb), baseMats[c.pick]);
+    base.position.set(c.cx + c.nx * 0.03, c.lo - 0.6 + fb / 2, c.cz + c.nz * 0.03);
+    base.rotation.y = yaw;
+    g.add(base);
   }
   return g;
 }
