@@ -101,6 +101,7 @@ export class Look {
         tDepth: { value: this.target.depthTexture },
         tChar: { value: this.chars.texture },
         tCharDepth: { value: this.chars.depthTexture },
+        uFull: { value: new THREE.Vector2(1, 1) },
         uLow: { value: new THREE.Vector2(1, 1) },
         uNear: { value: 0.5 },
         uFar: { value: 1000 },
@@ -120,6 +121,7 @@ export class Look {
         uniform sampler2D tChar;
         uniform sampler2D tCharDepth;
         uniform vec2 uLow;
+        uniform vec2 uFull;
         uniform float uNear, uFar, uTime, uGrain, uOutline, uSpeed, uAspect;
         varying vec2 vUv;
 
@@ -127,6 +129,10 @@ export class Look {
         // Laplacian is zero on planes and spikes at creases and silhouettes.
         float invZ(vec2 uv) {
           float d = texture2D(tDepth, uv).x;
+          return 1.0 / max(-perspectiveDepthToViewZ(d, uNear, uFar), 0.001);
+        }
+        float charInvZ(vec2 uv) {
+          float d = texture2D(tCharDepth, uv).x;
           return 1.0 / max(-perspectiveDepthToViewZ(d, uNear, uFar), 0.001);
         }
         float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
@@ -155,7 +161,18 @@ export class Look {
           vec4 ch = texture2D(tChar, vUv);
           if (ch.a > 0.5) {
             float charDist = -perspectiveDepthToViewZ(texture2D(tCharDepth, vUv).x, uNear, uFar);
-            if (charDist < 1.0 / invZ(uv) + 0.4) { col = ch.rgb; isChar = 1.0; }
+            if (charDist < 1.0 / invZ(uv) + 0.4) {
+              col = ch.rgb;
+              isChar = 1.0;
+              // Ink on creases inside the silhouette (car panel breaks, bumpers, arches),
+              // found the same way as the world's lines: where 1/depth stops being planar.
+              vec2 t = 1.0 / uFull;
+              float c = charInvZ(vUv);
+              float lap = abs(4.0 * c - charInvZ(vUv - vec2(t.x, 0.0)) - charInvZ(vUv + vec2(t.x, 0.0))
+                                   - charInvZ(vUv - vec2(0.0, t.y)) - charInvZ(vUv + vec2(0.0, t.y))) / c;
+              float crease = smoothstep(0.012, 0.03, lap) * smoothstep(1.0 / 60.0, 1.0 / 25.0, c);
+              col = mix(col, ${glslColor(0x1b1722)}, crease * 0.85);
+            }
           }
 
           // Manga speed lines from the screen edges.
@@ -192,6 +209,7 @@ export class Look {
     this.target.setSize(lw, lh);
     const pr = this.renderer.getPixelRatio();
     this.chars.setSize(Math.round(w * pr), Math.round(h * pr));
+    this.quad.material.uniforms.uFull.value.set(Math.round(w * pr), Math.round(h * pr));
     setOutlineResolution(Math.round(w * pr), Math.round(h * pr));
     this.quad.material.uniforms.uLow.value.set(lw, lh);
     this.quad.material.uniforms.uAspect.value = w / h;

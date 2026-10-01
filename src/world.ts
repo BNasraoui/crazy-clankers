@@ -574,6 +574,7 @@ function addStreetTrees(b: Block, r: () => number, out: TreeSpot[]) {
       if (side === 'W') { x = cx + at; z = cz + along; }
       if (side === 'E') { x = cx + CELL - at; z = cz + along; }
       if (landmarks.some((l) => Math.hypot(l.curb.walk.x - x, l.curb.walk.z - z) < 7)) continue;
+      if (Math.hypot(x + 69, z + 28) < 16) continue; // keep the robotaxi rank (src/rank.ts) clear
       const circle: Circle = { x, z, r: 0.4, breakable: true };
       b.circles.push(circle);
       const s = 0.55 + r() * 0.15;

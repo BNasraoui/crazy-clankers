@@ -8,6 +8,11 @@ export interface Input {
   restart: boolean; // edge-triggered
   debug: boolean; // edge-triggered: toggles the look panel
   hop: boolean; // edge-triggered: Crazy Hop
+  navX: number; // edge-triggered menu move: -1, 0 or 1
+  navY: number;
+  back: boolean; // edge-triggered: B / Esc / Backspace
+  alt: boolean; // edge-triggered: Y / H
+  lookX: number; // right stick (or Q/E) for inspecting, -1..1
 }
 
 const held = new Set<string>();
@@ -25,6 +30,8 @@ addEventListener('blur', () => held.clear());
 // Per-pad button state from last frame, for edge detection.
 const prevButtons = new Map<number, boolean[]>();
 let keySteer = 0;
+// Stick-as-D-pad latch for menus, so one flick moves one step.
+let stickNav = { x: 0, y: 0 };
 export let padName = '';
 // Live readout of every pad the browser reports (shown in the look panel).
 export let padDebug = '';
@@ -33,7 +40,7 @@ const down = (...codes: string[]) => codes.some((c) => held.has(c));
 const tapped = (...codes: string[]) => codes.some((c) => fresh.has(c));
 
 // One controller's state, normalised to the standard Xbox-style layout.
-interface PadState { steer: number; throttle: number; brake: number; buttons: boolean[] }
+interface PadState { steer: number; throttle: number; brake: number; buttons: boolean[]; ly: number; rx: number }
 
 // Browsers report the "standard" layout for most pads. On Linux, Steam's virtual
 // Xbox 360 pad can arrive unmapped instead: then triggers are axes 2 and 5 (-1..1)
@@ -41,14 +48,17 @@ interface PadState { steer: number; throttle: number; brake: number; buttons: bo
 function readPad(p: Gamepad): PadState {
   const pressed = p.buttons.map((x) => x.pressed || x.value > 0.5);
   if (p.mapping === 'standard') {
-    return { steer: p.axes[0] ?? 0, throttle: p.buttons[7]?.value ?? 0, brake: p.buttons[6]?.value ?? 0, buttons: pressed };
+    return { steer: p.axes[0] ?? 0, throttle: p.buttons[7]?.value ?? 0, brake: p.buttons[6]?.value ?? 0, buttons: pressed, ly: p.axes[1] ?? 0, rx: p.axes[2] ?? 0 };
   }
   const trig = (i: number) => (p.axes.length > i ? Math.max(0, ((p.axes[i] ?? -1) + 1) / 2) : 0);
   // Remap to standard indices: 0 A, 1 B, 2 X, 3 Y, 4 LB, 5 RB, 8 Back, 9 Start.
   const std: boolean[] = [];
   std[0] = pressed[0]; std[1] = pressed[1]; std[2] = pressed[2]; std[3] = pressed[3];
   std[4] = pressed[4]; std[5] = pressed[5]; std[8] = pressed[6]; std[9] = pressed[7];
-  return { steer: p.axes[0] ?? 0, throttle: trig(5), brake: trig(2), buttons: std };
+  // D-pad arrives as a hat on axes 6/7.
+  const hx = p.axes[6] ?? 0, hy = p.axes[7] ?? 0;
+  std[12] = hy < -0.5; std[13] = hy > 0.5; std[14] = hx < -0.5; std[15] = hx > 0.5;
+  return { steer: p.axes[0] ?? 0, throttle: trig(5), brake: trig(2), buttons: std, ly: p.axes[1] ?? 0, rx: p.axes[3] ?? 0 };
 }
 
 export function readInput(dt: number): Input {
@@ -69,6 +79,11 @@ export function readInput(dt: number): Input {
     restart: tapped('KeyR'),
     debug: false, // the look panel listens for ` itself
     hop: tapped('KeyE', 'KeyJ'),
+    navX: (tapped('ArrowRight', 'KeyD') ? 1 : 0) - (tapped('ArrowLeft', 'KeyA') ? 1 : 0),
+    navY: (tapped('ArrowDown', 'KeyS') ? 1 : 0) - (tapped('ArrowUp', 'KeyW') ? 1 : 0),
+    back: tapped('Escape', 'Backspace'),
+    alt: tapped('KeyH'),
+    lookX: (down('KeyX') ? 1 : 0) - (down('KeyZ') ? 1 : 0),
   };
 
   // Merge every connected pad. Some devices are listed but never send input
@@ -90,6 +105,20 @@ export function readInput(dt: number): Input {
     input.restart ||= edge(3);
     input.debug ||= edge(8);
     input.hop ||= edge(0);
+    input.back ||= edge(1);
+    input.alt ||= edge(3);
+    if (edge(12)) input.navY = -1;
+    if (edge(13)) input.navY = 1;
+    if (edge(14)) input.navX = -1;
+    if (edge(15)) input.navX = 1;
+    const rx = Math.abs(st.rx) < 0.2 ? 0 : st.rx;
+    if (rx !== 0) input.lookX = rx;
+    // Left stick flicks act as a D-pad in menus.
+    const fx = st.steer > 0.6 ? 1 : st.steer < -0.6 ? -1 : 0;
+    const fy = st.ly > 0.6 ? 1 : st.ly < -0.6 ? -1 : 0;
+    if (fx && fx !== stickNav.x) input.navX = fx;
+    if (fy && fy !== stickNav.y) input.navY = fy;
+    stickNav = { x: fx, y: fy };
     prevButtons.set(p.index, st.buttons);
     const busy = stick !== 0 || st.throttle > 0.05 || st.brake > 0.05 || st.buttons.some(Boolean);
     if (busy || !active) active = p;

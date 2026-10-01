@@ -14,10 +14,12 @@ import { Geysers, Particles, Props, type PropKind } from './props';
 import type { Pedestrians } from './pedestrians';
 import { SpritePerson, type SpriteSet } from './spritepeople';
 import { Trees } from './trees';
+import { BAY, Rank, snapshotCabs } from './rank';
+import { burst, howToHTML, pickerHTML, titleHTML } from './menus';
 
 const STEP = 1 / 120;
 const START_TIME = 75;
-const START = { x: 4, z: -30, yaw: Math.PI };
+const START = BAY; // every shift starts by pulling out of the robotaxi rank
 const WAITING_COUNT = 7;
 
 interface Waiting {
@@ -61,7 +63,7 @@ export class Game {
   car: Car;
   traffic: Traffic;
   quips: QuipDirector;
-  state: 'title' | 'play' | 'paused' | 'over' = 'title';
+  state: 'title' | 'picker' | 'play' | 'paused' | 'over' = 'title';
 
   time = START_TIME;
   cash = 0;
@@ -100,7 +102,9 @@ export class Game {
   private cabIndex = (() => {
     try { return Math.max(0, CABS.findIndex((c) => c.id === localStorage.getItem('clankers.cab'))); } catch { return 0; }
   })();
-  private steerLatch = false;
+  private rank!: Rank;
+  private thumbs: Record<string, string> = {};
+  private howTo = false;
 
   constructor(public renderer: THREE.WebGLRenderer, private people: Partial<Record<string, THREE.Object3D>> = {}) {
     const cab = makeCar(CABS[this.cabIndex].id);
@@ -133,6 +137,8 @@ export class Game {
     this.scene.add(cab.root);
     this.car = new Car(cab);
     this.traffic = new Traffic(this.scene, 46, this.rivals());
+    this.rank = new Rank(this.scene, this.cabIndex);
+    this.thumbs = snapshotCabs(renderer);
 
     // Flat, chunky arrow like the original's.
     this.arrowMat = new THREE.MeshLambertMaterial({ color: 0x7dff6a, emissive: 0x7dff6a, emissiveIntensity: 0.55 });
@@ -189,7 +195,7 @@ export class Game {
     this.clock = 0;
     this.car.reset(START.x, START.z, START.yaw);
     this.camYaw = START.yaw;
-    this.camera.position.set(START.x, this.car.pos.y + 4, START.z + 9);
+    this.camera.position.set(START.x - Math.sin(START.yaw) * 9, this.car.pos.y + 4, START.z - Math.cos(START.yaw) * 9);
     this.traffic.scatter();
     this.props.reset();
     this.geysers.reset();
@@ -211,13 +217,8 @@ export class Game {
 
   frame(dt: number) {
     const inp = readInput(dt);
-    if (this.state === 'title') {
-      if (inp.confirm) this.start();
-      // Pick a cab with left / right.
-      const dir = inp.steer > 0.6 ? 1 : inp.steer < -0.6 ? -1 : 0;
-      if (dir && !this.steerLatch) this.chooseCab(this.cabIndex + dir);
-      this.steerLatch = dir !== 0;
-      this.titleCamera(dt);
+    if (this.state === 'title' || this.state === 'picker') {
+      this.menuFrame(dt, inp);
       this.traffic.update(dt, this.car);
       this.peds?.update(dt, this.car, this.camera);
       this.idleAnimations(dt);
@@ -226,6 +227,7 @@ export class Game {
       else if (inp.restart) this.start();
     } else if (this.state === 'over') {
       if (inp.confirm) this.start();
+      else if (inp.back) this.showPicker();
       this.idleAnimations(dt);
     } else {
       if (inp.pause) this.setState('paused');
@@ -253,14 +255,59 @@ export class Game {
 
   private start() {
     unlockAudio();
+    burst();
     this.reset();
+    this.rank.setVisible(false);
+    this.car.model.root.visible = true;
     this.setState('play');
     this.popup('GO!', 'big');
   }
 
+  // Title screen and cab picker, staged at the taxi rank.
+  private menuFrame(dt: number, inp: Input) {
+    this.clock += dt;
+    this.rank.update(dt, this.state === 'picker' ? inp.lookX : 0);
+    this.rank.frame(this.camera, this.state === 'picker' ? 'picker' : 'wide', dt);
+    const p = this.rank.bayY;
+    this.sun.position.set(BAY.x + 60, p + 110, BAY.z + 35);
+    this.sun.target.position.set(BAY.x, p, BAY.z);
+    sunDir.value.copy(this.sun.position).sub(this.sun.target.position).normalize();
+    this.arrow.visible = false;
+    if (this.state === 'title') {
+      if (this.howTo) {
+        if (inp.confirm || inp.back || inp.alt) this.toggleHowTo();
+        return;
+      }
+      if (inp.confirm) { unlockAudio(); this.showPicker(); }
+      else if (inp.alt) this.toggleHowTo();
+      else if (inp.back) this.look.togglePanel();
+    } else {
+      const move = inp.navY || inp.navX;
+      if (move) {
+        this.chooseCab(this.cabIndex + move);
+        sfx.tip();
+      }
+      if (inp.confirm) this.start();
+      else if (inp.back) this.showTitle();
+    }
+  }
+
+  private toggleHowTo() {
+    this.howTo = !this.howTo;
+    document.querySelector('.howto')?.remove();
+    if (this.howTo) document.getElementById('overlay')!.insertAdjacentHTML('beforeend', howToHTML());
+  }
+
+  private showPicker() {
+    this.setState('picker');
+    this.rank.setVisible(true);
+    this.car.model.root.visible = false;
+    this.renderCabPicker();
+  }
+
   private setState(s: Game['state']) {
     this.state = s;
-    $('#hud').classList.toggle('hidden', s === 'title');
+    $('#hud').classList.toggle('hidden', s === 'title' || s === 'picker');
     const ov = $('#overlay');
     ov.className = '';
     if (s === 'play') ov.innerHTML = '';
@@ -281,32 +328,24 @@ export class Game {
     this.car.model = makeCar(CABS[this.cabIndex].id);
     this.scene.add(this.car.model.root);
     this.traffic.setRivals(this.scene, this.rivals());
+    this.car.model.root.visible = this.state === 'play';
+    this.rank.select(this.cabIndex);
     this.renderCabPicker();
   }
 
   private renderCabPicker() {
-    const el = document.getElementById('cabpick');
-    if (!el) return;
-    const c = CABS[this.cabIndex];
-    el.innerHTML = `<span class="arrow">◀</span><div><b>${c.name}</b><small>${c.tagline}</small></div><span class="arrow">▶</span>`;
+    if (this.state !== 'picker') return;
+    $('#overlay').innerHTML = pickerHTML(this.cabIndex, this.thumbs);
   }
 
   private showTitle() {
     this.setState('title');
-    $('#overlay').innerHTML = `
-      <h1>CRAZY<span>CLANKERS</span></h1>
-      <div class="tag">You are the robotaxi. Drive like it.</div>
-      <div id="cabpick"></div>
-      <div class="press">PRESS A / ENTER</div>
-      <div class="controls">
-        <b>Gas</b> RT / W &nbsp; <b>Brake / reverse</b> LT / S &nbsp; <b>Steer</b> stick / A D<br>
-        <b>Drift</b> B or RB / Space (hold) &nbsp; <b>Hop</b> A / E &nbsp; <b>Pause</b> Start / Esc<br>
-        <b>Launch Mode</b> hold handbrake + gas (stopped or drifting), release handbrake &nbsp; Smash junk, hit hydrants, jump off the piers.<br>
-        Stop in a ring to pick up. Stop in the beam to drop off.<br>
-        Jumps, near misses and drifts earn tips but cost you <b>rating</b>. Below 4.00, you're deactivated.
-      </div>
-      <div class="pad" id="padstatus"></div>`;
-    this.renderCabPicker();
+    this.howTo = false;
+    this.rank?.setVisible(true);
+    this.car.model.root.visible = false;
+    let rating = '5.00';
+    try { rating = localStorage.getItem('clankers.rating') ?? '5.00'; } catch { /* storage unavailable */ }
+    $('#overlay').innerHTML = titleHTML(rating, padName);
   }
 
   simulate(dt: number, inp: Input) {
@@ -715,6 +754,7 @@ export class Game {
   private gameOver(reason: string) {
     if (this.state !== 'play') return;
     this.state = 'over';
+    try { localStorage.setItem('clankers.rating', this.rating.toFixed(2)); } catch { /* storage unavailable */ }
     let equityLine = '';
     if (this.equity > 0) {
       const exit = this.rand() < 0.15;
@@ -736,7 +776,7 @@ export class Game {
         ${airLine}${equityLine}${promiseLine}
         <div class="total">${money(this.cash)}</div>
       </div>
-      <div class="press">A / ENTER TO DRIVE AGAIN</div>`;
+      <div class="press">A / ENTER TO DRIVE AGAIN</div><div class="pad">B / Esc to change cab</div>`;
     sfx.bad();
   }
 
@@ -765,19 +805,7 @@ export class Game {
     sunDir.value.copy(this.sun.position).sub(this.sun.target.position).normalize();
   }
 
-  private titleCamera(dt: number) {
-    this.clock += dt;
-    const a = this.clock * 0.25;
-    const p = this.car.pos;
-    this.camera.position.set(p.x + Math.sin(a) * 14, p.y + 5, p.z + Math.cos(a) * 14);
-    this.camera.lookAt(p.x, p.y + 1.5, p.z);
-    this.sun.position.set(p.x + 60, p.y + 110, p.z + 35);
-    this.sun.target.position.copy(p);
-    sunDir.value.copy(this.sun.position).sub(this.sun.target.position).normalize();
-    this.arrow.visible = false;
-    const ps = document.getElementById('padstatus');
-    if (ps) ps.textContent = padName ? `🎮 ${padName}` : 'Plug in or press a button on a controller to use it.';
-  }
+
 
   private updateArrow() {
     let target: THREE.Vector3 | null = null;
