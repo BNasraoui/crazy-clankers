@@ -703,7 +703,7 @@ export class Game {
     const p = this.car.pos;
     const ahead = new THREE.Vector3(target.x - p.x, 0, target.z - p.z).normalize();
     // Centre the arrow over the cab; its pivot is the tail.
-    this.arrow.position.set(p.x - ahead.x * 1.65 * this.arrow.scale.x, p.y + 2.9 + Math.sin(this.clock * 4) * 0.1, p.z - ahead.z * 1.65 * this.arrow.scale.x);
+    this.arrow.position.set(p.x - ahead.x * 1.65 * this.arrow.scale.x, p.y + 4.1 + Math.sin(this.clock * 4) * 0.1, p.z - ahead.z * 1.65 * this.arrow.scale.x);
     // Point level along the ground, but roll the arrow about its own length so
     // its face turns towards the camera and never reads as an edge-on slab.
     const dir = new THREE.Vector3(target.x - p.x, 0, target.z - p.z).normalize();
