@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { Car, MAX_SPEED } from './car';
 import { readInput, padName, type Input } from './input';
-import { makeCab, makePerson, makeLabel, type PersonModel } from './models';
+import { makePerson, makeLabel, personFrom, type CarModel, type PersonModel } from './models';
+import { Look, SKY, makeSky } from './look';
+import { CHARACTER_LAYER, makeCharacter, sunDir } from './anime';
 import { pickPassenger, type PassengerType } from './passengers';
 import { QuipDirector } from './quips';
 import { Traffic } from './traffic';
@@ -74,18 +76,25 @@ export class Game {
   private shake = 0;
   private camYaw = START.yaw;
   private sun: THREE.DirectionalLight;
+  private look: Look;
+  private sky = makeSky();
   private arrow: THREE.Group;
   private arrowMat: THREE.MeshLambertMaterial;
   private destMarker: THREE.Group | null = null;
   private quipTimer = 0;
   private rand = Math.random;
 
-  constructor(public renderer: THREE.WebGLRenderer) {
-    const fog = 0xc9d3dc;
-    this.scene.background = new THREE.Color(fog);
-    this.scene.fog = new THREE.Fog(fog, 150, 460);
-    this.scene.add(new THREE.HemisphereLight(0xe4eef8, 0x6b5e50, 1.6));
-    this.sun = new THREE.DirectionalLight(0xfff1dc, 2.2);
+  constructor(public renderer: THREE.WebGLRenderer, cab: CarModel, private people: Partial<Record<string, THREE.Object3D>> = {}) {
+    this.look = new Look(renderer);
+    this.scene.background = new THREE.Color(SKY.horizon);
+    this.scene.fog = new THREE.Fog(SKY.horizon, 170, 560);
+    this.scene.add(this.sky);
+    const sky = new THREE.HemisphereLight(0xdfeaff, 0x8a7a66, 1.25);
+    sky.layers.enable(CHARACTER_LAYER);
+    this.scene.add(sky);
+    this.sun = new THREE.DirectionalLight(0xfff1dc, 2.6);
+    this.sun.layers.enable(CHARACTER_LAYER);
+    this.sun.shadow.camera.layers.enable(CHARACTER_LAYER);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     const sc = this.sun.shadow.camera;
@@ -97,7 +106,6 @@ export class Game {
     this.scene.add(this.sun, this.sun.target);
 
     buildWorld(this.scene);
-    const cab = makeCab();
     this.scene.add(cab.root);
     this.car = new Car(cab);
     this.traffic = new Traffic(this.scene, 46);
@@ -123,8 +131,11 @@ export class Game {
     this.arrow.add(outline, body);
     this.scene.add(this.arrow);
 
-    this.quips = new QuipDirector((who, color, text, seconds) => {
+    this.quips = new QuipDirector((who, color, text, seconds, speaker) => {
       const el = $('#quip');
+      const face = $<HTMLImageElement>('#quip .face');
+      face.hidden = speaker === 'cab';
+      if (speaker !== 'cab') face.src = `/portraits/${speaker}.jpg`;
       el.classList.remove('hidden');
       el.style.animation = 'none';
       void el.offsetWidth;
@@ -142,6 +153,7 @@ export class Game {
   resize(w: number, h: number) {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.look.setSize(w, h);
   }
 
   private reset() {
@@ -187,7 +199,10 @@ export class Game {
     setEngine(this.car.forward, inp.throttle, this.state === 'play');
     this.car.sync(dt);
     this.traffic.sync(dt);
-    this.renderer.render(this.scene, this.camera);
+    if (inp.debug) this.look.togglePanel();
+    this.sky.position.copy(this.camera.position);
+    const rush = this.state === 'play' ? THREE.MathUtils.clamp((this.car.speed - 28) / 12, 0, 1) : 0;
+    this.look.render(this.scene, this.camera, performance.now() / 1000, rush);
   }
 
   private start() {
@@ -342,7 +357,7 @@ export class Game {
       const d = blocks(c.road, dest.curb.road);
       const color = d > 420 ? 0x47e05a : d > 270 ? 0xffd23a : 0xff5a3a;
 
-      const person = makePerson(type.person);
+      const person = this.makePassenger(type);
       person.root.position.copy(c.walk);
       person.root.rotation.y = c.facing;
       const marker = new THREE.Group();
@@ -357,10 +372,19 @@ export class Game {
     }
   }
 
+  private makePassenger(type: PassengerType): PersonModel {
+    const template = this.people[type.id];
+    if (template) return personFrom(template);
+    const person = makePerson(type.person);
+    makeCharacter(person.root);
+    return person;
+  }
+
   private idleAnimations(dt: number) {
     for (const w of this.waiting) {
       w.phase += dt;
-      w.person.armR.rotation.z = 2.6 + Math.sin(w.phase * 8) * 0.4;
+      const p = w.person;
+      p.armR.rotation.z = p.raise + Math.sin(w.phase * 8) * p.raise * 0.15;
       w.person.root.position.y = w.curb.walk.y + Math.abs(Math.sin(w.phase * 4)) * 0.12;
     }
   }
@@ -397,7 +421,7 @@ export class Game {
 
     if (r.firedT > 0) {
       r.firedT -= dt;
-      if (r.ejected) r.ejected.armR.rotation.z = 2.6 + Math.sin(this.clock * 9) * 0.4;
+      if (r.ejected) r.ejected.armR.rotation.z = r.ejected.raise + Math.sin(this.clock * 9) * r.ejected.raise * 0.15;
       if (r.firedT <= 0) {
         if (r.ejected) this.scene.remove(r.ejected.root);
         r.ejected = undefined;
@@ -435,7 +459,7 @@ export class Game {
   private fireSweater(r: Ride) {
     r.firedDone = true;
     r.firedT = 5;
-    const p = makePerson(r.type.person);
+    const p = this.makePassenger(r.type);
     const f = this.car.fwd;
     p.root.position.set(this.car.pos.x - f.y * 3.5, 0, this.car.pos.z + f.x * 3.5);
     p.root.position.y = heightAt(p.root.position.x, p.root.position.z);
@@ -568,6 +592,7 @@ export class Game {
     if (Math.abs(this.camera.fov - fov) > 0.1) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
     this.sun.position.set(car.pos.x + 60, car.pos.y + 110, car.pos.z + 35);
     this.sun.target.position.copy(car.pos);
+    sunDir.value.copy(this.sun.position).sub(this.sun.target.position).normalize();
   }
 
   private titleCamera(dt: number) {
@@ -578,6 +603,7 @@ export class Game {
     this.camera.lookAt(p.x, p.y + 1.5, p.z);
     this.sun.position.set(p.x + 60, p.y + 110, p.z + 35);
     this.sun.target.position.copy(p);
+    sunDir.value.copy(this.sun.position).sub(this.sun.target.position).normalize();
     this.arrow.visible = false;
     const ps = document.getElementById('padstatus');
     if (ps) ps.textContent = padName ? `🎮 ${padName}` : 'Plug in or press a button on a controller to use it.';

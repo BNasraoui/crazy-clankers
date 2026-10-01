@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { makeLabel } from './models';
+import { glslColor, toon } from './look';
 
 // The city is a 10x10 grid of blocks. Street centerlines sit every CELL units.
 // SF-style hills: intersections are flat and the streets between them are
@@ -210,28 +211,32 @@ export function buildWorld(scene: THREE.Scene) {
 
   const water = new THREE.Mesh(
     new THREE.PlaneGeometry(4000, 4000),
-    new THREE.MeshLambertMaterial({ color: 0x3d6f8e }),
+    toon({ color: 0x3d6f8e }),
   );
   water.rotation.x = -Math.PI / 2;
   water.position.y = -2;
   scene.add(water);
 
-  const boxes: { x: number; y: number; z: number; sx: number; sy: number; sz: number; c: THREE.Color }[] = [];
-  const addBox = (x0: number, x1: number, z0: number, z1: number, height: number, color: THREE.ColorRepresentation) => {
+  const boxes: { x: number; y: number; z: number; sx: number; sy: number; sz: number; c: THREE.Color; ground: number; top: number; tower: boolean }[] = [];
+  const addBox = (x0: number, x1: number, z0: number, z1: number, height: number, color: THREE.ColorRepresentation, tower = false) => {
     const hs = [heightAt(x0, z0), heightAt(x1, z0), heightAt(x0, z1), heightAt(x1, z1)];
-    const base = Math.min(...hs) - 2;
+    const ground = Math.min(...hs);
+    const base = ground - 2;
     const top = Math.max(...hs) + height;
     boxes.push({
       x: (x0 + x1) / 2, y: (base + top) / 2, z: (z0 + z1) / 2,
-      sx: x1 - x0, sy: top - base, sz: z1 - z0, c: new THREE.Color(color),
+      sx: x1 - x0, sy: top - base, sz: z1 - z0, c: new THREE.Color(color), ground, top, tower,
     });
     return top;
   };
+  // Street-facing house walls, some of which get a graffiti tag.
+  const walls: { x: number; z: number; nx: number; nz: number }[] = [];
 
   const r = rng(99);
-  const PASTEL = [0xf4d6c6, 0xe8c7d8, 0xcde3d2, 0xf1e3b3, 0xc9d8ec, 0xe9d0b0, 0xf6efe4, 0xd8c8ee, 0xb9d4cf];
-  const LADIES = [0x6fb3c9, 0xf2a2b5, 0xf6d76b, 0x9fd38c, 0xc79be6, 0xf39c6b];
-  const GLASS = [0x8fa3b5, 0x6f8799, 0xa9b8c4, 0x5e7488, 0xb7c3cc, 0x7d8e9b];
+  // San Francisco on a sunny day: butter, mint, dusty blue, cream, terracotta, sage, peach.
+  const PASTEL = [0xf3dc8a, 0xb7dcc4, 0x9fbad3, 0xf2e6cc, 0xd98a6c, 0xb3c79c, 0xf0c4a2, 0xe9e3d6, 0xc7b8d8];
+  const LADIES = [0x5f9ec2, 0xe58fa5, 0xf2cf55, 0x86c07a, 0xb08ad8, 0xee8f5a];
+  const GLASS = [0xc9d3dc, 0xb8c4cf, 0xd9d2c3, 0x9fb0c0, 0xe2ddd2, 0xaebdca];
   const trees: THREE.Matrix4[] = [];
   const roofs: THREE.Mesh[] = [];
 
@@ -258,9 +263,9 @@ export function buildWorld(scene: THREE.Scene) {
       if (split) {
         const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
         for (const [a0, a1, c0, c1] of [[x0, mx - 1, z0, mz - 1], [mx + 1, x1, z0, mz - 1], [x0, mx - 1, mz + 1, z1], [mx + 1, x1, mz + 1, z1]])
-          addBox(a0, a1, c0, c1, 24 + r() * 50, GLASS[Math.floor(r() * GLASS.length)]);
+          addBox(a0, a1, c0, c1, 24 + r() * 50, GLASS[Math.floor(r() * GLASS.length)], true);
       } else {
-        addBox(x0, x1, z0, z1, 40 + r() * 70, GLASS[Math.floor(r() * GLASS.length)]);
+        addBox(x0, x1, z0, z1, 40 + r() * 70, GLASS[Math.floor(r() * GLASS.length)], true);
       }
       continue;
     }
@@ -274,6 +279,10 @@ export function buildWorld(scene: THREE.Scene) {
       const hN = 7 + r() * 7, hS = 7 + r() * 7;
       const tN = addBox(x0 + k * w + 0.2, x0 + (k + 1) * w - 0.2, z0, z0 + 12, hN, pick());
       const tS = addBox(x0 + k * w + 0.2, x0 + (k + 1) * w - 0.2, z1 - 12, z1, hS, pick());
+      if (!ladies) {
+        walls.push({ x: x0 + (k + 0.5) * w, z: z0, nx: 0, nz: -1 });
+        walls.push({ x: x0 + (k + 0.5) * w, z: z1, nx: 0, nz: 1 });
+      }
       if (ladies) {
         roofs.push(gable(x0 + (k + 0.5) * w, tN, z0 + 6, w - 0.4, 12, pick()));
         roofs.push(gable(x0 + (k + 0.5) * w, tS, z1 - 6, w - 0.4, 12, pick()));
@@ -285,17 +294,25 @@ export function buildWorld(scene: THREE.Scene) {
       const tW = addBox(x0, x0 + 12, za, zb, 7 + r() * 7, pick());
       addBox(x1 - 12, x1, za, zb, 7 + r() * 7, pick());
       if (ladies) roofs.push(gable(x0 + 6, tW, (za + zb) / 2, 12, zb - za, pick(), true));
+      else {
+        walls.push({ x: x0, z: (za + zb) / 2, nx: -1, nz: 0 });
+        walls.push({ x: x1, z: (za + zb) / 2, nx: 1, nz: 0 });
+      }
     }
   }
 
   const geo = new THREE.BoxGeometry(1, 1, 1);
-  const inst = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial(), boxes.length);
+  geo.setAttribute('aGround', new THREE.InstancedBufferAttribute(new Float32Array(boxes.map((b) => b.ground)), 1));
+  geo.setAttribute('aTop', new THREE.InstancedBufferAttribute(new Float32Array(boxes.map((b) => b.top)), 1));
+  geo.setAttribute('aTower', new THREE.InstancedBufferAttribute(new Float32Array(boxes.map((b) => (b.tower ? 1 : 0))), 1));
+  const inst = new THREE.InstancedMesh(geo, buildingMaterial(), boxes.length);
   const m = new THREE.Matrix4();
   boxes.forEach((bx, i) => {
     m.makeScale(bx.sx, bx.sy, bx.sz).setPosition(bx.x, bx.y, bx.z);
     inst.setMatrixAt(i, m);
     inst.setColorAt(i, bx.c);
   });
+  addGraffiti(scene, walls, r);
   inst.castShadow = true;
   inst.receiveShadow = true;
   scene.add(inst);
@@ -309,9 +326,107 @@ export function buildWorld(scene: THREE.Scene) {
     const sign = makeLabel(lm.name, { bg: '#1d2a3a', fg: '#ffe14a', height: 2.2 });
     sign.position.copy(lm.curb.walk).add(new THREE.Vector3(0, 9, 0));
     scene.add(sign);
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 8), new THREE.MeshLambertMaterial({ color: 0x333333 }));
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 8), toon({ color: 0x333333 }));
     pole.position.copy(lm.curb.walk).add(new THREE.Vector3(0, 4, 0));
     scene.add(pole);
+  }
+}
+
+// Windows, frames and a white cornice painted per pixel, so houses read as
+// Victorians and towers as glass without any extra geometry.
+function buildingMaterial() {
+  const mat = toon();
+  const decl = 'varying vec3 vBPos;\nvarying vec3 vBNormal;\nvarying float vGround;\nvarying float vTop;\nvarying float vTower;\n';
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = 'attribute float aGround;\nattribute float aTop;\nattribute float aTower;\n' + decl + sh.vertexShader.replace(
+      '#include <begin_vertex>',
+      `#include <begin_vertex>
+      vec4 bw = vec4(transformed, 1.0);
+      mat3 nm = mat3(modelMatrix);
+      #ifdef USE_INSTANCING
+        bw = instanceMatrix * bw;
+        nm = nm * mat3(instanceMatrix);
+      #endif
+      vBPos = (modelMatrix * bw).xyz;
+      vBNormal = normalize(nm * objectNormal);
+      vGround = aGround; vTop = aTop; vTower = aTower;`,
+    );
+    sh.fragmentShader = decl + sh.fragmentShader.replace(
+      '#include <color_fragment>',
+      `#include <color_fragment>
+      if (vBNormal.y > 0.6) {
+        diffuseColor.rgb *= 0.8;
+      } else {
+        float along = abs(vBNormal.x) > 0.5 ? vBPos.z : vBPos.x;
+        float y = vBPos.y - vGround;
+        if (vBPos.y > vTop - 0.8) {
+          diffuseColor.rgb = ${glslColor(0xf6f1e6)};
+        } else if (vTower > 0.5) {
+          float band = step(0.4, fract(y / 3.6)) * step(0.1, fract(along / 3.0));
+          diffuseColor.rgb = mix(diffuseColor.rgb, ${glslColor(0x56738f)}, band * 0.85);
+        } else {
+          // Tall, narrow sash windows, like a Victorian, not an office block.
+          float fy = fract(y / 3.6), fa = fract(along / 2.8);
+          float lift = step(1.4, y);
+          float frame = step(0.14, fy) * step(fy, 0.9) * step(0.27, fa) * step(fa, 0.73) * lift;
+          float win = step(0.2, fy) * step(fy, 0.84) * step(0.33, fa) * step(fa, 0.67) * lift;
+          diffuseColor.rgb = mix(diffuseColor.rgb, ${glslColor(0xf6f1e6)}, frame);
+          diffuseColor.rgb = mix(diffuseColor.rgb, ${glslColor(0x3d4a5c)}, win);
+        }
+      }`,
+    );
+  };
+  return mat;
+}
+
+// A few spray-painted tags, used sparingly.
+const TAGS = ['CLANK', 'BEEP', 'NO ROBOTS', 'HUMAN MADE', 'CONE ZONE', 'FSD?', 'R.I.P. CRUISE', 'OBEY THE LIDAR'];
+const TAG_COLORS = ['#e2483b', '#26232b', '#3f6fd6', '#f3c530', '#2f9a6a', '#f4f1e8'];
+
+function tagTexture(text: string, color: string, tilt: number) {
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 256;
+  const g = c.getContext('2d')!;
+  g.translate(256, 128);
+  g.rotate(tilt);
+  g.font = `900 ${text.length > 8 ? 64 : 92}px Impact, "Arial Black", sans-serif`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.lineJoin = 'round';
+  g.lineWidth = 16;
+  g.strokeStyle = color === '#26232b' ? '#f4f1e8' : '#1b1722';
+  g.strokeText(text, 0, 0);
+  g.fillStyle = color;
+  g.fillText(text, 0, 0);
+  // Drips.
+  const w = g.measureText(text).width;
+  for (let k = 0; k < 5; k++) {
+    const x = -w / 2 + ((k + 0.5) / 5) * w;
+    g.fillRect(x, 20, 5, 18 + ((k * 37) % 40));
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function addGraffiti(scene: THREE.Scene, walls: { x: number; z: number; nx: number; nz: number }[], r: () => number) {
+  const mats = TAGS.map((t, i) => toon({
+    map: tagTexture(t, TAG_COLORS[i % TAG_COLORS.length], (r() - 0.6) * 0.25),
+    transparent: true,
+    alphaTest: 0.4,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+  }));
+  const geo = new THREE.PlaneGeometry(4, 2);
+  const count = 26;
+  for (let k = 0; k < count && walls.length; k++) {
+    const w = walls.splice(Math.floor(r() * walls.length), 1)[0];
+    const x = w.x + w.nx * 0.08, z = w.z + w.nz * 0.08;
+    const mesh = new THREE.Mesh(geo, mats[Math.floor(r() * mats.length)]);
+    mesh.position.set(x, heightAt(x + w.nx * 3, z + w.nz * 3) + 1.4 + r() * 0.8, z);
+    mesh.rotation.y = Math.atan2(w.nx, w.nz);
+    scene.add(mesh);
   }
 }
 
@@ -324,17 +439,13 @@ function gable(x: number, y: number, z: number, w: number, d: number, color: THR
   const geo = new THREE.ExtrudeGeometry(shape, { depth: d, bevelEnabled: false });
   geo.translate(0, 0, -d / 2);
   if (alongX) geo.rotateY(Math.PI / 2);
-  const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color }));
+  const mesh = new THREE.Mesh(geo, toon({ color }));
   mesh.position.set(x, y, z);
   mesh.castShadow = true;
   return mesh;
 }
 
 // Road paint is drawn per pixel in the shader so edges stay crisp.
-const glslColor = (hex: number) => {
-  const c = new THREE.Color(hex);
-  return `vec3(${c.r.toFixed(4)}, ${c.g.toFixed(4)}, ${c.b.toFixed(4)})`;
-};
 const SURFACE_GLSL = /* glsl */ `
 uniform sampler2D uParks;
 varying vec3 vWPos;
@@ -378,7 +489,7 @@ function makeTerrain() {
   tex.magFilter = tex.minFilter = THREE.NearestFilter;
   tex.needsUpdate = true;
 
-  const mat = new THREE.MeshLambertMaterial();
+  const mat = toon();
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uParks = { value: tex };
     sh.vertexShader = 'varying vec3 vWPos;\n' + sh.vertexShader.replace(
@@ -409,7 +520,7 @@ function makeSeaWall() {
       ));
     }
   }
-  const inst = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xa4a39b }), mats.length);
+  const inst = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon({ color: 0xa4a39b }), mats.length);
   mats.forEach((mm, i) => inst.setMatrixAt(i, mm));
   inst.castShadow = true;
   return inst;
@@ -419,8 +530,8 @@ function makeTrees(mats: THREE.Matrix4[]) {
   const g = new THREE.Group();
   const trunkGeo = new THREE.CylinderGeometry(0.25, 0.35, 2.4, 6).translate(0, 1.2, 0);
   const topGeo = new THREE.IcosahedronGeometry(2.2, 0).translate(0, 3.6, 0);
-  const trunks = new THREE.InstancedMesh(trunkGeo, new THREE.MeshLambertMaterial({ color: 0x6b4a2f }), mats.length);
-  const tops = new THREE.InstancedMesh(topGeo, new THREE.MeshLambertMaterial({ color: 0x3f7f3a, flatShading: true }), mats.length);
+  const trunks = new THREE.InstancedMesh(trunkGeo, toon({ color: 0x6b4a2f }), mats.length);
+  const tops = new THREE.InstancedMesh(topGeo, toon({ color: 0x4f8f45 }), mats.length);
   mats.forEach((mm, i) => { trunks.setMatrixAt(i, mm); tops.setMatrixAt(i, mm); });
   tops.castShadow = trunks.castShadow = true;
   g.add(trunks, tops);
@@ -434,7 +545,7 @@ function blockCenter(bi: number, bj: number) {
 }
 
 function addLandmarks(scene: THREE.Scene) {
-  const lam = (c: number) => new THREE.MeshLambertMaterial({ color: c });
+  const lam = (c: number) => toon({ color: c });
 
   // Salesfarce Tower: tapered rounded obelisk with a glowing crown.
   {
@@ -492,7 +603,7 @@ function addLandmarks(scene: THREE.Scene) {
 }
 
 function addGoldenGate(scene: THREE.Scene) {
-  const red = new THREE.MeshLambertMaterial({ color: 0xc0392b });
+  const red = toon({ color: 0xc0392b });
   const zc = -HALF - 110;
   const towers = [-340, -150];
   for (const tx of towers) {

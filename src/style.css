@@ -92,3 +92,18 @@ body { font-family: Inter, system-ui, sans-serif; color: #fff; user-select: none
 #overlay .stats { font: 600 18px/1.8 Inter, sans-serif; margin-bottom: 22px; background: #000a; padding: 14px 24px; border-radius: 10px; }
 #overlay .stats .total { font: 34px Bungee, Impact, sans-serif; color: #7dff6a; }
 #overlay .pad { margin-top: 10px; font: 600 13px Inter, sans-serif; opacity: 0.85; }
+
+#lookpanel {
+  position: fixed; top: 120px; right: 20px; z-index: 5; display: grid; gap: 8px;
+  background: #000c; padding: 12px 14px; border-radius: 10px; font: 600 13px Inter, sans-serif;
+}
+#lookpanel b { font: 14px Bungee, Impact, sans-serif; color: #ffe14a; }
+#lookpanel label { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+#lookpanel[hidden] { display: none; }
+
+#quip { display: flex; align-items: center; gap: 14px; }
+#quip .face {
+  width: 76px; height: 76px; flex: none; border-radius: 50%; object-fit: cover;
+  border: 3px solid #000; background: #fff; margin: -18px 0 -18px -26px; box-shadow: 3px 3px 0 #000;
+}
+#quip .face[hidden] { display: none; }
