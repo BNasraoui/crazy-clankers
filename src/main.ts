@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Game } from './game';
 import { loadCab, loadPeople } from './models';
+import { Pedestrians } from './pedestrians';
 import './style.css';
 
 const canvas = document.getElementById('view') as HTMLCanvasElement;
@@ -11,6 +12,7 @@ renderer.shadowMap.type = THREE.PCFShadowMap;
 
 const [cab, people] = await Promise.all([loadCab(), loadPeople()]);
 const game = new Game(renderer, cab, people);
+Pedestrians.load(game.scene).then((p) => { game.peds = p; }).catch((err) => console.warn('No pedestrians:', err));
 const fit = () => {
   renderer.setSize(innerWidth, innerHeight, false);
   game.resize(innerWidth, innerHeight);

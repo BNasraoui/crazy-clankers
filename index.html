@@ -5,29 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Crazy Clankers</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@600;800&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Permanent+Marker&family=Inter:wght@600;800&display=swap" />
   </head>
   <body>
     <canvas id="view"></canvas>
     <div id="hud" class="hidden">
-      <div id="time">75</div>
+      <div id="clock" class="sticker"><span class="lbl">TIME</span><b id="time">75</b></div>
       <div id="right">
-        <div id="money">$0</div>
-        <div id="permit">
-          <span>DMV PERMIT</span>
-          <div class="bar"><div class="fill"></div></div>
+        <div id="cash" class="sticker"><span class="lbl">CASH</span><b id="money">$0</b></div>
+        <div id="rating">
+          <div class="lbl">DRIVER RATING</div>
+          <div class="score"><b>5.00</b><span class="star">★</span></div>
+          <div class="track"><div class="fill"></div><div class="cutoff"></div></div>
+          <div class="note">Deactivation below 4.00</div>
         </div>
       </div>
       <div id="fare" class="hidden">
-        <div class="who"></div>
-        <div class="dest"></div>
+        <img class="face" alt="" />
+        <div class="info"><div class="who"></div><div class="dest"></div></div>
         <div class="clock"></div>
       </div>
       <div id="combo"></div>
       <div id="popups"></div>
       <div id="quip" class="hidden"><img class="face" alt="" /><div><span class="who"></span><span class="text"></span></div></div>
       <div id="launch" hidden><span>LAUNCH MODE</span><div class="bar"><div class="fill"></div></div></div>
-      <div id="speed">0 <small>MPH</small></div>
+      <div id="speed"><b>0</b><small>MPH</small></div>
     </div>
     <div id="overlay"></div>
     <script type="module" src="/src/main.ts"></script>
