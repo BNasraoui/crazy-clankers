@@ -103,7 +103,7 @@ body { font-family: var(--body); color: var(--paper); user-select: none; }
 
 /* ----- combo, popups ----- */
 #combo {
-  position: absolute; top: 132px; left: 30px; padding: 2px 12px;
+  position: absolute; top: 236px; left: 30px; padding: 2px 12px;
   font: 22px var(--num); color: #fff; background: var(--magenta) var(--halftone);
   border: 3px solid var(--ink); border-radius: 6px; box-shadow: 4px 4px 0 var(--ink); transform: rotate(-5deg);
 }
@@ -429,30 +429,21 @@ body { font-family: var(--body); color: var(--paper); user-select: none; }
 #radio-dashboard .radio-player { position: fixed; left: -10000px; top: 0; }
 
 /* ----- passenger wants: the meter in the fare panel, the pickup card, the drop-off stamp ----- */
-#fare { min-width: 340px; }
-#fare .want { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 8px; margin-top: 3px; }
-#fare .want .wt { grid-column: 1 / -1; font: 800 11px var(--body); letter-spacing: 0.04em; }
-#fare .want .meter { height: 9px; background: #1b172222; border: 2px solid var(--ink); border-radius: 5px; overflow: hidden;
-  background-image: repeating-linear-gradient(90deg, transparent 0 calc(20% - 2px), var(--ink) calc(20% - 2px) 20%); }
-#fare .want .fill { height: 100%; background: var(--yellow); transition: width 0.25s; }
-#fare .want .stars { font: 15px var(--num); color: #f5b400; -webkit-text-stroke: 1px var(--ink); letter-spacing: -1px; }
-#fare .want .stars s, #stamp s { text-decoration: none; color: #1b172233; -webkit-text-stroke: 0; }
-
-#want-card { position: absolute; top: 96px; left: calc(50% - 178px); display: none; gap: 10px; align-items: center;
-  padding: 5px 14px 5px 5px; transform: rotate(-1.5deg); transform-origin: left center;
-  background: var(--yellow) var(--halftone); color: var(--ink); border: 3px solid var(--ink); border-radius: 30px 10px 10px 30px; box-shadow: 4px 4px 0 var(--ink); }
-#want-card.show { display: flex; animation: card-in 4.2s cubic-bezier(.2, 1.4, .4, 1) forwards; }
-#want-card .face { width: 42px; height: 42px; flex: none; border-radius: 50%; border: 3px solid var(--ink); object-fit: cover; background: #fff; }
-#want-card .who { font: 10px var(--num); letter-spacing: 0.06em; }
-#want-card .title { font: 21px/1 var(--num); color: #fff; -webkit-text-stroke: 5px var(--ink); paint-order: stroke fill; margin: 1px 0; }
-#want-card .goal { font: 800 12px var(--body); }
-#want-card .goal i { font-style: normal; color: #b07c00; }
-@keyframes card-in {
-  0% { transform: translateX(-60px) rotate(-6deg) scale(0.8); opacity: 0; }
-  6% { transform: rotate(-1.5deg) scale(1); opacity: 1; }
-  88% { transform: rotate(-1.5deg) scale(1); opacity: 1; }
-  100% { transform: translateX(-30px) rotate(-1.5deg); opacity: 0; }
+#want {
+  position: absolute; top: 118px; left: 22px; width: 240px; padding: 8px 12px 8px; background: var(--yellow) var(--halftone); color: var(--ink);
+  border: 3px solid var(--ink); border-radius: 10px; box-shadow: 5px 5px 0 var(--ink); transform: rotate(1.5deg);
 }
+#want .lbl { font: 14px var(--pen); }
+#want .score { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: -2px; }
+#want .score b { font: 21px/1.15 var(--num); white-space: nowrap; }
+#want .stars { font: 17px var(--num); color: #fff; -webkit-text-stroke: 1.5px var(--ink); paint-order: stroke fill; letter-spacing: -1px; white-space: nowrap; }
+#want .stars s, #stamp s { text-decoration: none; color: #1b172233; -webkit-text-stroke: 0; }
+#want .track { position: relative; height: 12px; margin-top: 4px; background: #fff8; border: 2px solid var(--ink); border-radius: 6px; overflow: hidden;
+  background-image: repeating-linear-gradient(90deg, transparent 0 calc(20% - 2px), var(--ink) calc(20% - 2px) 20%); }
+#want .fill { height: 100%; background: var(--magenta); transition: width 0.2s; }
+#want .note { margin-top: 3px; font: 700 10px var(--body); letter-spacing: 0.04em; opacity: 0.75; }
+#want.new { animation: want-in 0.5s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes want-in { from { transform: translateX(-40px) rotate(-6deg) scale(0.85); opacity: 0; } }
 
 #stamp { position: absolute; left: 50%; top: 27%; display: none; text-align: center; pointer-events: none; }
 #stamp.show { display: block; animation: stamp-in 2.8s ease-out forwards; }
@@ -466,4 +457,4 @@ body { font-family: var(--body); color: var(--paper); user-select: none; }
   80% { transform: translate(-50%, -50%) rotate(-6deg) scale(1); opacity: 1; }
   100% { transform: translate(-50%, -50%) rotate(-6deg) scale(1.05); opacity: 0; }
 }
-@media (prefers-reduced-motion: reduce) { #want-card.show, #stamp.show { animation: none; } }
+@media (prefers-reduced-motion: reduce) { #want.new, #stamp.show { animation: none; } }

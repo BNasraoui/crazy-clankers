@@ -80,7 +80,6 @@ export class Game {
   equity = 0;
   promised = 0;
   private starsGiven: number[] = []; // each passenger's rating this shift
-  private cardTimer = 0;
   private stampTimer = 0;
   fares = 0;
   combo = 0;
@@ -571,16 +570,10 @@ export class Game {
     if (!this.quips.say(t.id, kind as 'jump') && kind === 'jump') this.quips.say('cab', 'jump');
   }
 
-  // The card that tells you what this passenger wants, Forza-style.
-  private showWantCard(r: Ride) {
-    const w = r.want, el = $('#want-card');
-    const face = `/portraits/${r.type.id}.jpg`;
-    const goal = w.targets.length ? `<i>★★★★★</i> ${w.targets.at(-1)}` : 'No bumps';
-    el.innerHTML = `<img class="face" src="${face}" alt=""><div class="body"><div class="who">${r.type.label.replace('★ ', '')} WANTS</div>
-      <div class="title">${w.def.icon} ${w.def.title}</div><div class="goal">${goal}</div></div>`;
-    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
-    clearTimeout(this.cardTimer);
-    this.cardTimer = window.setTimeout(() => el.classList.remove('show'), 4300);
+  // The want panel under the timer pops when a new passenger says what they want.
+  private showWantCard(_r: Ride) {
+    const el = $('#want');
+    el.classList.remove('new'); void el.offsetWidth; el.classList.add('new');
   }
 
   // The passenger's rating at the drop-off: a big star stamp.
@@ -962,12 +955,17 @@ export class Game {
       const t = r.left / r.total;
       fare.classList.toggle('warn', t <= 0.45 && t > 0.15);
       fare.classList.toggle('urgent', t <= 0.15);
-      // The want meter: five star slots filling as you deliver what they asked for.
-      const w = r.want;
-      $('#fare .want .wt').textContent = `${w.def.icon} ${w.def.title} · ${w.shown}`;
-      $('#fare .want .fill').style.width = `${(w.fill * 100).toFixed(1)}%`;
-      const n = w.stars;
-      $('#fare .want .stars').innerHTML = `${'★'.repeat(n)}<s>${'★'.repeat(5 - n)}</s>`;
+    }
+    // What this passenger wants, under the timer: like the driver rating, five stars to fill.
+    const want = $('#want');
+    want.classList.toggle('hidden', !r);
+    if (r) {
+      const w = r.want, n = w.stars;
+      $('#want .lbl').textContent = `${r.type.label.replace('★ ', '')} WANTS`;
+      $('#want .score b').textContent = `${w.def.icon} ${w.def.title}`;
+      $('#want .stars').innerHTML = `${'★'.repeat(n)}<s>${'★'.repeat(5 - n)}</s>`;
+      $('#want .fill').style.width = `${(w.fill * 100).toFixed(1)}%`;
+      $('#want .note').textContent = w.targets.length ? `★★★★★ AT ${w.targets.at(-1)!.toUpperCase()} · NOW ${w.shown.toUpperCase()}` : 'EVERY BUMP COSTS A STAR';
     }
   }
 
