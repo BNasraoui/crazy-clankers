@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rebuild Tech Bro v6 and its measured turnaround acceptance artifacts.
+# Rebuild Tech Bro v7 and its measured turnaround acceptance artifacts.
 set -euo pipefail
 cd "$(dirname "$0")"
 if [[ -z "${BLENDER:-}" ]]; then
@@ -15,11 +15,14 @@ case "${1:-techbro}" in
 esac
 "$ASSET_PYTHON" test_sheets.py
 "$ASSET_PYTHON" test_profile.py
+"$ASSET_PYTHON" test_region_checks.py
 "$BLENDER" --background --factory-startup --python-exit-code 1 --python test_head_shape.py
 "$BLENDER" --background --factory-startup --python-exit-code 1 --python test_sheets_blender.py
-"$ASSET_PYTHON" sheets.py techbro --output reviews/v6-calibration.json
-"$BLENDER" --background --factory-startup --python-exit-code 1 --python techbro_v6.py
-"$ASSET_PYTHON" validate_techbro.py > reviews/v6-validation.json
-"$ASSET_PYTHON" validate_techbro.py techbro-apose > reviews/v6-apose-validation.json
-"$BLENDER" --background --factory-startup --python-exit-code 1 --python score_sheet_export.py -- techbro --report reviews/v6-fit.json
+"$ASSET_PYTHON" sheets.py techbro --output reviews/v7-calibration.json
+"$BLENDER" --background --factory-startup --python-exit-code 1 --python techbro_v7.py
+"$ASSET_PYTHON" validate_techbro.py > reviews/v7-validation.json
+"$ASSET_PYTHON" validate_techbro.py techbro-apose > reviews/v7-apose-validation.json
+"$BLENDER" --background --factory-startup --python-exit-code 1 --python score_sheet_export.py -- techbro --report reviews/v7-fit.json
 "$ASSET_PYTHON" test_fit_artifact.py
+"$BLENDER" --background --factory-startup --python-exit-code 1 --python score_diagnostics.py -- techbro --output reviews/v7-diagnostics
+"$ASSET_PYTHON" compare_v7.py

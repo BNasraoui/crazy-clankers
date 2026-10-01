@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class FitArtifactTests(unittest.TestCase):
     def test_exported_neutral_asset_passes_all_six_views(self):
-        report = json.loads((ROOT / "assets/blender/reviews/v6-fit.json").read_text())
+        report = json.loads((ROOT / "assets/blender/reviews/v7-fit.json").read_text())
         self.assertIn(
             "asset_sha256", report, "fit must be remeasured from the exported GLB"
         )

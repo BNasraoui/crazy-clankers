@@ -1,6 +1,6 @@
 # Passenger pipeline: orthographic turnarounds
 
-Tech Bro v6 is the pilot for building all seven passengers from the approved
+Tech Bro v7 is the pilot for building all seven passengers from the approved
 [turnaround sheets](turnarounds/README.md). Fit the neutral character first;
 pose it only after the measured fit passes. `cast.jpg` supplies the performance
 and prop pose. The turnaround front controls widths; its profile controls depths.
@@ -29,7 +29,7 @@ To iterate on neutral geometry without posing:
 
 ```sh
 ~/.local/bin/blender --background --factory-startup --python-exit-code 1 \
-  --python assets/blender/techbro_v6.py -- fit
+  --python assets/blender/techbro_v7.py -- fit
 ```
 
 `-- preview` skips the source-mesh fit during art iteration. Always run the full
@@ -137,16 +137,17 @@ surface. Tech Bro needs a more explicit sheet-derived face surface.
 
 For this pilot:
 
-- `techbro_v6.py` constructs neutral trousers, shoes, sleeves and hands from
+- `techbro_v7.py` constructs neutral trousers, shoes, sleeves and hands from
   measured sections. It adapts the established open vest/shirt construction from
   `techbro.py`; the garment's internal surfaces are decimated to stay in budget.
 - Face widths and depths are independent. The profile includes a forehead,
   narrow nose bridge/tip, lips, projecting chin and receding jaw. The nose's
   extra depth is localized around its center rather than applied across the
-  whole face. Curved cheek normals retain the cel look.
-- Hair has a rounded underlying shell, returning S-shaped locks, small crown
-  curls and layered side/back waves. Looser forehead curls project away from
-  the scalp. Hair pigment is lighter brown (`#604735`); sparse ink follows each
+  whole face. The v7 face receives smooth ellipsoid proxy normals, independent of the
+  nose and jaw triangulation, before either GLB is exported.
+- Hair has a rounded crown mass with low returning strands and three tiers of
+  overlapping rounded side/back clumps tapering to the nape. Ears are 70% of
+  the v6 size and tucked in. The fringe antenna is folded into its neighbour. Hair pigment is lighter brown (`#604735`); sparse ink follows each
   curl's own longitudinal UVs.
 - Reuse `anime.py` for lofts, cloth shells, coordinate conversion, ordinary
   materials and cel previews. `common.py` and `cab.py` remain unchanged.
@@ -182,7 +183,7 @@ After export, use the same generic scorer on the actual GLB:
 ```sh
 ~/.local/bin/blender --background --factory-startup --python-exit-code 1 \
   --python assets/blender/score_sheet_export.py -- techbro \
-  --report assets/blender/reviews/v6-fit.json
+  --report assets/blender/reviews/v7-fit.json
 ```
 
 Replace `techbro` with another calibrated passenger; `--model` accepts an
@@ -190,7 +191,7 @@ alternate neutral GLB. The report records the scored GLB's SHA-256, and
 `test_fit_artifact.py` prevents a stale report from accepting a different asset.
 Body views must reach **0.90**, head views **0.88**. Builds fail otherwise.
 
-### Final exported-GLB fit
+### Archived v6 exported-GLB fit
 
 | View | Body IoU / overlay | Head IoU / overlay |
 | --- | --- | --- |
@@ -211,7 +212,60 @@ width reference; residual rear differences are visible in the XOR rather than
 hidden by changing cameras. Passing IoU does not replace reviewing facial
 expression, hair flow, or the native-size gameplay preview.
 
-## 4. Transfer facial identity
+## 4. Required colour-region fit
+
+After exporting, render **unlit flat material colours** with the same fixed
+orthographic cameras, for all body and head views. Run:
+
+```sh
+blender -b --factory-startup --python assets/blender/score_diagnostics.py -- <id> \
+  --model public/models/<id>-apose.glb --output assets/blender/reviews/<id>-diagnostics
+```
+
+`sheets.colour_region_fit` reads the character's data-only `regions.body` and
+`regions.head` palettes. Each region supplies reviewed RGB swatches and optional
+sheet-pixel row limits. These limits disambiguate white shoes from eyes and dark
+vest ink from hair; never fit them to model output. Textured GLB materials use
+the most frequent texture pigment as their flat albedo, since their imported
+material factor is white. Plain materials retain their base colour.
+
+Segment **both** reference and rendered RGB images by nearest palette swatch,
+inside their independently extracted silhouettes. Report intersection/union for
+hair, skin, vest, shirt, trousers and shoes in each body view; report hair and
+skin in the crown-to-chin head views. Missing regions return null, never a
+perfect score. Save the unlit renders and paired colour-labelled masks. Review
+those masks before accepting numbers: source ink and painted shading still
+introduce classification noise. Do not treat semantic IoU as silhouette IoU.
+
+Compare the previous delivered export with the candidate using identical code
+and calibration. Report every region, including regressions. This is a required
+review diagnostic, not a new numerical pass threshold.
+
+## 5. Required shadow cleanliness
+
+`sheets.face_shadow_fit` reimports the neutral export and renders front, 35°
+three-quarter and profile at **512 × 512**, zero elevation and a fixed
+crown/chin-derived orthographic scale. Use the game's N·L step **0.32** and sun
+rotation **(40°, 0°, 28°)**. `face_materials` identifies the face surface for any
+character; hair, ears and neck remain visible as occluders.
+
+Diagnostic colours encode lit face as yellow, shadow as green and non-face
+occluders as blue. Texture ink, cast shadows, outline hulls and AO are absent.
+Only visible face pixels below the calibrated hairline and above the chin enter
+the mask. Count **8-connected** shadow islands (a diagonal raster edge remains
+connected) and the total horizontal/vertical light–shadow edge length in pixels.
+Edges against hair, the silhouette or the crop are excluded. No small-component
+filtering, dilation or smoothing hides artifacts. Report shadow and face area as
+well, so an entirely lit face cannot masquerade as a shading improvement.
+
+Run this on both old and new neutral GLBs. Lower island count and shorter edges
+are cleaner only when the preview still has an appropriate shadow shape. Review
+the posed head close-ups too: posing changes the head's relation to the light.
+Transfer normals from a smooth proxy surface before export when facial topology
+creates fragmented shading. Preserve ordinary materials and the transferred
+normals in both exports; diagnostics must not repair the imported candidate.
+
+## 6. Transfer facial identity
 
 Extract eyes and brows from the approved front head view; register the
 three-quarter grin to the front mouth window. Retain ink/pigment and eye/tooth
@@ -224,7 +278,7 @@ profile; there are no camera-facing face planes.
 The v4 generated decal remains as an archival input for v4/v5 but is unused by
 v6. Other passengers need their own feature regions and grin/eye registration.
 
-## 5. Pose, bake and export
+## 7. Pose, bake and export
 
 First save `public/models/<id>-apose.glb`. Then shift the pelvis over the weight
 leg, relax the free leg, roll the torso, tilt the head, and bend the neutral
@@ -249,7 +303,7 @@ prop, while retaining its `arm_R` parent. It is excluded explicitly from the bod
 fit. In the posed export it is gripped at `(0.292, 1.39, 0.155)` on +X. There is
 no skeleton or animation in either baked export. A later rig can use the A-pose.
 
-## 6. Preview and verify
+## 8. Preview and verify
 
 The shared preview matches the game's cel presentation: a two-tone N·L step at
 0.32, sun orientation `(40, 0, 28)`, tinted skin/hair/clothing shadows, and
@@ -265,8 +319,13 @@ Deliver:
 - `techbro-small.png`: native game-size renders, not downsampled close-ups.
 - `techbro-fit-{body,head}-{front,right,back}.png`: the six measured overlays.
 
+`techbro-v6-v7-head.png` compares front, three-quarter and profile to the sheet.
+`techbro-shoes.png` exposes panel, collar, lace and sole construction.
+
 The older `techbro-head-compare.png` remains the archived v4/v5 comparison; it is
 not a v6 acceptance render and is not regenerated by the new build.
+
+Archived v6 budget:
 
 | Export | Triangles | Nodes / meshes | Materials | Textures | Sole-to-crown height |
 | --- | ---: | --- | ---: | --- | ---: |
@@ -275,11 +334,12 @@ not a v6 acceptance render and is not regenerated by the new build.
 
 `validate_techbro.py` checks actual GLB positions, indices, unit normals, pivots,
 parenting, budgets, embedded PNG sizes and ordinary opaque roughness-1,
-metallic-0 materials. Reports are in `reviews/v6-{apose-,}validation.json`.
+metallic-0 materials. Current reports are in `reviews/v7-{apose-,}validation.json`; v6 reports are archived.
 Independent glTF Transform inspection is retained in `reviews/v6-inspect.txt`.
 
-Two full rebuilds must give identical hashes for both GLBs, all ten v6 renders,
-and the cab. The recorded result is `reviews/v6-rebuild-sha256.json`. Cab remains
+Two full rebuilds must give identical hashes for both GLBs, all regenerated renders,
+and the cab. Strip Blender timestamp metadata from diagnostic PNGs before saving.
+The v7 record is `reviews/v7-rebuild-sha256.json`; the v6 record remains archived. Cab remains
 byte-identical to main:
 
 ```text
@@ -289,3 +349,40 @@ c166f5c3f6e92ebd2c89c72f78c43c830ed1df1bf4c910afdd45353e2e40c33d
 The pilot still simplifies fine flyaway hair, cloth folds, sneaker panels and
 clear-cup optics for the triangle budget and game scale. Review those artistic
 tradeoffs in the previews, independently of the silhouette gate.
+
+## v7 acceptance results
+
+Colour-region IoU, **v6 → v7** (same calibration and scorer):
+
+| Region | Front | Profile | Back |
+| --- | ---: | ---: | ---: |
+| body hair | 0.5572 → 0.5928 | 0.6827 → 0.6972 | 0.8391 → 0.8681 |
+| body skin | 0.6185 → 0.6179 | 0.6557 → 0.6684 | 0.5640 → 0.5498 |
+| body vest | 0.7360 → 0.7360 | 0.7571 → 0.7571 | 0.8862 → 0.8862 |
+| body shirt | 0.6833 → 0.6833 | 0.7279 → 0.7279 | 0.7305 → 0.7305 |
+| body trousers | 0.8831 → 0.8822 | 0.8806 → 0.8806 | 0.8766 → 0.8760 |
+| body shoes | 0.7709 → 0.7693 | 0.8190 → 0.8338 | 0.6443 → 0.6269 |
+| head hair | 0.6552 → 0.6634 | 0.6974 → 0.6820 | 0.8647 → 0.8770 |
+| head skin | 0.7631 → 0.7730 | 0.6951 → 0.6793 | 0.4225 → 0.4111 |
+
+Shadow cleanliness, **v6 → v7**, 512px neutral head:
+
+| View | Islands | Edge length (px) | Shadow pixels |
+| --- | ---: | ---: | ---: |
+| front | 3 → 2 | 522 → 329 | 7350 → 2769 |
+| three quarter | 5 → 5 | 403 → 231 | 6390 → 1966 |
+| profile | 1 → 1 | 259 → 246 | 10488 → 4910 |
+
+Silhouette IoU, **v6 → v7**:
+
+| View | Body (≥ 0.90) | Head (≥ 0.88) |
+| --- | ---: | ---: |
+| front | 0.9107 → 0.9130 | 0.8955 → 0.9130 |
+| right | 0.9251 → 0.9271 | 0.8932 → 0.8856 |
+| back | 0.9012 → 0.9018 | 0.8888 → 0.9091 |
+
+All silhouette gates pass. Colour-region scores reveal remaining internal-shape differences: head-profile hair/skin and some shoe regions regress; these are reported rather than hidden by silhouette acceptance. Shadow islands total 9 → 8 and internal edge length 1,184 → 806 px. Three-quarter island count remains 5; shorter edges do not imply a perfect face.
+
+Posed: **29,430 triangles**. Neutral: **28,886 triangles**. Both exports preserve the node contract and +X cup parenting. Cab SHA-256 stays `c166f5c3f6e92ebd2c89c72f78c43c830ed1df1bf4c910afdd45353e2e40c33d`.
+
+Reproduction: `assets/blender/build.sh`. Generic diagnostics: `score_diagnostics.py -- <id> --model <neutral.glb> --output <directory>`. The retained v6 baseline GLB has SHA-256 `8c5d1c2628c8d5da839721970b4a57141b45ed58fa8e6dd1393fc29d415c22d1`. Raw renders, segmentation masks and complete metrics are in `reviews/v7-baseline/` and `reviews/v7-diagnostics/`.

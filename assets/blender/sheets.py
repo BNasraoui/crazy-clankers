@@ -178,7 +178,9 @@ def render_mask(character, kind, view, objects, path):
     scene.render.image_settings.color_mode = "RGBA"
     scene.render.filepath = str(path)
     bpy.ops.render.render(write_still=True)
-    mask = np.asarray(Image.open(path))[:, :, 3] >= 128
+    pixels = np.asarray(Image.open(path).convert("RGBA"))
+    Image.fromarray(pixels).save(path)  # Discard Blender render timestamps.
+    mask = pixels[:, :, 3] >= 128
     for o, hidden in state.items():
         o.hide_render = hidden
     bpy.data.objects.remove(camera, do_unlink=True)
@@ -260,6 +262,194 @@ def measure(character):
                     "mask_area_pixels": int(mask.sum()),
                 }
         result[kind] = entry
+    return result
+
+
+# Semantic diagnostics use the same fixed cameras as silhouette acceptance.
+def segment_regions(image, foreground, regions, crop_y=0):
+    """Nearest reviewed RGB swatch within optional sheet-y intervals.
+
+    All foreground pixels, including line art, belong to a region. Intervals
+    disambiguate white eyes from white shoes; never derive them from the model.
+    Label zero is background, remaining labels follow configuration order.
+    """
+    rgb = np.asarray(image)[..., :3].astype(float)
+    yy = np.arange(rgb.shape[0])[:, None] + crop_y
+    distances = []
+    for region in regions.values():
+        colours = np.asarray(region['colours'], dtype=float)
+        d = np.min(np.sum((rgb[..., None, :] - colours) ** 2, axis=-1), axis=-1)
+        lo, hi = region.get('rows', [-float('inf'), float('inf')])
+        distances.append(np.where((yy >= lo) & (yy <= hi), d, np.inf))
+    labels = np.argmin(distances, axis=0).astype(np.uint8) + 1
+    labels[~np.asarray(foreground, dtype=bool)] = 0
+    return labels
+
+
+def region_iou(reference_labels, rendered_labels, names):
+    result = {}
+    for i, name in enumerate(names, 1):
+        a, b = reference_labels == i, rendered_labels == i
+        result[name] = iou(a, b) if np.any(a | b) else None
+    return result
+
+
+def shadow_cleanliness(shadow, face):
+    """8-connected islands and Manhattan light/shadow edge length in pixels.
+
+    Only edges between two face pixels count; silhouette/occlusion boundaries
+    are excluded. No removal of small islands or smoothing hides artifacts.
+    """
+    face = np.asarray(face, dtype=bool)
+    shadow = np.asarray(shadow, dtype=bool) & face
+    seen = np.zeros_like(shadow)
+    islands = 0
+    h, w = shadow.shape
+    for y, x in zip(*np.nonzero(shadow)):
+        if seen[y, x]:
+            continue
+        islands += 1
+        todo = [(y, x)]
+        seen[y, x] = True
+        while todo:
+            y, x = todo.pop()
+            for j, i in ((y-1,x), (y+1,x), (y,x-1), (y,x+1), (y-1,x-1), (y-1,x+1), (y+1,x-1), (y+1,x+1)):
+                if 0 <= j < h and 0 <= i < w and shadow[j,i] and not seen[j,i]:
+                    seen[j,i] = True
+                    todo.append((j,i))
+    edge = np.count_nonzero((shadow[1:] != shadow[:-1]) & face[1:] & face[:-1])
+    edge += np.count_nonzero((shadow[:,1:] != shadow[:,:-1]) & face[:,1:] & face[:,:-1])
+    return {'islands': islands, 'edge_pixels': int(edge), 'shadow_pixels': int(shadow.sum()), 'face_pixels': int(face.sum())}
+
+
+def diagnostic_material(name, colour, shadow=False):
+    import bpy
+    import anime as A
+    import math
+    from mathutils import Matrix, Vector
+    mat = bpy.data.materials.new(name)
+    mat.use_nodes = True
+    mat.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (*colour, 1)
+    if shadow:
+        light = Matrix.Rotation(math.radians(28), 3, 'Z') @ Matrix.Rotation(math.radians(40), 3, 'X') @ Vector((0,0,1))
+        A.toonify(mat, shadow_mul=(0,1,0), threshold=0.32, light=light)
+    else:
+        nt = mat.node_tree
+        nt.nodes.clear()
+        emit = nt.nodes.new('ShaderNodeEmission')
+        emit.inputs['Color'].default_value = (*colour, 1)
+        out = nt.nodes.new('ShaderNodeOutputMaterial')
+        nt.links.new(emit.outputs[0], out.inputs['Surface'])
+    return mat
+
+
+def colour_region_fit(character, objects, output):
+    """Render flat material albedo and return every region IoU, plus audit masks."""
+    import bpy
+    cfg = load(character)
+    output = Path(output)
+    output.mkdir(parents=True, exist_ok=True)
+    originals = {o: list(o.data.materials) for o in objects}
+    scene = bpy.context.scene
+    scene.view_settings.view_transform = 'Standard'
+    scene.view_settings.look = 'None'
+    # One flat material for each original material, retaining its actual albedo.
+    for o, mats in originals.items():
+        for i, mat in enumerate(mats):
+            base = mat.node_tree.nodes.get('Principled BSDF').inputs['Base Color'].default_value[:3]
+            tex = next((n for n in mat.node_tree.nodes if n.type == 'TEX_IMAGE' and n.image), None)
+            if tex:
+                # glTF uses a white factor for textured materials. Recover the
+                # dominant flat pigment, not the white factor or painted ink.
+                pixels = np.array(tex.image.pixels[:], dtype=np.float32).reshape(-1,4)[:,:3]
+                quantized = np.round(pixels * 255).astype(np.uint8)
+                colours, counts = np.unique(quantized, axis=0, return_counts=True)
+                srgb = colours[np.argmax(counts)] / 255
+                base = np.where(srgb <= .04045, srgb / 12.92, ((srgb + .055)/1.055)**2.4)
+            o.data.materials[i] = diagnostic_material('flat-' + mat.name, base)
+    result = {}
+    try:
+        for kind in ['body', 'head']:
+            settings = cfg['regions'][kind]
+            targets = objects if kind == 'body' else [o for o in objects if o.name == cfg['head_node']]
+            result[kind] = {}
+            for view, v in cfg[kind]['views'].items():
+                path = output / f'{character}-regions-{kind}-{view}.png'
+                foreground = render_mask(character, kind, view, targets, path)
+                ref, target = reference(character, kind, view)
+                a = segment_regions(ref, target, settings, v['crop'][1])
+                b = segment_regions(Image.open(path), foreground, settings, v['crop'][1])
+                result[kind][view] = region_iou(a, b, settings)
+                palette = np.array([[255,255,255], [99,65,37], [245,178,127], [48,57,85], [141,180,223], [194,158,103], [130,135,137]], dtype=np.uint8)
+                # Arbitrary character region counts are supported with a stable palette.
+                if len(settings) >= len(palette):
+                    palette = np.array([[255,255,255]] + [[(i*73)%230,(i*137)%230,(i*191)%230] for i in range(1,len(settings)+1)], dtype=np.uint8)
+                Image.fromarray(np.concatenate([palette[a], palette[b]], axis=1)).save(output / f'{character}-region-labels-{kind}-{view}.png')
+    finally:
+        for o, mats in originals.items():
+            for i, mat in enumerate(mats): o.data.materials[i] = mat
+    return result
+
+
+def face_shadow_fit(character, head, output):
+    """Texture-free N.L pass: yellow lit face, green shadow, blue non-face occluders.
+
+    Fixed 512px orthographic front/35 degree/profile views. Head remains neutral,
+    so light orientation and pixel scale agree across versions and characters.
+    """
+    import bpy
+    import anime as A
+    import math
+    from mathutils import Vector
+    cfg = load(character)
+    k = cfg['head']
+    output = Path(output)
+    output.mkdir(parents=True, exist_ok=True)
+    scene = bpy.context.scene
+    originals = list(head.data.materials)
+    roles = cfg['face_materials']
+    for i, mat in enumerate(originals):
+        is_face = mat.name.split('.')[0] in roles
+        head.data.materials[i] = diagnostic_material('shadow-face' if is_face else 'occluder', (1,1,0) if is_face else (0,0,1), is_face)
+    states = {o: o.hide_render for o in scene.objects if o.type == 'MESH'}
+    for o in states: o.hide_render = o != head
+    scene.render.engine = 'BLENDER_EEVEE'
+    scene.render.film_transparent = True
+    scene.view_settings.view_transform = 'Standard'
+    scene.view_settings.look = 'None'
+    scene.render.resolution_x = scene.render.resolution_y = 512
+    scene.render.resolution_percentage = 100
+    scene.render.image_settings.color_mode = 'RGBA'
+    scene.eevee.taa_render_samples = 16
+    cd = bpy.data.cameras.new('shadow-camera')
+    cd.type = 'ORTHO'
+    span = (k['chin_pixel'] - k['crown_pixel']) * k['metres_per_pixel']
+    cd.ortho_scale = span * 1.2
+    camera = bpy.data.objects.new(cd.name, cd)
+    scene.collection.objects.link(camera)
+    scene.camera = camera
+    mid = k['world_y_at_zero'] - (k['chin_pixel'] + k['crown_pixel']) / 2 * k['metres_per_pixel']
+    target = A.gv(Vector((0,mid,0)))
+    result = {}
+    try:
+        for view, degrees in [('front',0), ('three_quarter',35), ('profile',90)]:
+            a = math.radians(degrees)
+            camera.location = target + A.gv(Vector((math.sin(a)*5,0,math.cos(a)*5)))
+            camera.rotation_euler = (target-camera.location).to_track_quat('-Z','Y').to_euler()
+            path = output / f'{character}-shadow-{view}.png'
+            scene.render.filepath = str(path)
+            bpy.ops.render.render(write_still=True)
+            im = np.asarray(Image.open(path).convert('RGBA'))
+            Image.fromarray(im).save(path)  # Stable bytes, without render timestamps.
+            yy = mid + (256 - np.arange(512) - .5) * cd.ortho_scale / 512
+            top = k['world_y_at_zero'] - k['landmarks']['hairline']*k['metres_per_pixel']
+            bottom = k['world_y_at_zero'] - k['chin_pixel']*k['metres_per_pixel']
+            face = (im[:,:,3] >= 128) & (im[:,:,1] >= 128) & (im[:,:,2] < 128) & (yy[:,None] < top) & (yy[:,None] > bottom)
+            result[view] = shadow_cleanliness(im[:,:,0] < 128, face)
+    finally:
+        for i, mat in enumerate(originals): head.data.materials[i] = mat
+        for o, hidden in states.items(): o.hide_render = hidden
+        bpy.data.objects.remove(camera, do_unlink=True)
     return result
 
 

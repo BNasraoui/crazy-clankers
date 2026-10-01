@@ -1,0 +1,14 @@
+{
+  "asset": "public/models/techbro-apose.glb",
+  "asset_sha256": "c2d9d548cee9b5b8526adb4a316333ae8cabd27dd0a0fb657b281459ae54be38",
+  "body": {
+    "front": 0.9129560393580693,
+    "right": 0.9270625701651889,
+    "back": 0.9017674584551205
+  },
+  "head": {
+    "front": 0.9130007142606231,
+    "right": 0.8855530072363478,
+    "back": 0.9091219880228226
+  }
+}
