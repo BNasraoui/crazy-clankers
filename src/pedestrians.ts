@@ -14,7 +14,7 @@ type Frame = 'front' | 'back' | 'walk1' | 'walk2' | 'dive'
 const PX_PER_M = 320 / 1.75; // sprites are cut at 320 px for a 1.75 m person
 const SIDEWALK = 7.9; // walking line, just past the street trees, measured from the street centreline
 
-interface Kind { frames: Partial<Record<Frame, THREE.Texture>>; size: Partial<Record<Frame, [number, number]>> }
+interface Kind { id: string; frames: Partial<Record<Frame, THREE.Texture>>; size: Partial<Record<Frame, [number, number]>> }
 
 // Walk cycles per view, falling back to whatever frames a sprite set has.
 const CYCLES: Record<'front' | 'back' | 'side', Frame[][]> = {
@@ -42,9 +42,12 @@ interface Ped {
   pos: THREE.Vector3;
   vel: THREE.Vector3;
   diveDir: THREE.Vector3;
+  shoutAt: number; // clock time before which this person stays quiet
 }
 
 export interface PedEvents { dives: THREE.Vector3[]; closeCalls: number }
+// Someone reacting out loud to the cab, for src/voices.ts. pos is live: it follows them.
+export interface Shout { pos: THREE.Vector3; kind: string; scream: boolean }
 
 // A manga "!" that pops over someone's head when they spot the cab.
 function alertTexture() {
@@ -79,6 +82,7 @@ const ALERT_TIME = 0.22;
 export class Pedestrians {
   private peds: Ped[] = [];
   private clock = 0;
+  shouts: Shout[] = []; // this frame's reactions
   size = 1.3; // drawn larger than life so they read at speed (tunable in the look panel)
   private shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.22, depthWrite: false });
   private shadowGeo = new THREE.CircleGeometry(0.45, 16).rotateX(-Math.PI / 2);
@@ -94,7 +98,7 @@ export class Pedestrians {
         tex.anisotropy = 4;
         frames[f] = tex;
       }));
-      return { frames, size };
+      return { id, frames, size };
     }));
     return new Pedestrians(scene, kinds, count);
   }
@@ -103,7 +107,8 @@ export class Pedestrians {
     const r = rng(31);
     // Origin at the feet, centred, so scaling a frame keeps the person standing on the ground.
     const geo = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0);
-    const alertMat = new THREE.SpriteMaterial({ map: alertTexture(), depthTest: false });
+    // Depth testing stays on: without it WebGL writes no depth, and the look hides character-layer pixels with none.
+    const alertMat = new THREE.SpriteMaterial({ map: alertTexture(), alphaTest: 0.5 });
     for (let k = 0; k < count; k++) {
       const kind = kinds[k % kinds.length];
       const mat = new THREE.MeshBasicMaterial({ map: kind.frames.front ?? null, alphaTest: 0.5, side: THREE.DoubleSide });
@@ -126,7 +131,7 @@ export class Pedestrians {
         speed: 1.1 + r() * 0.6,
         phase: r() * 10,
         state: 'walk', t: 0, alert,
-        pos: new THREE.Vector3(), vel: new THREE.Vector3(), diveDir: new THREE.Vector3(),
+        pos: new THREE.Vector3(), vel: new THREE.Vector3(), diveDir: new THREE.Vector3(), shoutAt: 0,
       });
       // Every fourth person uses a crosswalk instead of a sidewalk.
       if (k % 4 === 3) {
@@ -162,12 +167,13 @@ export class Pedestrians {
   }
 
   reset() {
-    for (const p of this.peds) { p.state = 'walk'; p.t = 0; p.alert.visible = false; }
+    for (const p of this.peds) { p.state = 'walk'; p.t = 0; p.alert.visible = false; p.shoutAt = 0; }
   }
 
   update(dt: number, car: Car, camera: THREE.Camera): PedEvents {
     this.clock += dt;
     const ev: PedEvents = { dives: [], closeCalls: 0 };
+    this.shouts.length = 0;
     const fwd = car.fwd;
     const camRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
     for (const p of this.peds) {
@@ -200,6 +206,9 @@ export class Pedestrians {
           p.diveDir.set(fwd.y * away, 0, -fwd.x * away);
           p.state = 'alert';
           p.t = 0;
+          this.shout(p, true, 6);
+        } else if (speed > 6 && Math.hypot(dx, dz) < 5.5 && Math.abs(p.pos.y - car.pos.y) < 2) {
+          this.shout(p, false, 8); // the cab tore past on the sidewalk
         }
       } else if (p.state === 'alert') {
         p.t += dt;
@@ -218,6 +227,8 @@ export class Pedestrians {
           p.pos.y = g;
           p.state = 'down';
           p.t = 0;
+          p.shoutAt = 0;
+          this.shout(p, false, 8); // picking themselves up, furious
           if (Math.hypot(p.pos.x - car.pos.x, p.pos.z - car.pos.z) < 6) ev.closeCalls++;
         }
       } else {
@@ -233,6 +244,12 @@ export class Pedestrians {
       this.draw(p, camera, camRight);
     }
     return ev;
+  }
+
+  private shout(p: Ped, scream: boolean, quiet: number) {
+    if (this.clock < p.shoutAt) return;
+    p.shoutAt = this.clock + quiet;
+    this.shouts.push({ pos: p.pos, kind: p.kind.id, scream });
   }
 
   private draw(p: Ped, camera: THREE.Camera, camRight: THREE.Vector3) {

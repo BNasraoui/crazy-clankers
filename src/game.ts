@@ -9,6 +9,9 @@ import { pickPassenger, type PassengerType } from './passengers';
 import { QuipDirector, SPEAKERS } from './quips';
 import { Traffic } from './traffic';
 import { sfx, setEngine, unlockAudio } from './audio';
+import { bump, crunch, splash as splashLayers } from './sfx';
+import { Tyres } from './skids';
+import { Voices } from './voices';
 import { BLOCKS_SIDES, WATER, buildWorld, curb, landmarks, N, type Curb, type Landmark } from './world';
 import { buildFeatures, groundAt } from './features';
 import { Geysers, Particles, Props, type PropKind } from './props';
@@ -90,6 +93,8 @@ export class Game {
   private particles: Particles;
   private geysers: Geysers;
   private trees = new Trees();
+  private tyres = new Tyres(this.scene);
+  private voices = new Voices(this.scene);
   private cableCars!: CableCars;
   peds: Pedestrians | null = null;
   paxSprites: Record<string, SpriteSet> = {};
@@ -207,6 +212,7 @@ export class Game {
     this.geysers.reset();
     this.trees.reset();
     this.peds?.reset();
+    this.tyres.reset();
     this.maxAir = 0;
     for (const w of this.waiting) this.scene.remove(w.person.root, w.marker);
     this.waiting = [];
@@ -242,6 +248,8 @@ export class Game {
     }
     setEngine(this.car.forward, inp.throttle, this.state === 'play');
     this.car.sync(dt);
+    this.tyres.update(dt, this.car, inp, this.state === 'play');
+    this.voices.update(dt, this.camera, this.peds);
     this.traffic.sync(dt);
     if (inp.debug) this.look.togglePanel();
     this.look.setPadDebug(padDebug);
@@ -385,6 +393,7 @@ export class Game {
     }
     if (splash) {
       sfx.splash();
+      splashLayers();
       this.particles.emit(this.car.pos.clone().setY(WATER), 50, 0xe6f6ff, 9, 12, 0.45);
       this.popup('SEABED MODE', 'big');
       this.quips.say('cab', 'underwater', { force: true });
@@ -430,6 +439,7 @@ export class Game {
     if (tev.honk) sfx.honk();
 
     if (impact > 5) this.onCrash(impact);
+    else if (impact > 1.5) bump(impact);
     // A plain hop is about 0.7 s of air, so it takes a real jump to earn a tip.
     if (landed > 0.85) {
       sfx.land(landed * 4);
@@ -468,6 +478,7 @@ export class Game {
 
   private onCrash(impact: number) {
     sfx.crash(impact);
+    crunch(impact);
     this.shake = Math.min(1, impact / 20);
     this.combo = 0;
     this.safetyHit(THREE.MathUtils.clamp(impact * 0.9, 4, 22));
