@@ -213,6 +213,12 @@
    "kind": "house",
    "wall": "#a15e49",
    "base": "#624d49"
+  },
+  {
+   "id": "potrero-3",
+   "kind": "house",
+   "wall": "#b0855f",
+   "base": "#75685e"
   }
  ],
  "soma": [
@@ -265,6 +271,44 @@
    "kind": "house",
    "wall": "#69b9e5",
    "base": "#bfc8c4"
+  }
+ ],
+ "fidi": [
+  {
+   "id": "tower-1",
+   "kind": "tile",
+   "wall": "#56799e",
+   "base": "#6f89a3"
+  },
+  {
+   "id": "tower-2",
+   "kind": "tile",
+   "wall": "#eaddc6",
+   "base": "#d1c6b1"
+  },
+  {
+   "id": "tower-3",
+   "kind": "tile",
+   "wall": "#30485d",
+   "base": "#354a5b"
+  },
+  {
+   "id": "tower-4",
+   "kind": "tile",
+   "wall": "#5c4a3a",
+   "base": "#4d3f34"
+  },
+  {
+   "id": "towerbase-1",
+   "kind": "towerbase",
+   "wall": "#ae9474",
+   "base": "#a59b97"
+  },
+  {
+   "id": "towerbase-2",
+   "kind": "towerbase",
+   "wall": "#e7d8bc",
+   "base": "#e0d1b5"
   }
  ]
 }

@@ -3,6 +3,7 @@ import { Car, MAX_SPEED } from './car';
 import { readInput, padName, padDebug, type Input } from './input';
 import { CABS, EXTRA_CARS, makeCar, makePerson, makeLabel, personFrom, type PersonModel } from './models';
 import { Look, SKY, makeSky } from './look';
+import { paintSky, updateSky } from './sky';
 import { CHARACTER_LAYER, makeCharacter, sunDir } from './anime';
 import { pickPassenger, type PassengerType } from './passengers';
 import { QuipDirector, SPEAKERS } from './quips';
@@ -114,6 +115,7 @@ export class Game {
     this.look.onChange = () => this.refreshPassengers();
     this.scene.background = new THREE.Color(SKY.horizon);
     this.scene.fog = new THREE.Fog(SKY.horizon, 320, 900); // crisp air, haze only far away
+    paintSky(this.sky);
     this.scene.add(this.sky);
     const sky = new THREE.HemisphereLight(0xd8e8ff, 0x8f7f9a, 1.2);
     sky.layers.enable(CHARACTER_LAYER);
@@ -244,6 +246,7 @@ export class Game {
     if (inp.debug) this.look.togglePanel();
     this.look.setPadDebug(padDebug);
     this.sky.position.copy(this.camera.position);
+    updateSky(performance.now() / 1000, this.camera.position.y);
     const under = this.camera.position.y < WATER;
     if (under !== this.underwaterView) {
       this.underwaterView = under;

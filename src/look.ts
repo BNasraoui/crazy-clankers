@@ -37,21 +37,9 @@ export function makeSky() {
       }`,
     fragmentShader: /* glsl */ `
       varying vec3 vDir;
-      float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-      float noise(vec2 p) {
-        vec2 i = floor(p), f = fract(p);
-        f = f * f * (3.0 - 2.0 * f);
-        return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
-      }
-      float fbm(vec2 p) { return 0.55 * noise(p) + 0.3 * noise(p * 2.1) + 0.15 * noise(p * 4.3); }
       void main() {
         float h = vDir.y;
         vec3 col = mix(${glslColor(SKY.horizon)}, ${glslColor(SKY.zenith)}, smoothstep(-0.02, 0.5, h));
-        // Flat cel clouds: a lit top and one shadow tone underneath.
-        vec2 q = vDir.xz / max(h, 0.06) * 0.9;
-        float n = fbm(q * 0.7);
-        float band = smoothstep(0.03, 0.12, h) * (1.0 - smoothstep(0.55, 0.8, h));
-        if (n > 0.6 && band > 0.5) col = n > 0.64 ? vec3(1.0) : ${glslColor(0xc9d6e6)};
         gl_FragColor = vec4(col, 1.0);
         #include <colorspace_fragment>
       }`,
