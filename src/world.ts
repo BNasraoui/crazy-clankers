@@ -296,6 +296,7 @@ export function buildWorld(scene: THREE.Scene) {
   const trees: TreeSpot[] = [];
   const streetTrees: TreeSpot[] = [];
   const gables: { m: THREE.Matrix4; c: THREE.Color }[] = [];
+  const facadeCards: FacadeCard[] = [];
 
   for (const b of blocks) {
     const { x0, x1, z0, z1 } = b;
@@ -330,7 +331,7 @@ export function buildWorld(scene: THREE.Scene) {
     if (b.kind === 'landmark') continue;
     const dist = districtOf(b.bi, b.bj);
     const ladies = b.kind === 'ladies';
-    buildFrontages(b, ladies ? PAINTED_LADIES : dist, ladies ? LADIES : dist.colors, r, addBox, addPart, gables, walls);
+    buildFrontages(b, ladies ? PAINTED_LADIES : dist, ladies ? LADIES : dist.colors, r, addBox, addPart, gables, walls, facadeCards);
     addStreetTrees(b, r, streetTrees);
   }
 
@@ -350,6 +351,7 @@ export function buildWorld(scene: THREE.Scene) {
   inst.receiveShadow = true;
   scene.add(inst);
   scene.add(makeGables(gables));
+  scene.add(makeFacadeCards(facadeCards));
 
   scene.add(makeTrees(trees));
   scene.add(makeTrees(streetTrees));
@@ -470,6 +472,11 @@ const PAINTED_LADIES: District = { ...districtOf(4, 5), bays: 1, gables: 1, gara
 const AWNINGS = [0xd23b2e, 0x2f6b4f, 0x2d4a7a, 0xe8a33d, 0x7a3f8a];
 const TRIM = 0xf6f1e6;
 
+// Painted facade prototype: these blocks get drawn facades on their street faces
+// (the robotaxi rank street, x = -64 between z = -64 and 0).
+const FACADE_BLOCKS = new Set(['3,4', '4,4']);
+export interface FacadeCard { cx: number; cz: number; nx: number; nz: number; width: number; bottom: number; top: number; pick: number }
+
 type AddBox = (x0: number, x1: number, z0: number, z1: number, height: number, color: THREE.ColorRepresentation, tower?: boolean) => number;
 type AddPart = (x0: number, x1: number, z0: number, z1: number, y0: number, y1: number, color: THREE.ColorRepresentation, style: number, ground?: number) => void;
 
@@ -480,8 +487,10 @@ function buildFrontages(
   addBox: AddBox, addPart: AddPart,
   gables: { m: THREE.Matrix4; c: THREE.Color }[],
   walls: { x: number; z: number; nx: number; nz: number }[],
+  cards: FacadeCard[] = [],
 ) {
   const { x0, x1, z0, z1 } = b;
+  const painted = FACADE_BLOCKS.has(`${b.bi},${b.bj}`);
   const DEPTH = 12;
   // side: [length start, length end, which face, outward normal]
   const rows: { a0: number; a1: number; face: 'N' | 'S' | 'W' | 'E'; corners: boolean }[] = [
@@ -519,8 +528,25 @@ function buildFrontages(
       const floors = Math.round(d.floors[0] + r() * (d.floors[1] - d.floors[0])) + (corner ? d.cornerFloors : 0);
       const color = colors[Math.floor(r() * colors.length)];
       const width = la1 - la0;
-      const gabled = !corner && r() < d.gables;
+      const gabled = !painted && !corner && r() < d.gables;
       const top = addBox(...box(la0 + 0.15, la1 - 0.15, 0, DEPTH), floors * 3.3 + 0.5, color);
+      if (painted) {
+        // The drawing carries the bays, doors and cornice; just place the card on the face.
+        const lo = Math.min(groundAtLot(la0), groundAtLot(la1));
+        cards.push({ cx: (fx0 + fx1) / 2, cz: (fz0 + fz1) / 2, nx, nz, width: width - 0.3, bottom: lo - 0.4, top, pick: cards.length });
+        if (corner) {
+          // A corner lot also shows its side wall to the cross street: paint that too, as two narrow fronts.
+          const end = i === 0 ? la0 : la1;
+          const sx = (row.face === 'N' || row.face === 'S') ? (i === 0 ? -1 : 1) : 0;
+          const sz = (row.face === 'W' || row.face === 'E') ? (i === 0 ? -1 : 1) : 0;
+          for (const k of [0.25, 0.75]) {
+            const [ax0, ax1, az0, az1] = box(end, end, k * DEPTH, k * DEPTH);
+            const gx = (ax0 + ax1) / 2, gz = (az0 + az1) / 2;
+            cards.push({ cx: gx, cz: gz, nx: sx, nz: sz, width: DEPTH / 2 - 0.3, bottom: heightAt(gx, gz) - 2.4, top, pick: cards.length });
+          }
+        }
+        return;
+      }
       const shop = corner && r() < d.shops;
       if (gabled) {
         // A prism along the lot's depth, peak over the middle of the facade.
@@ -585,6 +611,28 @@ function addStreetTrees(b: Block, r: () => number, out: TreeSpot[]) {
       ) });
     }
   }
+}
+
+const FACADES = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6'];
+function makeFacadeCards(cards: FacadeCard[]) {
+  const g = new THREE.Group();
+  const loader = new THREE.TextureLoader();
+  const mats = FACADES.map((id) => {
+    const tex = loader.load(`/facades/${id}.jpg`);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    return toon({ map: tex });
+  });
+  for (const c of cards) {
+    const h = c.top - c.bottom;
+    // Consecutive cards cycle through the drawings, so neighbours never repeat.
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(c.width, h), mats[c.pick % mats.length]);
+    mesh.position.set(c.cx + c.nx * 0.04, c.bottom + h / 2, c.cz + c.nz * 0.04);
+    mesh.rotation.y = Math.atan2(c.nx, c.nz);
+    mesh.receiveShadow = true;
+    g.add(mesh);
+  }
+  return g;
 }
 
 function makeGables(list: { m: THREE.Matrix4; c: THREE.Color }[]) {
