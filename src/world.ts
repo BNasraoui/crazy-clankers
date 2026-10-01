@@ -8,8 +8,11 @@ import { glslColor, toon } from './look';
 export const CELL = 64;
 export const N = 10;
 export const HALF = (N * CELL) / 2;
-export const STREET_HALF = 8;
+export const STREET_HALF = 6; // 12 m curb to curb
+export const SIDEWALK_EDGE = 9; // sidewalk runs from the curb to here; front yards beyond
 export const BUILD_INSET = 12;
+// Hills stay flat for 8 m around each intersection (the slopes were tuned with this).
+const TERRAIN_FLAT = 8;
 export const BOUND = HALF + 6;
 
 export function rng(seed: number) {
@@ -45,7 +48,7 @@ const corner = new Float32Array((N + 1) * (N + 1));
     }
 }
 
-const FLAT = STREET_HALF / CELL;
+const FLAT = TERRAIN_FLAT / CELL;
 const remap = (t: number) => clamp((t - FLAT) / (1 - 2 * FLAT), 0, 1);
 
 export function heightAt(x: number, z: number): number {
@@ -189,16 +192,20 @@ export interface Curb {
   facing: number; // yaw for a person looking at the street
 }
 
+// Distances from the street centreline: where people stand, and the lane beside them.
+export const CURB_WALK = 7.5;
+export const CURB_ROAD = 3;
+
 // A point on the curb of block (bi, bj). t runs 0..1 along that side.
 export function curb(bi: number, bj: number, side: Side, t: number): Curb {
   const cx = -HALF + bi * CELL;
   const cz = -HALF + bj * CELL;
   const along = BUILD_INSET + 4 + t * (CELL - 2 * BUILD_INSET - 8);
   let wx = 0, wz = 0, rx = 0, rz = 0, facing = 0;
-  if (side === 'N') { wx = rx = cx + along; wz = cz + 10; rz = cz + 4; facing = Math.PI; }
-  if (side === 'S') { wx = rx = cx + along; wz = cz + CELL - 10; rz = cz + CELL - 4; facing = 0; }
-  if (side === 'W') { wz = rz = cz + along; wx = cx + 10; rx = cx + 4; facing = -Math.PI / 2; }
-  if (side === 'E') { wz = rz = cz + along; wx = cx + CELL - 10; rx = cx + CELL - 4; facing = Math.PI / 2; }
+  if (side === 'N') { wx = rx = cx + along; wz = cz + CURB_WALK; rz = cz + CURB_ROAD; facing = Math.PI; }
+  if (side === 'S') { wx = rx = cx + along; wz = cz + CELL - CURB_WALK; rz = cz + CELL - CURB_ROAD; facing = 0; }
+  if (side === 'W') { wz = rz = cz + along; wx = cx + CURB_WALK; rx = cx + CURB_ROAD; facing = -Math.PI / 2; }
+  if (side === 'E') { wz = rz = cz + along; wx = cx + CELL - CURB_WALK; rx = cx + CELL - CURB_ROAD; facing = Math.PI / 2; }
   return {
     walk: new THREE.Vector3(wx, heightAt(wx, wz), wz),
     road: new THREE.Vector3(rx, heightAt(rx, rz), rz),
@@ -260,8 +267,10 @@ export function buildWorld(scene: THREE.Scene) {
 
   const r = rng(99);
   // San Francisco on a sunny day: butter, mint, dusty blue, cream, terracotta, sage, peach.
-  const PASTEL = [0xf3dc8a, 0xb7dcc4, 0x9fbad3, 0xf2e6cc, 0xd98a6c, 0xb3c79c, 0xf0c4a2, 0xe9e3d6, 0xc7b8d8];
-  const LADIES = [0x5f9ec2, 0xe58fa5, 0xf2cf55, 0x86c07a, 0xb08ad8, 0xee8f5a];
+  // Slightly muted so the (saturated) people stand out against them.
+  const mute = (c: number) => new THREE.Color(c).lerp(new THREE.Color(0xc9c2b6), 0.22).getHex();
+  const PASTEL = [0xf3dc8a, 0xb7dcc4, 0x9fbad3, 0xf2e6cc, 0xd98a6c, 0xb3c79c, 0xf0c4a2, 0xe9e3d6, 0xc7b8d8].map(mute);
+  const LADIES = [0x5f9ec2, 0xe58fa5, 0xf2cf55, 0x86c07a, 0xb08ad8, 0xee8f5a].map(mute);
   const GLASS = [0xc9d3dc, 0xb8c4cf, 0xd9d2c3, 0x9fb0c0, 0xe2ddd2, 0xaebdca];
   const trees: THREE.Matrix4[] = [];
   const roofs: THREE.Mesh[] = [];
@@ -302,7 +311,7 @@ export function buildWorld(scene: THREE.Scene) {
     const pick = () => (ladies ? LADIES : PASTEL)[Math.floor(r() * (ladies ? LADIES : PASTEL).length)];
     const w = (x1 - x0) / 4;
     for (let k = 0; k < 4; k++) {
-      const hN = 7 + r() * 7, hS = 7 + r() * 7;
+      const hN = 6 + r() * 4, hS = 6 + r() * 4;
       const tN = addBox(x0 + k * w + 0.2, x0 + (k + 1) * w - 0.2, z0, z0 + 12, hN, pick());
       const tS = addBox(x0 + k * w + 0.2, x0 + (k + 1) * w - 0.2, z1 - 12, z1, hS, pick());
       if (!ladies) {
@@ -317,8 +326,8 @@ export function buildWorld(scene: THREE.Scene) {
     const h2 = (z1 - z0 - 24) / 2;
     for (let k = 0; k < 2; k++) {
       const za = z0 + 12 + k * h2 + 0.2, zb = z0 + 12 + (k + 1) * h2 - 0.2;
-      const tW = addBox(x0, x0 + 12, za, zb, 7 + r() * 7, pick());
-      addBox(x1 - 12, x1, za, zb, 7 + r() * 7, pick());
+      const tW = addBox(x0, x0 + 12, za, zb, 6 + r() * 4, pick());
+      addBox(x1 - 12, x1, za, zb, 6 + r() * 4, pick());
       if (ladies) roofs.push(gable(x0 + 6, tW, (za + zb) / 2, 12, zb - za, pick(), true));
       else {
         walls.push({ x: x0, z: (za + zb) / 2, nx: -1, nz: 0 });
@@ -476,7 +485,7 @@ const SURFACE_GLSL = /* glsl */ `
 uniform sampler2D uParks;
 varying vec3 vWPos;
 vec3 surface(vec2 p) {
-  const float HALF = ${HALF.toFixed(1)}, CELL = ${CELL.toFixed(1)}, SH = ${STREET_HALF.toFixed(1)}, BI = ${BUILD_INSET.toFixed(1)};
+  const float HALF = ${HALF.toFixed(1)}, CELL = ${CELL.toFixed(1)}, SH = ${STREET_HALF.toFixed(1)}, SW = ${SIDEWALK_EDGE.toFixed(1)}, BI = ${BUILD_INSET.toFixed(1)};
   float m = max(abs(p.x), abs(p.y));
   if (m > HALF + 12.0) return ${glslColor(0xb8a888)};
   if (m > HALF + 8.0) return ${glslColor(0x8d8d86)};
@@ -492,10 +501,12 @@ vec3 surface(vec2 p) {
     return c;
   }
   float e = min(d.x, d.y);
-  if (e < BI) return e < SH + 0.4 ? ${glslColor(0x8f8a80)} : ${glslColor(0xbdb7ab)};
   vec2 cell = floor((p + HALF) / CELL);
-  if (texture(uParks, (cell + 0.5) / ${N.toFixed(1)}).r > 0.5)
-    return ${glslColor(0x6fa04f)} * (0.94 + 0.06 * sin(p.x * 0.7) * cos(p.y * 0.6));
+  vec4 kind = texture(uParks, (cell + 0.5) / ${N.toFixed(1)});
+  if (e < SW || (e < BI && kind.g > 0.5)) return e < SH + 0.4 ? ${glslColor(0x8f8a80)} : ${glslColor(0xbdb7ab)};
+  vec3 grass = ${glslColor(0x6fa04f)} * (0.94 + 0.06 * sin(p.x * 0.7) * cos(p.y * 0.6));
+  if (e < BI) return e < SW + 0.3 ? ${glslColor(0x8a8478)} : grass; // low wall, then the front yard
+  if (kind.r > 0.5) return grass;
   return ${glslColor(0x7c7a72)};
 }
 `;
@@ -510,7 +521,10 @@ function makeTerrain() {
   geo.computeVertexNormals();
 
   const parks = new Uint8Array(N * N * 4);
-  for (const b of blocks) if (b.kind === 'park') parks[(b.bj * N + b.bi) * 4] = 255;
+  for (const b of blocks) {
+    if (b.kind === 'park') parks[(b.bj * N + b.bi) * 4] = 255;
+    if (b.kind === 'downtown' || b.kind === 'landmark') parks[(b.bj * N + b.bi) * 4 + 1] = 255; // paved to the building line
+  }
   const tex = new THREE.DataTexture(parks, N, N);
   tex.magFilter = tex.minFilter = THREE.NearestFilter;
   tex.needsUpdate = true;

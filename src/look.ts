@@ -63,8 +63,8 @@ export function makeSky() {
 }
 
 export interface LookSettings { height: number; grain: number; outline: boolean; speedLines: boolean; people: number; camBack: number; camUp: number; fov: number }
-const DEFAULTS: LookSettings = { height: 480, grain: 0.07, outline: true, speedLines: true, people: 1.3, camBack: 8.5, camUp: 4.3, fov: 68 };
-const STORE = 'clankers.look';
+const DEFAULTS: LookSettings = { height: 480, grain: 0.07, outline: true, speedLines: true, people: 1.2, camBack: 6.5, camUp: 3, fov: 60 };
+const STORE = 'clankers.look.v2'; // bump when defaults change, so old saved tweaks don't hide them
 
 function loadSettings(): LookSettings {
   try {

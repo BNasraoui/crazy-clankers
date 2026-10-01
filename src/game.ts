@@ -323,7 +323,7 @@ export class Game {
         this.tip('nearMiss', 1, 'CLOSE CALL');
       }
     }
-    const tev = this.traffic.update(dt, this.car);
+    const tev = this.traffic.update(dt, this.car, this.peds?.inRoad() ?? []);
     impact = Math.max(impact, tev.impact);
     if (tev.honk) sfx.honk();
 
@@ -718,7 +718,7 @@ export class Game {
       const c = t > 0.45 ? 0x7dff6a : t > 0.15 ? 0xffd23a : 0xff4a3a;
       this.arrowMat.color.set(c);
       this.arrowMat.emissive.set(c);
-      this.arrow.scale.setScalar(1);
+      this.arrow.scale.setScalar(0.8);
     } else {
       let best = Infinity;
       for (const w of this.waiting) {
@@ -727,14 +727,21 @@ export class Game {
       }
       this.arrowMat.color.set(0xffffff);
       this.arrowMat.emissive.set(0x888888);
-      this.arrow.scale.setScalar(0.6);
+      this.arrow.scale.setScalar(0.5);
     }
     this.arrow.visible = !!target && this.state === 'play';
     if (!target) return;
     const p = this.car.pos;
     const ahead = new THREE.Vector3(target.x - p.x, 0, target.z - p.z).normalize();
     // Centre the arrow over the cab; its pivot is the tail.
-    this.arrow.position.set(p.x - ahead.x * 1.65 * this.arrow.scale.x, p.y + 4.1 + Math.sin(this.clock * 4) * 0.1, p.z - ahead.z * 1.65 * this.arrow.scale.x);
+    // Float just under the camera's eye line, a little ahead of the cab, so it never blocks the road.
+    const height = Math.min(3.4, this.look.settings.camUp * 0.62 + 1.25);
+    const fwd = this.car.fwd;
+    this.arrow.position.set(
+      p.x + fwd.x * 2.2 - ahead.x * 1.65 * this.arrow.scale.x,
+      p.y + height + Math.sin(this.clock * 4) * 0.08,
+      p.z + fwd.y * 2.2 - ahead.z * 1.65 * this.arrow.scale.x,
+    );
     // Point level along the ground, but roll the arrow about its own length so
     // its face turns towards the camera and never reads as an edge-on slab.
     const dir = new THREE.Vector3(target.x - p.x, 0, target.z - p.z).normalize();

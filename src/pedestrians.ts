@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CHARACTER_LAYER } from './anime';
 import { groundAt } from './features';
-import { CELL, HALF, N, rng } from './world';
+import { CELL, HALF, N, STREET_HALF, rng } from './world';
 import type { Car } from './car';
 
 // Pedestrians are 2D sprites standing in the 3D world (like Paper Mario or
@@ -12,7 +12,7 @@ import type { Car } from './car';
 type Frame = 'front' | 'back' | 'walk1' | 'walk2' | 'dive'
   | 'fwalk1' | 'fwalk2' | 'bwalk1' | 'bwalk2' | 'swalk1' | 'swalk2' | 'swalk3' | 'swalk4';
 const PX_PER_M = 320 / 1.75; // sprites are cut at 320 px for a 1.75 m person
-const SIDEWALK = 10; // distance of the walking line from the street centreline
+const SIDEWALK = 7.2; // walking line, close to the curb, measured from the street centreline
 
 interface Kind { frames: Partial<Record<Frame, THREE.Texture>>; size: Partial<Record<Frame, [number, number]>> }
 
@@ -33,6 +33,7 @@ interface Ped {
   side: 1 | -1; // which sidewalk
   dir: 1 | -1;
   s: number;
+  cross?: { at: number; min: number; max: number; wait: number }; // crosswalk walkers go back and forth
   speed: number;
   phase: number;
   state: 'walk' | 'alert' | 'dive' | 'down';
@@ -127,13 +128,36 @@ export class Pedestrians {
         state: 'walk', t: 0, alert,
         pos: new THREE.Vector3(), vel: new THREE.Vector3(), diveDir: new THREE.Vector3(),
       });
+      // Every fourth person uses a crosswalk instead of a sidewalk.
+      if (k % 4 === 3) {
+        const p = this.peds[this.peds.length - 1];
+        const street = -HALF + (1 + Math.floor(r() * (N - 1))) * CELL; // the street being crossed
+        const corner = -HALF + (1 + Math.floor(r() * (N - 1))) * CELL; // the intersection it's next to
+        const at = corner + (r() < 0.5 ? -1 : 1) * (STREET_HALF + 1.5);
+        p.cross = { at, min: street - SIDEWALK, max: street + SIDEWALK, wait: r() * 3 };
+        p.s = p.cross.min + r() * (p.cross.max - p.cross.min);
+      }
     }
   }
 
   private walkPos(p: Ped, out: THREE.Vector3) {
+    if (p.cross) {
+      if (p.axis === 'z') out.set(p.cross.at, 0, p.s);
+      else out.set(p.s, 0, p.cross.at);
+      out.y = groundAt(out.x, out.z, false);
+      return out;
+    }
     if (p.axis === 'z') out.set(p.line + p.side * SIDEWALK, 0, p.s);
     else out.set(p.s, 0, p.line + p.side * SIDEWALK);
     out.y = groundAt(out.x, out.z, false);
+    return out;
+  }
+
+  // People out in the road, for traffic to stop for.
+  inRoad(): { x: number; z: number }[] {
+    const out: { x: number; z: number }[] = [];
+    for (const p of this.peds)
+      if (p.cross && p.state === 'walk' && Math.abs(p.s - (p.cross.min + p.cross.max) / 2) < STREET_HALF + 1) out.push({ x: p.pos.x, z: p.pos.z });
     return out;
   }
 
@@ -148,9 +172,22 @@ export class Pedestrians {
     const camRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
     for (const p of this.peds) {
       if (p.state === 'walk') {
-        p.s += p.dir * p.speed * dt;
-        if (p.s > HALF + 4) p.s = -HALF - 4;
-        if (p.s < -HALF - 4) p.s = HALF + 4;
+        if (p.cross) {
+          // Wait at the curb, then cross; turn round on the far side.
+          if (p.cross.wait > 0) p.cross.wait -= dt;
+          else {
+            p.s += p.dir * p.speed * dt;
+            if (p.s > p.cross.max || p.s < p.cross.min) {
+              p.s = Math.min(p.cross.max, Math.max(p.cross.min, p.s));
+              p.dir = p.dir === 1 ? -1 : 1;
+              p.cross.wait = 2 + Math.random() * 4;
+            }
+          }
+        } else {
+          p.s += p.dir * p.speed * dt;
+          if (p.s > HALF + 4) p.s = -HALF - 4;
+          if (p.s < -HALF - 4) p.s = HALF + 4;
+        }
         this.walkPos(p, p.pos);
         // Danger check: is the cab heading straight at me, fast?
         const dx = p.pos.x - car.pos.x, dz = p.pos.z - car.pos.z;
@@ -220,7 +257,7 @@ export class Pedestrians {
       const heading = p.axis === 'z' ? new THREE.Vector3(0, 0, p.dir) : new THREE.Vector3(p.dir, 0, 0);
       const toCam = new THREE.Vector3(cam.x - p.pos.x, 0, cam.z - p.pos.z).normalize();
       const c = heading.dot(toCam);
-      const moving = p.state === 'walk';
+      const moving = p.state === 'walk' && !(p.cross && p.cross.wait > 0);
       if (c > 0.72) frame = pick('front', moving);
       else if (c < -0.72) frame = pick('back', moving);
       else {

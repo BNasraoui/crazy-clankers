@@ -62,7 +62,7 @@ interface TCar {
 export interface TrafficEvents { impact: number; nearMisses: number; honk: boolean }
 
 const COLORS = [0x2d4a7a, 0x8a2b2b, 0x1f1f22, 0xd8d8d8, 0x4a6a3a, 0xc9a227, 0x6a6f78, 0x7a3f8a];
-const LANE = 4;
+const LANE = 3;
 // Each car is three circles along its length.
 const PARTS = [-1.4, 0, 1.4];
 const CARRIER_PARTS = [2.4, 3.6]; // only the cab is solid; the ramp is for driving on
@@ -117,7 +117,7 @@ export class Traffic {
     return c.axis === 'z' ? [0, c.dir] : [c.dir, 0];
   }
 
-  update(dt: number, player: Car): TrafficEvents {
+  update(dt: number, player: Car, walkers: { x: number; z: number }[] = []): TrafficEvents {
     this.clock += dt;
     const ev: TrafficEvents = { impact: 0, nearMisses: 0, honk: false };
     const pf = player.fwd;
@@ -136,6 +136,7 @@ export class Traffic {
       if (check(player.pos.x, player.pos.z)) { blocked = true; byPlayer = true; }
       if (!blocked && c.blockedFor < 3)
         for (const o of this.cars) if (o !== c && check(o.x, o.z)) { blocked = true; break; }
+      if (!blocked) for (const w of walkers) if (check(w.x, w.z)) { blocked = true; break; }
 
       if (c.stopped > 0) { c.stopped -= dt; c.speed = 0; }
       else if (blocked) { c.blockedFor += dt; c.speed = Math.max(0, c.speed - 25 * dt); }
