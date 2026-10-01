@@ -3,50 +3,50 @@
   {
    "id": "drop-barris",
    "kind": "drop",
-   "wall": "#a0644f",
-   "base": "#564e4d"
+   "wall": "#ca7859",
+   "base": "#736160"
   },
   {
    "id": "drop-burrito",
    "kind": "drop",
-   "wall": "#fec841",
-   "base": "#be625a"
+   "wall": "#e6bd58",
+   "base": "#aa7057"
   },
   {
    "id": "drop-crypto",
    "kind": "drop",
-   "wall": "#cdbb9f",
-   "base": "#d4b677"
+   "wall": "#f7e2b0",
+   "base": "#bdaa91"
   },
   {
    "id": "drop-lab",
    "kind": "drop",
-   "wall": "#fdd36a",
-   "base": "#dfc27e"
+   "wall": "#d8835b",
+   "base": "#a88871"
   },
   {
    "id": "drop-ladies-a",
    "kind": "drop",
-   "wall": "#e4d7be",
-   "base": "#aba290"
+   "wall": "#d6ccbb",
+   "base": "#9b9c9a"
   },
   {
    "id": "drop-ladies-b",
    "kind": "drop",
-   "wall": "#cbbba0",
-   "base": "#a19795"
+   "wall": "#e4dbbc",
+   "base": "#ad9fa2"
   },
   {
    "id": "drop-phlz",
    "kind": "drop",
-   "wall": "#765b3f",
-   "base": "#535e4d"
+   "wall": "#4e7457",
+   "base": "#506851"
   },
   {
    "id": "drop-seriesa",
    "kind": "drop",
-   "wall": "#5a3f22",
-   "base": "#3f372b"
+   "wall": "#d6bca3",
+   "base": "#4d4742"
   }
  ],
  "haight": [

@@ -1,33 +1,72 @@
+# Second pass at the drop-off drawings (2026-10-01): styled on crops of the key art, not on an elevation drawing.
+#   python3 drops.py <workdir> [id[:tag] ...]   -> <workdir>/<id>[-tag].png
+# <workdir> must hold style-*.png, crops of the buildings in public/keyart/ (see README).
 import os, subprocess, sys
 from concurrent.futures import ThreadPoolExecutor
-F = os.path.dirname(os.path.abspath(__file__))
-BASE = ('A single San Francisco building FRONT ELEVATION for use as a game texture. Perfectly straight-on orthographic elevation, no perspective, '
-        'flat even lighting with no cast shadows. The facade FILLS THE ENTIRE IMAGE edge to edge: no sky, no ground, no sidewalk, no neighbouring buildings, '
-        'no margins, no border. Bottom edge = where the building meets the sidewalk; top edge = top of the roofline or cornice. '
-        'Drawn in EXACTLY the style of the attached references: clean manga/anime ink linework, flat colours with one soft shadow tone, crisp and readable. '
-        'This is a one-of-a-kind, instantly recognisable landmark storefront in a satirical San Francisco tech comedy game. '
-        'Match the warm, sunny, pastel palette and the simple clean shapes of the reference facades exactly: no grey, gloomy, gritty or dark rendering, and keep small details sparse. '
-        'Apart from the one shop sign named below (spelled exactly), NO other text; NO real brand logos; NO people, NO cars, NO trees in front. Building: ')
+W = os.path.abspath(sys.argv[1])
+STYLE = ('Painted in EXACTLY the rendering style of the buildings in the attached key-art crops: a bright, sunny Japanese anime background '
+         'painting with crisp manga ink linework, like a frame from a modern cel-anime film: confident dark ink outlines on every edge and detail, '
+         'thin and slightly broken, varying in weight, and cel-shaded shadow shapes with crisp edges; '
+         'bright, clear, high-noon California sunlight (NOT golden hour, NOT sunset, NOT warm-orange cast) from the UPPER LEFT, with soft blue-violet cast shadows under every cornice, bay window, sill, awning and sign, '
+         'and shadowed reveals on the right side of each window and door opening; gentle light-to-shade gradients across each wall; '
+         'windows are glossy and reflect a deep blue sky with soft white cloud highlights and a few light streaks; '
+         'saturated, vivid, cheerful colour with crisp white highlights, warm sunlit highlights, rich, legible, hand-painted detail. It must NOT look like flat vector clip art, '
+         'an icon, an architectural line drawing, a CAD elevation or a smooth 3D render: no uniform heavy outlines, no flat unshaded fills. ')
+FORMAT = ('Composition: ONE building, a perfectly straight-on front elevation (orthographic, no perspective, no vanishing points), '
+          'for use as a game texture pasted on the front of a box. The facade FILLS THE ENTIRE IMAGE edge to edge: '
+          'NO sky anywhere, no ground, no street, no sidewalk, no neighbouring buildings, no margins, no border, no frame. '
+          'Bottom edge = the foot of the wall and the door thresholds, with NO strip of pavement or sidewalk below it; top edge = the top of the roof parapet or cornice cap (no sliver of sky above it); left and right edges = the building\'s sides. '
+          'Apart from the one shop sign named below (spelled exactly, letter for letter), NO other text; NO real brand logos; NO people, NO cars, NO trees in front. ')
 JOBS = {
- 'drop-lab': 'A cheerful startup headquarters called "THE LAB" in a two-storey SoMa brick warehouse painted warm butter yellow with teal window frames and a white cornice. Big multi-pane factory windows upstairs; on the ground floor one wide roll-up door left open, showing a few whiteboards with simple doodles and a ping-pong table as clean, simple shapes; a teal door; a bold hand-painted sign reading "THE LAB" on a white panel. Simple and uncluttered.',
- 'drop-crypto': 'A gaudy San Francisco Queen Anne Victorian mansion that a crypto millionaire has turned into a "castle", called "CRYPTO CASTLE", three storeys: cream paint with lots of shiny gold trim, a round corner turret with a gold conical roof, a crenellated parapet added along the roofline, a gold portcullis-style front door at the top of a stair, two hanging banners with a simple orange coin symbol (no real logos), and a gold sign reading "CRYPTO CASTLE". Sunny, bright, cheerful and a bit ridiculous.',
- 'drop-phlz': 'A third-wave coffee bar called "PHLZ COFFEE" on the ground floor of a narrow two-storey Edwardian building painted deep forest green with cream trim. Tall steel-framed windows showing a gleaming espresso machine, pour-over stands and minimalist wooden shelves; a hanging blade sign and a clean sans-serif sign reading "PHLZ COFFEE"; a chalkboard A-frame by the door (blank). Upstairs: two tall bay windows with plants.',
- 'drop-barris': 'A boutique fitness studio called "BARRI\'S BOOTCAMP" in a converted SoMa brick warehouse, two storeys. Big glass roll-up garage doors glowing red inside, with rows of treadmills and dumbbell racks visible as shapes; black steel frames; a bold red illuminated sign reading "BARRI\'S BOOTCAMP" across the top.',
- 'drop-seriesa': 'The street-level base (two storeys) of a downtown office tower housing an exclusive members-only venture capital club called "SERIES A LOUNGE": black marble and brass, tall brass double doors, a velvet rope on brass stanchions, warm amber light through smoked-glass windows, gold art-deco lettering reading "SERIES A LOUNGE" above the doors.',
- 'drop-lab-old': 'A scrappy startup headquarters called "THE LAB" in a small SoMa light-industrial building, two storeys, corrugated metal and painted concrete in grey with a safety-orange stripe. A half-open roll-up door showing whiteboards covered in diagrams, server racks with blinking lights, beanbags and a ping-pong table as shapes; a hand-painted sign reading "THE LAB"; a row of electric scooters parked outside as simple shapes.',
- 'drop-crypto-old': 'A gaudy faux-medieval castle mansion called "CRYPTO CASTLE" squeezed into a San Francisco city lot, three storeys: grey stone blocks, crenellated battlements on top, two small round turrets with gold conical roofs at the corners, a portcullis-style gate as the front door, gold trim everywhere, banners with a generic glowing orange coin symbol (no real logos), stone gargoyles with glowing red laser eyes, and a gold sign reading "CRYPTO CASTLE".',
- 'drop-burrito': 'A beloved Mission District taqueria called "BURRITO SPOT", two storeys, painted sunshine yellow with red trim. A huge colourful mural on the upper wall of a giant smiling burrito under an Aztec-style sun with marigolds; strings of papel picado over the door; big windows with a menu board shown as simple shapes; a red awning with the sign "BURRITO SPOT".',
- 'drop-ladies-a': 'Four of San Francisco\'s famous Painted Ladies on Postcard Row, side by side as one continuous elevation: identical tall narrow Queen Anne Victorian row houses, each three storeys with a steep pointed gable, a bay window, ornate gingerbread trim and a stair up to the front door. Colours left to right: powder blue, blush pink, butter yellow, mint green, each with cream and contrasting accent trim.',
- 'drop-ladies-b': 'Three of San Francisco\'s famous Painted Ladies on Postcard Row, side by side as one continuous elevation: identical tall narrow Queen Anne Victorian row houses, each three storeys with a steep pointed gable, a bay window, ornate gingerbread trim and a stair up to the front door. Colours left to right: lavender, peach, sky blue, each with cream and contrasting accent trim.',
+ 'drop-lab': 'A scrappy, lovable startup HQ called "THE LAB" in a two-storey SoMa brick light-industrial building with a flat parapet roofline. '
+             'Sun-warmed red-orange brick with a pale cream painted band and cornice, a hand-painted cream sign board above the ground floor with bold '
+             'hand-lettered teal-and-black letters reading "THE LAB". Upstairs: a row of big steel multi-pane factory windows, one pane patched with cardboard, '
+             'a window unit and a tangle of cables. Ground floor: a wide roll-up garage door rolled half open, showing a cluttered, warm-lit interior with '
+             'whiteboards full of scribbled diagrams, a ping-pong table, beanbags and blinking server racks; a scuffed steel side door with taped-up paper notes; '
+             'a few rental e-scooters leaning against the wall; a little cheerful sticker graffiti. Satirical, scrappy, sunny.',
+ 'drop-crypto': 'A crypto millionaire\'s gaudy faux castle squeezed into a narrow San Francisco city lot, called "CRYPTO CASTLE", three storeys: '
+                'pale sandstone blocks with far too much shiny gold trim, a crenellated battlement parapet along the top edge of the image, where the gaps between the '
+                'merlons are backed by a taller cream stone wall behind them, so NO sky shows anywhere, '
+                'two squat round corner towers that rise flush with the parapet (their battlements form the top edge too, NO pointed roofs, NO sky), '
+                'tall pointed Gothic windows with gold tracery, a gold portcullis gate as the front door at the top of a short stair, '
+                'two hanging purple banners with a generic glowing orange coin symbol (no real logos), a pair of stone gargoyles with red laser eyes, '
+                'a security camera, and an ornate gold sign over the gate reading "CRYPTO CASTLE". The deep window and gate recesses, the overhanging battlements and the round towers '
+                'cast strong, crisp blue-violet shadows to the lower right, so the stone has real form and depth. Bright, sunny, ridiculous.',
+ 'drop-phlz': 'A third-wave coffee bar called "PHLZ COFFEE" on the ground floor of a narrow two-storey Edwardian building painted deep forest green with cream trim '
+              'and a bracketed cream cornice along the top. Ground floor: tall black steel-framed shop windows showing a gleaming espresso machine, pour-over stands, '
+              'minimalist wooden shelves of coffee bags and hanging plants; a glass door in the middle; a small hanging blade sign; a clean cream sans-serif sign '
+              'reading "PHLZ COFFEE" on the green fascia; a blank chalkboard A-frame by the door. Upstairs: two angled bay windows with plants.',
+ 'drop-barris': 'A boutique fitness studio called "BARRI\'S BOOTCAMP" in a converted two-storey SoMa red-brick warehouse with a simple brick parapet. '
+                'Big glass roll-up garage doors across the ground floor and big multi-pane windows upstairs, all glowing with red studio light inside, '
+                'with rows of treadmills and dumbbell racks visible; black steel frames and gooseneck lamps; a bold red illuminated channel-letter sign '
+                'reading "BARRI\'S BOOTCAMP" across the top. The sunlit brick outside is warm and bright, contrasting with the red glow.',
+ 'drop-seriesa': 'The street-level base (two storeys) of a downtown art-deco office tower housing an exclusive members-only venture capital club called '
+                 '"SERIES A LOUNGE": polished black marble piers and brass trim, a stone band course along the top edge, tall brass double doors in the centre, '
+                 'a red velvet rope on brass stanchions, warm amber-lit lounges with leather chairs seen through smoked-glass windows, brass wall lanterns, and '
+                 'gold art-deco lettering reading "SERIES A LOUNGE" above the doors. Sunlight glints on the marble and brass.',
+ 'drop-burrito': 'A beloved Mission District taqueria called "BURRITO SPOT", a two-storey Italianate building painted sunshine yellow with red and teal trim '
+                 'and a bracketed cornice on top. A big colourful hand-painted mural on the upper wall between the windows: a giant smiling burrito under an '
+                 'Aztec-style sun with marigolds; a red scalloped awning with the sign "BURRITO SPOT"; strings of papel picado over the door; big shop windows '
+                 'with a hand-painted menu board and a busy warm-lit counter inside; potted agaves by the door.',
+ 'drop-ladies-a': 'Four of San Francisco\'s famous Painted Ladies on Postcard Row, side by side as one continuous elevation filling the frame: identical tall narrow '
+                  'Queen Anne Victorian row houses, each three storeys with a steep pointed gable, a two-storey angled bay window, ornate gingerbread trim, '
+                  'and a stair up to an arched porch and front door. Colours left to right: powder blue, blush pink, butter yellow, mint green, each with cream and '
+                  'contrasting accent trim. The triangles between and above the gables are filled with the dark grey slate roof behind them, so NO sky shows.',
+ 'drop-ladies-b': 'Three of San Francisco\'s famous Painted Ladies on Postcard Row, side by side as one continuous elevation filling the frame: identical tall narrow '
+                  'Queen Anne Victorian row houses, each three storeys with a steep pointed gable, a two-storey angled bay window, ornate gingerbread trim, '
+                  'and a stair up to an arched porch and front door. Colours left to right: lavender, peach, sky blue, each with cream and contrasting accent trim. '
+                  'The triangles between and above the gables are filled with the dark grey slate roof behind them, so NO sky shows.',
 }
-def run(k):
-    if os.path.exists(f'{F}/city/{k}.png'): print(k, 'exists'); return
+def run(spec):
+    k, _, tag = spec.partition(':')
+    name = f'{k}-{tag}' if tag else k
+    if os.path.exists(f'{W}/{name}.png'): print(name, 'exists'); return
     full = ('Use your built-in image generation tool to create exactly ONE image, then save/copy the generated PNG into the current directory as '
-            f'{k}.png and print its absolute path. Do not write any code or other files. Image prompt: ' + BASE + JOBS[k] + ' Landscape 3:2.')
-    with open(f'{F}/city/{k}.log', 'w') as log:
-        subprocess.run(['codex', 'exec', '--skip-git-repo-check', '-s', 'workspace-write', '-C', f'{F}/city',
-                        '-i', f'{F}/ref-facade.png', '-i', f'{F}/ref-jump.png', '-i', f'{F}/city/drop-burrito.png', '-i', f'{F}/city/nb-3.png', '--', full],
+            f'{name}.png and print its absolute path. Do not write any code or other files. Image prompt: ' + STYLE + FORMAT + 'Building: ' + JOBS[k] +
+            ' Landscape 3:2.')
+    refs = [x for f in ('style-rank.png', 'style-jump.png', 'style-chaos.png') for x in ('-i', f'{W}/{f}')]
+    with open(f'{W}/{name}.log', 'w') as log:
+        subprocess.run([os.path.expanduser('~/.local/bin/codex'), 'exec', '--skip-git-repo-check', '-s', 'workspace-write', '-C', W, *refs, '--', full],
                        stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
-    print(k, 'ok' if os.path.exists(f'{F}/city/{k}.png') else 'MISSING', flush=True)
-ids = sys.argv[1:] or list(JOBS)
-with ThreadPoolExecutor(max_workers=2) as ex: list(ex.map(run, ids))
+    print(name, 'ok' if os.path.exists(f'{W}/{name}.png') else 'MISSING', flush=True)
+with ThreadPoolExecutor(max_workers=2) as ex: list(ex.map(run, sys.argv[2:] or list(JOBS)))
