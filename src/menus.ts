@@ -24,7 +24,7 @@ export function titleHTML(padName: string) {
   const art = KEYART[keyartIndex++ % KEYART.length];
   return `
     <div class="menu title-screen">
-      <img class="keyart" src="/keyart/${art}.jpg" alt="">
+      <img class="keyart" src="/keyart/${art}.avif" alt="">
       <div class="logo-block">${LOGO}<div class="tag">You are AGI. Drive like it.</div></div>
       <div class="press-start">${phrase(`PRESS ${glyph('a', 'A')} TO START`, `PRESS ${keycap('Enter')} TO START`, 'TAP TO START')}</div>
       <button class="radio-menu-button" data-radio-open>${key('radio')} Radio</button>

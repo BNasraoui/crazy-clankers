@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+
+// Every .glb is meshopt-compressed (gltf-transform meshopt), so loaders need the decoder.
+export const gltfLoader = () => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 import { toon } from './look';
 
 // The SF street kit (assets/blender/street_kit.py): trees, lamps, poles, shelters
@@ -35,7 +39,7 @@ const LANDMARKS = ['salesfarce_tower', 'pyramid', 'ferry_building', 'coit_tower'
 
 // Loads the street kit and the landmarks; a model that fails to load is just missing.
 export async function loadStreetKit() {
-  const loader = new GLTFLoader();
+  const loader = gltfLoader();
   const jobs = [...KIT.map((id) => ({ id, dir: 'street', into: kit })), ...LANDMARKS.map((id) => ({ id, dir: 'landmarks', into: landmarkModels }))];
   await pool(jobs, 4, async ({ id, dir, into }) => {
     try {

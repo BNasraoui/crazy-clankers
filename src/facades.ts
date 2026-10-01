@@ -22,7 +22,7 @@ export async function loadFacades() {
   const ids = [...new Set(Object.values(facadeSets).flat().map((f) => f.id))];
   await pool(ids, 4, async (id) => {
     try {
-      const tex = await retry(() => loader.loadAsync(`/facades/${id}.jpg`));
+      const tex = await retry(() => loader.loadAsync(`/facades/${id}.avif`));
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = 8;
       if (repeats.has(id)) tex.wrapS = tex.wrapT = THREE.RepeatWrapping; // tiles and lobbies repeat

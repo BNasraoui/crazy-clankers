@@ -14,7 +14,7 @@ export async function loadSky() {
   const loader = new THREE.TextureLoader();
   await pool(IMAGES, 3, async (id) => {
     try {
-      const tex = await retry(() => loader.loadAsync(`/sky/${id}.png`));
+      const tex = await retry(() => loader.loadAsync(`/sky/${id}.avif`));
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = 4;
       textures.set(id, tex);

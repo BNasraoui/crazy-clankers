@@ -93,7 +93,7 @@ export class Pedestrians {
     const kinds: Kind[] = await Promise.all(Object.entries(meta).map(async ([id, size]) => {
       const frames: Partial<Record<Frame, THREE.Texture>> = {};
       await Promise.all((Object.keys(size) as Frame[]).map(async (f) => {
-        const tex = await loader.loadAsync(`/sprites/${id}-${f}.png`);
+        const tex = await loader.loadAsync(`/sprites/${id}-${f}.avif`);
         tex.colorSpace = THREE.SRGBColorSpace;
         tex.anisotropy = 4;
         frames[f] = tex;

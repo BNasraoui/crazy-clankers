@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { gltfLoader } from './scenery';
 import { toon } from './look';
 import { makeCharacter } from './anime';
 
@@ -41,18 +41,10 @@ function addWheels(body: THREE.Group, halfW: number, front: number, back: number
   return { wheels, steer };
 }
 
-// Blender-built passengers, keyed by passenger id. Missing ones fall back to box people.
+// Blender-built passengers, keyed by passenger id. Passengers are drawn as sprites now, so none are
+// loaded (the Tech Bro model lives in assets/models); without a sprite they fall back to box people.
 export async function loadPeople(): Promise<Partial<Record<string, THREE.Object3D>>> {
-  const people: Partial<Record<string, THREE.Object3D>> = {};
-  for (const id of ['techbro']) {
-    try {
-      const gltf = await new GLTFLoader().loadAsync(`/models/${id}.glb`);
-      people[id] = makeCharacter(gltf.scene);
-    } catch (err) {
-      console.warn(`Using the box ${id}:`, err);
-    }
-  }
-  return people;
+  return {};
 }
 
 export function personFrom(template: THREE.Object3D): PersonModel {
@@ -85,7 +77,7 @@ const CAR_PALETTES: Record<string, Record<string, number>> = {
 };
 
 export async function loadCars(): Promise<void> {
-  const loader = new GLTFLoader();
+  const loader = gltfLoader();
   await Promise.all([...CABS.map((c) => c.id), ...EXTRA_CARS].map(async (id) => {
     try {
       const gltf = await loader.loadAsync(`/models/${id}.glb`);

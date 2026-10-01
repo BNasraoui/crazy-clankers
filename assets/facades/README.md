@@ -41,3 +41,8 @@ not a castle, and asks for cool midday light so the white paint and gold glass d
 Pick: `drop-crypto-b1.png` from the fourth of four tries. `wall` was sampled by hand from the sunlit siding,
 because body_colour picks the shaded blue. `process_drops.py` now takes optional ids, so a single drawing can be
 reprocessed. `refs/crypto-redo/` has the before/after and the in-game shot.
+
+## Web formats (2026-10-02)
+The game loads **AVIF** images and **meshopt-compressed** models, not the JPG/PNG and plain GLB the scripts here produce.
+After writing new art into `public/`, run `scripts/avif.sh` (converts every JPG/PNG under `public/` to AVIF at quality 60
+and removes the original) and compress new models with `npx @gltf-transform/cli meshopt in.glb out.glb`.

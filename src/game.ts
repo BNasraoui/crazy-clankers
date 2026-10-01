@@ -188,7 +188,7 @@ export class Game {
       const el = $('#quip');
       const face = $<HTMLImageElement>('#quip .face');
       face.hidden = speaker === 'cab';
-      if (speaker !== 'cab') face.src = `/portraits/${speaker}.jpg`;
+      if (speaker !== 'cab') face.src = `/portraits/${speaker}.avif`;
       el.classList.remove('hidden');
       el.style.animation = 'none';
       void el.offsetWidth;
@@ -957,7 +957,7 @@ export class Game {
     fare.classList.toggle('hidden', !r);
     if (r) {
       const face = $<HTMLImageElement>('#fare .face');
-      const src = `/portraits/${r.type.id}.jpg`;
+      const src = `/portraits/${r.type.id}.avif`;
       if (!face.src.endsWith(src)) face.src = src;
       const who = $('#fare .who');
       who.textContent = r.type.label.replace('★ ', '★ ');
