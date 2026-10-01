@@ -14,6 +14,7 @@ import { Geysers, Particles, Props, type PropKind } from './props';
 import type { Pedestrians } from './pedestrians';
 import { SpritePerson, type SpriteSet } from './spritepeople';
 import { Trees } from './trees';
+import { CableCars } from './cablecar';
 import { BAY, Rank, snapshotCabs } from './rank';
 import { burst, howToHTML, pickerHTML, titleHTML } from './menus';
 
@@ -88,6 +89,7 @@ export class Game {
   private particles: Particles;
   private geysers: Geysers;
   private trees = new Trees();
+  private cableCars!: CableCars;
   peds: Pedestrians | null = null;
   paxSprites: Record<string, SpriteSet> = {};
   private maxAir = 0;
@@ -138,6 +140,7 @@ export class Game {
     this.car = new Car(cab);
     this.traffic = new Traffic(this.scene, 46, this.rivals());
     this.rank = new Rank(this.scene, this.cabIndex);
+    this.cableCars = new CableCars(this.scene);
     this.thumbs = snapshotCabs(renderer);
 
     // Flat, chunky arrow like the original's.
@@ -221,6 +224,7 @@ export class Game {
     if (this.state === 'title' || this.state === 'picker') {
       this.menuFrame(dt, inp);
       this.traffic.update(dt, this.car);
+      this.cableCars.update(dt, this.car);
       this.peds?.update(dt, this.car, this.camera);
       this.idleAnimations(dt);
     } else if (this.state === 'paused') {
@@ -418,6 +422,7 @@ export class Game {
       }
     }
     const tev = this.traffic.update(dt, this.car, this.peds?.inRoad() ?? []);
+    impact = Math.max(impact, this.cableCars.update(dt, this.car));
     impact = Math.max(impact, tev.impact);
     if (tev.honk) sfx.honk();
 
