@@ -1,0 +1,47 @@
+{
+  "triangles": 28690,
+  "nodes": 7,
+  "meshes": 6,
+  "materials": 16,
+  "textures": [
+    {
+      "name": "shirt",
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "name": "techbro_face_cylindrical",
+      "width": 2048,
+      "height": 2048
+    },
+    {
+      "name": "techbro_hair_flow",
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "name": "techbro_chino_seams",
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "name": "vest",
+      "width": 1024,
+      "height": 1024
+    }
+  ],
+  "bounds": [
+    [
+      -0.3030290901660919,
+      0.00019401311874389648,
+      -0.17745531164109707
+    ],
+    [
+      0.33600640296936035,
+      1.7965776920318604,
+      0.23538269102573395
+    ]
+  ],
+  "bytes": 1122052,
+  "cab_sha256": "c166f5c3f6e92ebd2c89c72f78c43c830ed1df1bf4c910afdd45353e2e40c33d"
+}

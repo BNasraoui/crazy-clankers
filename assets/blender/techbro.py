@@ -1,13 +1,13 @@
-"""The Tech Bro: navy fleece vest, light blue shirt with rolled sleeves, khakis, white
-sneakers, iced cold brew, soft brown anime hair, smug little smile.
+"""Tech Bro v4: open navy fleece, rolled oxford sleeves, khakis and cold brew.
 
-Flat early-2000s anime-cel proportions: about 6.7 heads tall, rounded tapered limbs,
-relaxed contrapposto (weight on his left leg, hip out, other knee bent), left hand in
-his pocket, cold brew held up at chest height, head tilted towards the cup.
+A sculpted sectional head with a cylindrical face atlas and broad swept hair
+clumps, posed in relaxed contrapposto. Export plain role materials before adding
+preview-only N.L shading and position-merged inverted hulls. Seven transform
+nodes; no skeleton. The cup remains under the +X shoulder's arm_R node.
 
-Nodes: techbro (root) > legs, torso, head, arm_L, arm_R > cup.
-He faces +Z in the game. arm_R sits at +X so the game's wave (arm_R.rotation.z = 2.6)
-raises it up and outwards; the cup rides along in that hand.
+Run build.sh, or blender --background --factory-startup --python techbro.py.
+`-- quick` renders the head only without changing the GLB; `-- quick body` also
+renders the contact sheet. Full builds always export and render all four files.
 """
 import math
 import sys
@@ -15,454 +15,460 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import bmesh  # noqa: E402
-import bpy  # noqa: E402
-from mathutils import Matrix, Vector  # noqa: E402
-from mathutils.bvhtree import BVHTree  # noqa: E402
+from mathutils import Vector  # noqa: E402
 
+import anime as A  # noqa: E402
 import common as C  # noqa: E402
+from anime import g, gv, lerp  # noqa: E402
+
+ARGS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 
 PALETTE = {
-    "skin": 0xF1C8A8,
-    "hair": 0x4A2E1E,
-    "vest": 0x26324A,
-    "shirt": 0x9CC3E6,
-    "pants": 0xC9B184,
-    "shoes": 0xE9ECF0,
-    "sole": 0xFFFFFF,
-    "cup": 0xDCECF0,
-    "coffee": 0x4B2C1A,
-    "straw": 0x1F1F1F,
-    "line_dark": 0x1A1414,
+    "skin": 0xF3BE96,
+    "face": 0xF3BE96,
+    "hair": 0x3C2F29,
+    "vest": 0x30374B,
+    "shirt": 0xA6BEDF,
+    "pants": 0xD4BA94,
+    "shoes": 0xF2F2F0,
+    "sole": 0xE7E5E0,
+    "cup": 0xE4EEF2,
+    "coffee": 0x5A3420,
+    "straw": 0x222222,
+    "ear_ink": 0xB87958,
+    "seam": 0x555C68,
+    "shoe_panel": 0xCDCFD0,
+    "outsole": 0x45484F,
+    "ice": 0xB49069,
 }
 MATS = list(PALETTE)
-SMOOTH = 50  # degrees; soft rounded forms, only real creases stay crisp
+SMOOTH = 115  # degrees: everything reads as smooth, only real creases stay crisp
+TRI_BUDGET = 30000
 
-# Joints, game coordinates (Y up, +Z forward, metres).
-SHOULDER_R = Vector((0.205, 1.395, 0.0))
-SHOULDER_L = Vector((-0.205, 1.375, 0.0))  # weight side: shoulder drops
-PELVIS = Vector((-0.035, 0.93, 0.005))     # hip pushed out over the standing leg
-HIP_ROLL, SHOULDER_ROLL = -6.0, 4.0        # degrees about Z; contrapposto counter-tilt
-HEAD_C = Vector((0, 1.615, 0.012))         # skull centre before the head tilt
-HEAD_R = (0.112, 0.133, 0.12)
-NECK = Vector((0, 1.42, 0))                # head pivot
-
-
-def g(x, y, z):
-    """Game coordinates (Y up, +Z forward) to Blender (Z up, -Y forward)."""
-    return Vector((x, -z, y))
+# --- proportions (game space: Y up, +Z forward, metres) ---------------------------
+HEAD_C = Vector((0, 1.65, 0.012))
+NECK = Vector((0, 1.44, -0.012))            # head pivot
+SHOULDER_R = Vector((0.172, 1.414, -0.014))  # cup arm (+X)
+SHOULDER_L = Vector((-0.172, 1.402, -0.014))
+HIP_ROLL, SHOULDER_ROLL = 4.0, -4.0          # degrees about Z; +X hip up (weight leg)
+PELVIS = Vector((0.038, 0.9, 0.0))
+HEAD_TILT = ((4, (0, 0, 1)), (0, (0, 1, 0)), (-12, (1, 0, 0)))  # roll to cup, turn, chin up
 
 
-def gv(v):
-    return g(*v)
+def sway(p):
+    """Contrapposto: roll each torso slice about Z, interpolating hip to shoulder roll,
+    and shift the hips over the standing leg."""
+    t = A.smoothstep(0.9, 1.4, p.y)
+    r = math.radians(lerp(HIP_ROLL, SHOULDER_ROLL, t))
+    cx = lerp(PELVIS.x, 0.0, t)
+    return Vector((cx + p.x * math.cos(r), p.y + p.x * math.sin(r), p.z))
 
 
-def to_game(co):
-    return Vector((co.x, co.z, -co.y))
+def apply(b, fn):
+    for v in b.bm.verts:
+        v.co = gv(fn(A.to_game(v.co)))
 
 
-def grot(deg, axis):
-    """Blender-space rotation about a game-space axis."""
-    return Matrix.Rotation(math.radians(deg), 3, gv(axis))
-
-
-def rot_xy(v, deg):
-    a = math.radians(deg)
-    return Vector((v.x * math.cos(a) - v.y * math.sin(a), v.x * math.sin(a) + v.y * math.cos(a), v.z))
-
-
-# --- lofted shapes -----------------------------------------------------------
-# A ring is (centre, u, w, rx, rz, p) in game space: a superellipse of radii rx along u
-# and rz along w (p=2 is an ellipse, higher is boxier).
-
-def ring(c, rx, rz, roll=0.0, pitch=0.0, p=2.0):
-    """Horizontal ring, rolled about Z and pitched about X (positive pitch drops the front)."""
-    m = Matrix.Rotation(math.radians(roll), 3, "Z") @ Matrix.Rotation(math.radians(pitch), 3, "X")
-    return (Vector(c), m @ Vector((1, 0, 0)), m @ Vector((0, 0, 1)), rx, rz, p)
-
-
-def path_rings(pts, radii, ref, p=2.0, closed=False):
-    """Rings perpendicular to a polyline. `ref(i, c)` (or a vector) gives the rz direction."""
-    pts = [Vector(q) for q in pts]
-    n = len(pts)
-    out = []
-    for i, c in enumerate(pts):
-        if closed:
-            t = pts[(i + 1) % n] - pts[i - 1]
-        else:
-            t = pts[min(i + 1, n - 1)] - pts[max(i - 1, 0)]
-        t.normalize()
-        r = Vector(ref(i, c) if callable(ref) else ref)
-        w = (r - t * r.dot(t)).normalized()
-        u = t.cross(w)
-        rx, rz = radii[i]
-        out.append((c, u, w, rx, rz, p))
-    return out
-
-
-def loft(b, mat, rings, sides, cap0="flat", cap1="flat", closed=False):
-    """Skin rings into a closed shell. A cap is "flat", None, or a tip point (game space)."""
-    before = b._begin()
-    bm = b.bm
-    loops = []
-    for c, u, w, rx, rz, p in rings:
-        loop = []
-        for k in range(sides):
-            a = 2 * math.pi * (k + 0.5) / sides
-            ca, sa = math.cos(a), math.sin(a)
-            x = math.copysign(abs(ca) ** (2 / p), ca)
-            z = math.copysign(abs(sa) ** (2 / p), sa)
-            loop.append(bm.verts.new(gv(c + u * (rx * x) + w * (rz * z))))
-        loops.append(loop)
-    pairs = list(zip(loops, loops[1:])) + ([(loops[-1], loops[0])] if closed else [])
-    for l0, l1 in pairs:
-        for k in range(sides):
-            j = (k + 1) % sides
-            bm.faces.new((l0[k], l0[j], l1[j], l1[k]))
-    if not closed:
-        for loop, cap in ((loops[0], cap0), (loops[-1], cap1)):
-            if cap is None:
-                continue
-            if isinstance(cap, str):
-                bm.faces.new(loop)
-            else:
-                tip = bm.verts.new(gv(cap))
-                for k in range(sides):
-                    bm.faces.new((loop[k], loop[(k + 1) % sides], tip))
-    return b._assign(before, mat)
-
-
-def catmull(pts, steps=2):
-    """Catmull-Rom through `pts`, `steps` samples per segment."""
-    pts = [Vector(q) for q in pts]
-    ext = [pts[0] * 2 - pts[1]] + pts + [pts[-1] * 2 - pts[-2]]
-    out = []
-    for i in range(1, len(ext) - 2):
-        p0, p1, p2, p3 = ext[i - 1:i + 3]
-        for s in range(steps):
-            t = s / steps
-            out.append(0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t
-                              + (3 * p1 - p0 - 3 * p2 + p3) * t * t * t))
-    out.append(pts[-1])
-    return out
-
-
-def decal(b, mat, bvh, pts, z0=1.0, depth=0.008, lift=0.0015, step=None):
-    """A thin plate following the existing surface: the game-space (x, y) outline is
-    projected along -Z onto `bvh` and thickened along the surface normal."""
-    before = b._begin()
-    bm = b.bm
-    dense = []  # with `step`, subdivide long edges so the plate hugs the faceted surface
-    for i, (x0, y0) in enumerate(pts):
-        x1, y1 = pts[(i + 1) % len(pts)]
-        k = max(1, math.ceil(math.hypot(x1 - x0, y1 - y0) / step)) if step else 1
-        dense += [(x0 + (x1 - x0) * j / k, y0 + (y1 - y0) * j / k) for j in range(k)]
-    front, back = [], []
-    for x, y in dense:
-        hit, n, _i, _d = bvh.ray_cast(g(x, y, z0), gv((0, 0, -1)))
-        assert hit is not None, f"decal point {(x, y)} missed the surface"
-        front.append(bm.verts.new(hit + n * (lift + depth / 2)))
-        back.append(bm.verts.new(hit + n * (lift - depth / 2)))
-    bm.faces.new(front)
-    bm.faces.new(list(reversed(back)))
-    k = len(dense)
-    for i in range(k):
-        j = (i + 1) % k
-        bm.faces.new((back[i], back[j], front[j], front[i]))
-    return b._assign(before, mat)
-
-
-def ellipse_pts(cx, cy, rx, ry, n=8, rot=0.0):
-    a0 = math.radians(rot)
-    return [(cx + rx * math.cos(2 * math.pi * k / n) * math.cos(a0) - ry * math.sin(2 * math.pi * k / n) * math.sin(a0),
-             cy + rx * math.cos(2 * math.pi * k / n) * math.sin(a0) + ry * math.sin(2 * math.pi * k / n) * math.cos(a0))
-            for k in range(n)]
-
-
-def limb(b, mat, pts, radii, sides, ref=(0, 0, 1), cap0="flat", cap1="flat", p=2.0):
-    return loft(b, mat, path_rings(pts, radii, ref, p), sides, cap0, cap1)
-
-
-# --- legs --------------------------------------------------------------------
-
-def knee_ik(hip, ankle, thigh, shin, bend):
-    """Two-bone solve; `bend` is the direction the knee pushes towards."""
-    d = ankle - hip
-    dist = d.length
-    if dist >= thigh + shin:
-        return hip + d * (thigh / (thigh + shin))
-    a = (thigh ** 2 - shin ** 2 + dist ** 2) / (2 * dist)
-    h = math.sqrt(max(thigh ** 2 - a ** 2, 0.0))
-    dn = d.normalized()
-    perp = (Vector(bend) - dn * Vector(bend).dot(dn)).normalized()
-    return hip + dn * a + perp * h
-
-
-def hip_joint(sx):
-    return PELVIS + rot_xy(Vector((sx * 0.092, -0.02, 0)), HIP_ROLL)
-
+# --- legs ----------------------------------------------------------------------
 
 def leg(b, hip, knee, ankle):
-    """Khaki leg: wide thigh, a little slack at the knee, slimmer shin, loose hem."""
-    def lerp(a, c, t):
-        return a + (c - a) * t
-    pts = [hip + Vector((0, 0.035, -0.01)), hip, lerp(hip, knee, 0.3), lerp(hip, knee, 0.65), knee,
-           lerp(knee, ankle, 0.3), lerp(knee, ankle, 0.65), ankle + Vector((0, 0.03, 0)), ankle]
-    radii = [(0.07, 0.07), (0.09, 0.09), (0.09, 0.096), (0.079, 0.084), (0.07, 0.075),
-             (0.064, 0.067), (0.06, 0.063), (0.063, 0.066), (0.069, 0.072)]
-    limb(b, "pants", pts, radii, 10, cap0=hip + Vector((0, 0.06, -0.01)))
+    """Slim chinos: full thigh, narrow knee, a little break above the hem."""
+    offset=knee-lerp(hip,ankle,.5)
+    pts=[];rad=[]
+    for i in range(29):
+        t=i/28
+        c=lerp(hip+Vector((0,.07,0)),ankle+Vector((0,.006,0)),t)+offset*math.sin(math.pi*t)
+        rx=lerp(.085,.055,t)-.005*math.exp(-((t-.55)/.13)**2)
+        rz=lerp(.088,.059,t)-.004*math.exp(-((t-.55)/.13)**2)
+        ankle_fold=.008*math.exp(-((t-.955)/.027)**2)
+        pts.append(c);rad.append((rx+ankle_fold,rz+ankle_fold))
+    faces=A.loft(b,"pants",A.path_rings(pts,rad,(0,0,1)),18)
+    for v in {v for f in faces for v in f.verts}:
+        p=A.to_game(v.co)
+        t=max(0,min(1,(hip.y+.07-p.y)/(hip.y+.064-ankle.y)))
+        c=lerp(hip+Vector((0,.07,0)),ankle+Vector((0,.006,0)),t)+offset*math.sin(math.pi*t)
+        a=math.atan2(p.x-c.x,p.z-c.z)
+        # Soft diagonal folds, continuous around the knee instead of ring-shaped cuts.
+        fold=.004*math.sin(a*1.5+(p.y-knee.y)*57)*math.exp(-((p.y-knee.y)/.075)**2)
+        fold+=.003*math.sin(a*2+(p.y-ankle.y)*92)*math.exp(-((p.y-ankle.y-.04)/.05)**2)
+        p.x+=math.sin(a)*fold;p.z+=math.cos(a)*fold;v.co=gv(p)
 
 
 def shoe(b, ankle, yaw):
-    """Chunky sneaker: separate white sole slab with a raised heel, rounded toe box."""
+    """Chunky sneaker: a hard-edged sole slab, rounded upper with a high heel collar."""
     f = Vector((math.sin(math.radians(yaw)), 0, math.cos(math.radians(yaw))))
     base = Vector((ankle.x, 0, ankle.z))
 
     def at(t, y):
         return base + f * t + Vector((0, y, 0))
-    # Sole: rounded-rectangle sections; thicker at the heel, toe springs up a touch.
-    st = [-0.085, -0.07, -0.02, 0.06, 0.13, 0.17, 0.19]
-    sw = [0.03, 0.044, 0.047, 0.055, 0.054, 0.044, 0.026]
-    sh = [0.042, 0.044, 0.04, 0.032, 0.028, 0.028, 0.024]
-    lift = [0.0, 0.0, 0.0, 0.0, 0.002, 0.006, 0.011]
-    rings = path_rings([at(t, lift[i] + sh[i] / 2) for i, t in enumerate(st)],
-                       [(sw[i] * 1.12, sh[i] / 2) for i in range(len(st))], (0, 1, 0), p=4.0)
-    loft(b, "sole", rings, 8)
-    # Upper: high heel collar, rounded toe box sitting on the sole.
-    ut = [-0.078, -0.064, -0.02, 0.04, 0.1, 0.145, 0.172]
-    uw = [0.032, 0.043, 0.046, 0.05, 0.05, 0.042, 0.026]
-    uh = [0.05, 0.058, 0.06, 0.046, 0.034, 0.027, 0.018]
-    sole_top = [0.043, 0.044, 0.041, 0.034, 0.031, 0.034, 0.035]
-    rings = path_rings([at(t, sole_top[i] + uh[i] * 0.85) for i, t in enumerate(ut)],
-                       [(uw[i] * 1.12, uh[i] * 1.06) for i in range(len(ut))], (0, 1, 0))
-    loft(b, "shoes", rings, 10, cap1=at(0.182, 0.04))
+    st = [-0.09, -0.075, -0.02, 0.06, 0.13, 0.175, 0.198]
+    sw = [0.032, 0.046, 0.05, 0.057, 0.056, 0.046, 0.026]
+    sh = [0.036, 0.036, 0.034, 0.028, 0.026, 0.026, 0.024]
+    lift = [0.0, 0.0, 0.0, 0.0, 0.002, 0.006, 0.012]
+    rings = A.path_rings([at(t, lift[i] + sh[i] / 2) for i, t in enumerate(st)],
+                         [(sw[i] * 1.1, sh[i] / 2) for i in range(len(st))], (0, 1, 0), p=5.0)
+    A.loft(b, "sole", rings, 12)
+    A.loft(b,"outsole",A.path_rings([at(t,.006+lift[i]) for i,t in enumerate(st)],
+        [(sw[i]*1.1,.004) for i in range(len(st))],(0,1,0),p=5.0),12)
+    ut = [-0.083, -0.07, -0.02, 0.04, 0.1, 0.15, 0.178]
+    uw = [0.034, 0.045, 0.048, 0.052, 0.052, 0.043, 0.026]
+    uh = [0.052, 0.06, 0.062, 0.046, 0.033, 0.026, 0.017]
+    top = [0.036, 0.036, 0.034, 0.029, 0.027, 0.031, 0.034]
+    pts = [at(t, top[i] + uh[i] * 0.85) for i, t in enumerate(ut)]
+    rad = [(uw[i] * 1.08, uh[i] * 1.05) for i in range(len(ut))]
+    A.loft(b, "shoes", A.path_rings(A.catmull(pts, 2), [r[:2] for r in A.catmull_vals(rad, 2)], (0, 1, 0)),
+           12, cap1=at(0.188, 0.036))
+
+    across=Vector((f.z,0,-f.x))
+    # Toe cap seam, side panels, tongue and six crossing laces.
+    for side in [-1,1]:
+        pts=[at(t,y)+across*(side*w) for t,y,w in [(-.067,.060,.048),(.004,.066,.054),(.075,.047,.058),(.144,.040,.045)]]
+        A.limb(b,"shoe_panel",pts,[(.006,.003)]*4,sides=6,steps=2)
+        pts=[at(t,y)+across*(side*w) for t,y,w in [(-.04,.072,.046),(.005,.061,.050),(.070,.052,.044)]]
+        A.limb(b,"seam",pts,[(.009,.003),(.008,.003),(.001,.001)],sides=6,steps=2)
+    A.limb(b,"shoe_panel",[at(.005,.156),at(.035,.136),at(.095,.096)],[(.025,.004),(.026,.004),(.020,.003)],sides=8,steps=2)
+    for k in range(6):
+        t=.040+k*.014;y=.128-k*.009
+        A.limb(b,"shoes",[at(t,y)+across*.022,at(t+.008,y+.001),at(t,y)-across*.022],
+               [(.0025,.0025)]*3,sides=6,steps=1)
 
 
 def build_legs():
     b = C.Builder(MATS)
-    # Pelvis: rolled with the hips.
-    for_ring = [(1.0, 0.15, 0.106), (0.93, 0.168, 0.116), (0.86, 0.16, 0.104), (0.80, 0.125, 0.09)]
-    rings = [ring(PELVIS + rot_xy(Vector((0, y - PELVIS.y, 0)), HIP_ROLL), rx, rz, roll=HIP_ROLL)
-             for y, rx, rz in for_ring]
-    loft(b, "pants", rings, 12, cap1=PELVIS + rot_xy(Vector((0, -0.16, 0)), HIP_ROLL))
-    # Standing leg (-X): nearly straight, foot under the body.
-    hip_l = hip_joint(-1)
-    ankle_l = Vector((-0.085, 0.115, -0.01))
-    knee_l = hip_l + (ankle_l - hip_l) * 0.51 + Vector((0, 0, 0.012))
-    leg(b, hip_l, knee_l, ankle_l)
-    shoe(b, ankle_l, -8)
-    # Free leg (+X): hip drops, knee bends forward and in, foot set out and forward.
-    hip_r = hip_joint(1)
-    ankle_r = Vector((0.155, 0.12, 0.085))
-    knee_r = knee_ik(hip_r, ankle_r, 0.42, 0.41, (-0.35, 0, 1))
+    pel = [(1.0, 0.148, 0.1), (0.93, 0.158, 0.108), (0.87, 0.15, 0.1), (0.81, 0.11, 0.085)]
+    rings = [A.ring((0, y, 0), rx, rz, p=2.2) for y, rx, rz in pel]
+    A.loft(b, "pants", rings, 20, cap1=Vector((0, 0.77, 0)))
+    apply(b, sway)
+    # Standing leg (+X, cup side): straight, foot under the hip.
+    hip_r = sway(Vector((0.07, 0.86, 0)))
+    ankle_r = Vector((0.085, 0.095, -0.01))
+    knee_r = lerp(hip_r, ankle_r, 0.5) + Vector((0, 0, 0.012))
     leg(b, hip_r, knee_r, ankle_r)
-    shoe(b, ankle_r, 18)
-    return b.to_object("legs", MATS_BY_NAME, pivot=g(0, 0.92, 0), parent=ROOT, smooth_angle=SMOOTH)
+    shoe(b, ankle_r, 10)
+    # Free leg (-X): set out to the side, knee a touch soft.
+    hip_l = sway(Vector((-0.07, 0.86, 0)))
+    ankle_l = Vector((-0.2, 0.095, 0.035))
+    knee_l = A.knee_ik(hip_l, ankle_l, 0.39, 0.39, (0.2, 0, 1))
+    leg(b, hip_l, knee_l, ankle_l)
+    shoe(b, ankle_l, -14)
+    o = b.to_object("legs", MATS_BY_NAME, pivot=g(0, 0.92, 0), parent=ROOT, smooth_angle=SMOOTH)
+    A.front_uv(o,"pants",.5,0, fallback=(.01,.99),min_nz=.2)
+    A.set_flat(o, {"sole", "outsole"})
+    return o
 
 
-# --- torso -------------------------------------------------------------------
+def paint_pants():
+    pt=A.Painter(1024,A.rgb(PALETTE["pants"]),.5,0,ss=2)
+    ink=(147,125,99)
+    folds=[([(.030,.837),(.075,.817),(.127,.817)],[0,.0018,0]),
+           ([(.026,.820),(.053,.789),(.066,.749)],[0,.0015,0]),
+           ([(-.054,.837),(-.099,.822),(-.124,.802)],[0,.0016,0]),
+           ([(.129,.572),(.100,.550),(.068,.514)],[0,.0017,0]),
+           ([(-.092,.571),(-.137,.534),(-.158,.522)],[0,.0018,0]),
+           ([(.034,.210),(.070,.161),(.130,.138)],[0,.0016,0]),
+           ([(-.239,.190),(-.207,.162),(-.164,.147)],[0,.0016,0])]
+    for pts,ws in folds: pt.stroke(pts,ws,ink)
+    return pt.save('techbro_chino_seams')
 
-def torso_ring(y, cx, rx, rz, cz=0.0, pitch=0.0):
-    t = min(max((y - 0.93) / (1.37 - 0.93), 0.0), 1.0)
-    roll = HIP_ROLL + (SHOULDER_ROLL - HIP_ROLL) * t
-    return ring((cx, y, cz), rx, rz, roll=roll, pitch=pitch, p=2.3)
+
+# --- torso ---------------------------------------------------------------------
+# (y, rx, rz, cz) profiles; superellipse sections.
+SHIRT = [(0.872, 0.168, 0.12, 0.0), (0.9, 0.166, 0.118, 0.0), (0.97, 0.162, 0.118, 0.0),
+         (1.06, 0.15, 0.106, 0.0), (1.16, 0.15, 0.102, 0.0), (1.26, 0.16, 0.104, 0.0),
+         (1.34, 0.168, 0.1, -0.004), (1.4, 0.155, 0.088, -0.008), (1.44, 0.1, 0.07, -0.01),
+         (1.47, 0.05, 0.05, -0.012)]
+VEST = [(0.955, 0.168, 0.122, 0.0), (0.985, 0.172, 0.127, 0.0), (1.08, 0.167, 0.122, 0.0),
+        (1.18, 0.170, 0.116, 0.0), (1.28, 0.177, 0.115, -0.002), (1.36, 0.178, 0.112, -0.006),
+        (1.42, 0.166, 0.098, -0.01), (1.465, 0.108, 0.084, -0.012)]
+
+
+def profile(table, y):
+    ys = [r[0] for r in table]
+    i = max(1, min(len(ys) - 1, next((k for k, v in enumerate(ys) if v >= y), len(ys) - 1)))
+    t = (y - ys[i - 1]) / (ys[i] - ys[i - 1])
+    t = t * t * (3 - 2 * t)
+    return [lerp(table[i - 1][k], table[i][k], t) for k in (1, 2, 3)]
+
+
+def section(table, y, a, p=2.3, grow=0.0):
+    rx, rz, cz = profile(table, y)
+    s, c = math.sin(a), math.cos(a)
+    return Vector((math.copysign(abs(s) ** (2 / p), s) * (rx + grow), y,
+                   cz + math.copysign(abs(c) ** (2 / p), c) * (rz + grow)))
+
+
+def opening(y):
+    """Half angle (radians) of the open vest front at height y: a narrow gap showing the
+    shirt placket, widening into the V under the collar."""
+    return math.radians(13 + 22 * A.smoothstep(1.24, 1.465, y))
+
+
+def collar_base(a):
+    d = abs(math.degrees(math.atan2(math.sin(a), math.cos(a))))
+    return 1.442 + 0.012 * A.smoothstep(90, 180, d) - 0.05 * A.smoothstep(70, 28, d)
 
 
 def build_torso():
     b = C.Builder(MATS)
-    # Shirt, untucked: the hem flares out over the khakis below the vest.
-    shirt = [(0.845, -0.034, 0.2, 0.148), (0.87, -0.034, 0.198, 0.146), (0.95, -0.032, 0.186, 0.132), (1.05, -0.022, 0.163, 0.112),
-             (1.18, -0.01, 0.175, 0.118), (1.3, 0.0, 0.18, 0.11), (1.37, 0.0, 0.15, 0.092),
-             (1.41, 0.0, 0.08, 0.068)]
-    loft(b, "shirt", [torso_ring(*r) for r in shirt], 12)
-    # Fleece vest: puffy body with a tucked-in hem, narrowing to straps above the armpits.
-    vest = [(0.965, -0.026, 0.186, 0.13), (0.99, -0.026, 0.198, 0.142), (1.09, -0.02, 0.204, 0.15),
-            (1.19, -0.01, 0.21, 0.153), (1.265, -0.003, 0.2, 0.146), (1.325, 0.0, 0.152, 0.128),
-            (1.39, 0.0, 0.112, 0.104)]
-    loft(b, "vest", [torso_ring(y, cx, rx, rz, cz=-0.004) for y, cx, rx, rz in vest], 14)
-    # Raised collar: a thick stand-up band, lower at the front so it clears the chin.
-    collar = [ring((0, 1.365, -0.012), 0.112, 0.104, SHOULDER_ROLL, 12),
-              ring((0, 1.47, -0.022), 0.1, 0.098, SHOULDER_ROLL, 16),
-              ring((0, 1.468, -0.022), 0.078, 0.076, SHOULDER_ROLL, 16),
-              ring((0, 1.375, -0.012), 0.072, 0.07, SHOULDER_ROLL, 12)]
-    loft(b, "vest", collar, 12, closed=True)
-    # Armhole binding standing off the shirt, wrapped around each arm root.
+    # Buttoned front with a genuinely open top: the UV placket follows the surface.
+    grid=[]
+    for j in range(21):
+        y=lerp(.872,1.47,j/20)
+        a0=.80*A.smoothstep(1.400,1.47,y)
+        row=[]
+        for i in range(33):
+            p=section(SHIRT,y,lerp(a0,2*math.pi-a0,i/32))
+            if y<.930:
+                front=A.smoothstep(0,.08,p.z)
+                p.y+=front*(.036*math.exp(-(p.x/.025)**2)-.013*math.exp(-((abs(p.x)-.067)/.04)**2))
+                p.y+=.003*math.sin(p.x*45)
+                p.y+=.071*math.exp(-((p.x+.15)/.045)**2)*A.smoothstep(.01,.075,p.z)
+            row.append(p)
+        grid.append(row)
+    A.shell(b,"shirt",grid,.003,wrap=False)
+    A.loft(b,"skin",[A.ring((0,1.352,0),.025,.092), A.ring((0,1.40,0),.041,.073),
+                     A.ring((0,1.475,-.014),.043,.043)],20)
+    # Fleece vest, worn open: a thick shell wrapping from one front edge round the back
+    # to the other.
+    n, rows = 28, 22
+    grid = []
+    for j in range(rows + 1):
+        y = lerp(0.955, 1.465, j / rows)
+        a0 = opening(y)
+        row=[section(VEST,y,lerp(a0,2*math.pi-a0,i/(n-1))) for i in range(n)]
+        for p in row:
+            if y<1.02: p.y+=.012*math.sin(p.x*22)*A.smoothstep(1.02,.95,y)
+            radial=Vector((p.x,0,p.z)).normalized()
+            front=A.smoothstep(0,.09,p.z)
+            ridge=.007*math.exp(-((y-(1.03+.30*abs(p.x)))/.022)**2)
+            ridge-=.004*math.exp(-((y-(1.09+.20*abs(p.x)))/.027)**2)
+            ridge+=.005*math.exp(-((y-(1.29-.40*abs(p.x)))/.025)**2)
+            p+=radial*ridge*front
+        grid.append(row)
+    A.shell(b, "vest", grid, 0.014, wrap=False, axis=lambda p: Vector((0, p.y, profile(VEST, p.y)[2])))
+    # Stand collar: a thick band around the back of the neck, open at the front.
+    cn, crows = 26, 4
+    cang = [math.radians(lerp(-150, 150, i / (cn - 1))) + math.pi for i in range(cn)]
+    cgrid = []
+    for j in range(crows + 1):
+        s = j / crows
+        row = []
+        for a in cang:
+            d = abs(math.degrees(math.atan2(math.sin(a), math.cos(a))))
+            y0 = collar_base(a) - 0.012
+            y = lerp(y0, y0 + 0.09 - 0.02 * A.smoothstep(150, 60, d), s)
+            r = lerp(1.0, 0.9, s)
+            row.append(Vector((math.sin(a) * 0.092 * r, y, -0.014 + math.cos(a) * 0.084 * r)))
+        cgrid.append(row)
+    A.shell(b, "vest", cgrid, 0.014, wrap=False, axis=lambda p: Vector((0, p.y, -0.014)))
+    # Rolled fleece edge down each front.
     for sx in (1, -1):
-        sh = SHOULDER_R if sx > 0 else SHOULDER_L
-        c = Vector((sx * 0.168, sh.y - 0.085, -0.005))
-        loop = [c + Vector((0, 0.072 * math.sin(a), 0.098 * math.cos(a)))
-                for a in (2 * math.pi * k / 10 for k in range(10))]
-        rings = path_rings(loop, [(0.013, 0.016)] * 10, lambda i, q: q - c, closed=True)
-        loft(b, "vest", rings, 4, closed=True)
-    # Open V at the neck showing the shirt, and the zip down the front.
-    bvh = BVHTree.FromBMesh(b.bm)
-    v = [(-0.07, 1.4), (-0.05, 1.36), (-0.03, 1.32), (-0.012, 1.285), (0.0, 1.265), (0.012, 1.285),
-         (0.03, 1.32), (0.05, 1.36), (0.07, 1.4)]
-    decal(b, "shirt", bvh, v, depth=0.01)
-    zip_line = [(-0.02 * (1.265 - y) / 0.3, y) for y in (1.265, 1.19, 1.11, 1.04, 0.968)]
-    decal(b, "line_dark", bvh, [(x - 0.004, y) for x, y in zip_line]
-          + [(x + 0.004, y) for x, y in reversed(zip_line)], depth=0.006)
-    return b.to_object("torso", MATS_BY_NAME, pivot=g(0, 0.95, 0), parent=ROOT, smooth_angle=SMOOTH)
+        ys = [0.958, 1.06, 1.16, 1.26, 1.36, 1.44]
+        pts = [section(VEST, y, sx * opening(y), grow=0.002) for y in ys]
+        A.limb(b, "vest", pts, [(0.01, 0.012)] * len(pts), sides=8, steps=2)
+    # Folded oxford collar: broad base, triangular ends, subtly raised fold.
+    for sx in [-1,1]:
+        grid=[[Vector((sx*x,y,z)) for x,y,z in row] for row in [
+            [(0.018,1.401,.101),(.048,1.391,.098),(.058,1.421,.077)],
+            [(0.034,1.435,.071),(.054,1.446,.056),(.068,1.440,.054)]]]
+        A.shell(b,"shirt",grid,.004,wrap=False)
+    # Armhole binding where the sleeves leave the vest.
+    for sx, sh in ((1, SHOULDER_R), (-1, SHOULDER_L)):
+        c = Vector((sx * 0.165, sh.y - 0.085, -0.008))
+        loop = [c + Vector((sx * 0.012 * math.cos(a), 0.085 * math.sin(a), 0.1 * math.cos(a)))
+                for a in (2 * math.pi * k / 16 for k in range(16))]
+        rings = A.path_rings(loop, [(0.012, 0.014)] * 16, lambda i, q: q - c, closed=True)
+        A.loft(b, "vest", rings, 6, closed=True)
+    apply(b, sway)
+    o = b.to_object("torso", MATS_BY_NAME, pivot=g(0, 0.95, 0), parent=ROOT, smooth_angle=SMOOTH)
+    A.front_uv(o, "vest", VEST_TEX[0], VEST_TEX[1], fallback=(0.01, 0.99), min_nz=0.05)
+    A.front_uv(o, "shirt", SHIRT_TEX[0], SHIRT_TEX[1], fallback=(0.01, 0.99), min_nz=0.05)
+    return o
 
 
-# --- head --------------------------------------------------------------------
-
-HAIR_C = HEAD_C + Vector((0, 0.014, -0.01))
-HAIR_R = (HEAD_R[0] * 1.1, HEAD_R[1] * 1.1, HEAD_R[2] * 1.1)
+VEST_TEX = (0.32, 0.92)  # half size, bottom of the vest texture window
 
 
-def hair_pt(theta, phi, lift):
-    """Point over the hair shell: azimuth theta (0 = front, 90 = +X), elevation phi."""
-    t, p = math.radians(theta), math.radians(phi)
-    s = 1 + lift
-    return HAIR_C + Vector((HAIR_R[0] * s * math.sin(t) * math.cos(p), HAIR_R[1] * s * math.sin(p),
-                            HAIR_R[2] * s * math.cos(t) * math.cos(p)))
+SHIRT_TEX = (0.34, 0.86)
 
 
-def lock(b, path, width, thick):
-    """Soft chunky hair lock: fattens just after the root, tapers to a rounded tip."""
-    path = [(path[0][0], path[0][1], path[0][2] - 0.04)] + path[1:]  # root sinks into the shell
-    pts = catmull([hair_pt(*q) for q in path], 2)
-    n = len(pts)
-    prof = [max(0.3, math.sin(math.pi * (0.28 + 0.72 * i / (n - 1)))) for i in range(n)]
-    radii = [(width * f, thick * (0.5 + 0.5 * f)) for f in prof]
-    rings = path_rings(pts, radii, lambda i, c: c - HAIR_C)
-    tip = pts[-1] + (pts[-1] - pts[-2]).normalized() * width * 0.45
-    loft(b, "hair", rings, 6, cap0="flat", cap1=tip)
+def paint_vest():
+    pt = A.Painter(1024, A.rgb(PALETTE["vest"]), *VEST_TEX)
+    dark = (22, 27, 44)
+    # Chest zip pocket and a small embroidered wordmark on the -X chest (his left in cast.jpg).
+    pt.stroke([(-0.08, 1.255), (-0.078, 1.2), (-0.076, 1.16)], [0.004] * 3, dark)
+    font=A.ImageFont.load_default(size=round(pt.m(.009)))
+    pt.draw.text(pt.px(-.143,1.288),"CORPO",fill=(201,203,210),font=font)
+    # Hand-warmer pockets.
+    for sx in (1, -1):
+        pt.stroke([(sx * .082,1.125),(sx * .095,1.075),(sx * .111,1.015)], [.0025]*3,dark)
+        pt.stroke([(sx * .089,1.128),(sx * .135,1.118),(sx * .147,1.017),(sx * .111,1.015)], [0,.0015,.0015,0],dark)
+    return pt.save("vest")
 
 
-# (azimuth, elevation, lift) control points; widths and thicknesses are radii.
-LOCKS = [
-    # Fringe: big locks falling over the forehead, swept towards -X.
-    ([(30, 70, 0.0), (16, 52, 0.09), (2, 34, 0.11), (-8, 20, 0.09)], 0.034, 0.016),
-    ([(55, 60, 0.0), (46, 42, 0.09), (36, 26, 0.1), (30, 16, 0.08)], 0.03, 0.015),
-    ([(-10, 68, 0.0), (-26, 50, 0.09), (-38, 32, 0.1), (-44, 18, 0.08)], 0.03, 0.014),
-    ([(75, 50, 0.0), (72, 32, 0.08), (68, 16, 0.07)], 0.024, 0.012),
-    # Top: full swept volume over the crown.
-    ([(170, 58, 0.02), (120, 76, 0.06), (50, 78, 0.06), (20, 68, 0.04)], 0.052, 0.022),
-    ([(-150, 56, 0.02), (-110, 74, 0.06), (-50, 74, 0.06), (-25, 64, 0.04)], 0.048, 0.02),
-    ([(125, 46, 0.02), (100, 64, 0.06), (70, 68, 0.05)], 0.04, 0.018),
-    # Sides, behind the cheek and over the top of the ear.
-    ([(95, 52, 0.02), (102, 28, 0.09), (106, 6, 0.09), (108, -10, 0.05)], 0.032, 0.015),
-    ([(-95, 52, 0.02), (-102, 28, 0.09), (-106, 6, 0.09), (-108, -10, 0.05)], 0.032, 0.015),
-    # Back, falling to the nape.
-    ([(140, 55, 0.02), (148, 20, 0.1), (152, -15, 0.09), (156, -36, 0.05)], 0.04, 0.017),
-    ([(-140, 55, 0.02), (-148, 20, 0.1), (-152, -15, 0.09), (-156, -36, 0.05)], 0.04, 0.017),
-    ([(180, 50, 0.02), (180, 15, 0.1), (178, -18, 0.09), (176, -40, 0.05)], 0.044, 0.018),
-]
+def paint_shirt():
+    """Button placket down the front, following the contrapposto sway."""
+    pt = A.Painter(1024, A.rgb(PALETTE["shirt"]), *SHIRT_TEX)
+    line, button = (128, 156, 204), (244, 246, 250)
+    ys = [0.86, 1.0, 1.15, 1.3, 1.41]
+    for dx in (-0.012, 0.012):
+        pt.stroke([(sway(Vector((dx, y, 0))).x, y) for y in ys], [0.0022] * len(ys), line)
+    for y in (1.36, 1.27, 1.18, 1.09, 1.0, 0.91):
+        x = sway(Vector((0, y, 0))).x
+        pt.ellipse(x, y, 0.0055, 0.0055, line)
+        pt.ellipse(x, y, 0.0038, 0.0038, button)
+    for pts in [[(-.04,1.025),(-.066,1.004),(-.09,.998)],[(.048,.98),(.08,.953),(.12,.939)],
+                [(-.025,1.26),(-.042,1.242),(-.06,1.236)]]:
+        pt.stroke(pts,[0,.0015,0],line)
+    return pt.save("shirt")
 
 
-def hairline(theta):
-    """Elevation (degrees) below which the hair shell tucks inside the skull."""
-    c = math.cos(math.radians(theta))
-    return 2 + 33 * c if c > 0 else 2 + 44 * c
+# --- head ----------------------------------------------------------------------
 
+from techbro_head import build_head_mesh, paint_head, paint_hair
 
 def build_head():
-    b = C.Builder(MATS)
-    hc = HEAD_C
-    rx, ry, rz = HEAD_R
-    b.tube("skin", gv(NECK + Vector((0, -0.03, -0.01))), gv(NECK + Vector((0, 0.11, 0.0))), 0.05, 0.048, sides=8)
-    # Skull: an ellipsoid whose lower half narrows into a soft, rounded anime jaw.
-    faces = b.sphere("skin", gv(hc), (rx, rz, ry), u=14, v=10)
-    for v in {v for f in faces for v in f.verts}:
-        d = to_game(v.co) - hc
-        if d.y < 0:
-            t = -d.y / ry
-            d.x *= 1 - 0.3 * t ** 1.4
-            d.z *= 1 - (0.12 if d.z > 0 else 0.3) * t
-            d.z += 0.012 * t * max(0.0, 1 - abs(d.x) / rx)  # chin a touch forward
-        v.co = gv(hc + d)
-    for sx in (1, -1):
-        b.sphere("skin", gv(hc + Vector((sx * 0.106, -0.018, -0.008))), (0.02, 0.026, 0.034), u=6, v=4)
-    # Face, flush with the skin: two dark ovals, simple brows (one cocked), smug smile.
-    bvh = BVHTree.FromBMesh(b.bm)
-    ey = hc.y - 0.022
-    for sx in (1, -1):
-        decal(b, "line_dark", bvh, ellipse_pts(sx * 0.041, ey, 0.011, 0.017), depth=0.006)
-    decal(b, "line_dark", bvh, [(0.022, ey + 0.036), (0.064, ey + 0.05), (0.068, ey + 0.041), (0.024, ey + 0.028)],
-          depth=0.006, step=0.016)
-    decal(b, "line_dark", bvh, [(-0.022, ey + 0.031), (-0.066, ey + 0.035), (-0.068, ey + 0.026), (-0.024, ey + 0.023)],
-          depth=0.006, step=0.016)
-    my = hc.y - 0.078
-    smile = [(-0.022, 0.003), (-0.008, -0.003), (0.008, -0.002), (0.021, 0.004), (0.03, 0.013),
-             (0.026, 0.004), (0.01, -0.008), (-0.006, -0.009), (-0.02, -0.003)]
-    decal(b, "line_dark", bvh, [(0.004 + x, my + y) for x, y in smile], depth=0.006)
-    # Hair shell: fuller on top; below the hairline it tucks inside the skull.
-    faces = b.sphere("hair", gv(HAIR_C), (HAIR_R[0], HAIR_R[2], HAIR_R[1]), u=12, v=9)
-    for v in {v for f in faces for v in f.verts}:
-        d = to_game(v.co) - HAIR_C
-        theta = math.degrees(math.atan2(d.x, d.z))
-        n = Vector((d.x / HAIR_R[0], d.y / HAIR_R[1], d.z / HAIR_R[2]))
-        phi = math.degrees(math.asin(max(-1.0, min(1.0, n.y / n.length))))
-        if phi < hairline(theta):
-            v.co = gv(HAIR_C + d * 0.82)
-        elif d.y > 0:
-            v.co = gv(HAIR_C + Vector((d.x, d.y * 1.07, d.z)))
-    for path, w, t in LOCKS:
-        lock(b, path, w, t)
-    # Head tilts towards the cup (+X) and dips a little to look at it.
-    tilt = grot(-8, (0, 0, 1)) @ grot(2, (1, 0, 0))
-    bmesh.ops.rotate(b.bm, verts=b.bm.verts, cent=gv(NECK), matrix=tilt)
-    return b.to_object("head", MATS_BY_NAME, pivot=gv(NECK), parent=ROOT, smooth_angle=SMOOTH)
+    return build_head_mesh(A, C, MATS, MATS_BY_NAME, ROOT, HEAD_C, NECK, HEAD_TILT)
 
 
-# --- arms and cup ------------------------------------------------------------
+# --- arms, hands, cup ------------------------------------------------------------
 
-def build_arm(name, sh, elbow, wrist, hand_size):
-    """Sleeve from the shoulder pivot, rolled cuff below the elbow, bare forearm, hand."""
-    b = C.Builder(MATS)
+def sleeve_arm(b, sh, elbow, wrist, roll_at=0.78):
+    """Shirt sleeve from the shoulder cap to a rolled cuff on the forearm, bare wrist."""
     up = (elbow - sh).normalized()
+    cuff = lerp(elbow, wrist, roll_at)
+    pts = [sh - up * 0.02, sh + up * 0.01, lerp(sh, elbow, 0.5), elbow, lerp(elbow, cuff, 0.5), cuff]
+    rad = [(0.036, 0.036), (0.058, 0.056), (0.060, 0.057), (0.054, 0.053), (0.050, 0.048), (0.047, 0.046)]
+    faces=A.limb(b, "shirt", pts, rad, sides=18, cap0=sh - up * 0.04, cap1="flat", ref=(0, 0, 1))
+    for v in {v for f in faces for v in f.verts}:
+        p=A.to_game(v.co);d=(p-elbow).length
+        p.z+=.006*math.cos((p.y-elbow.y)*92+(p.x-elbow.x)*35)*math.exp(-(d/.078)**2)
+        v.co=gv(p)
     fore = (wrist - elbow).normalized()
-    sleeve = [sh - up * 0.03, sh, sh + (elbow - sh) * 0.35, sh + (elbow - sh) * 0.7, elbow]
-    limb(b, "shirt", sleeve, [(0.046, 0.045), (0.06, 0.058), (0.056, 0.055), (0.051, 0.05), (0.048, 0.047)],
-         10, cap0=sh - up * 0.048, cap1=None)
-    cuff = [elbow - up * 0.025, elbow + fore * 0.01, elbow + fore * 0.05, elbow + fore * 0.075]
-    limb(b, "shirt", cuff, [(0.05, 0.049), (0.056, 0.055), (0.056, 0.055), (0.05, 0.049)], 10)
-    arm = [elbow + fore * 0.03, elbow + fore * 0.12, wrist]
-    limb(b, "skin", arm, [(0.04, 0.038), (0.037, 0.035), (0.029, 0.027)], 8)
-    hand = wrist + fore * 0.045
-    b.sphere("skin", gv(hand), hand_size, u=8, v=5,
-             rot=C.look_rot(gv(fore)))
-    return b.to_object(name, MATS_BY_NAME, pivot=gv(sh), parent=ROOT, smooth_angle=SMOOTH), hand
+    A.limb(b, "shirt", [cuff - fore * 0.03, cuff, cuff + fore * 0.02],
+           [(0.051, 0.048), (0.055, 0.052), (0.051, 0.048)], sides=16)
+    A.limb(b, "skin", [cuff - fore * 0.02, lerp(cuff, wrist, 0.5), wrist],
+           [(0.036, 0.034), (0.031, 0.028), (0.026, 0.022)], sides=12, ref=(0, 0, 1))
 
 
-def build_cup(hand, parent):
-    """Iced cold brew in a clear cup: coffee body, icy top, domed lid, black straw."""
+CUP_C = Vector((0.232, 1.405, 0.118))
+CUP_H, CUP_R0, CUP_R1 = 0.135, 0.033, 0.043
+
+
+def cup_r(y):
+    return lerp(CUP_R0, CUP_R1, (y - (CUP_C.y - CUP_H / 2)) / CUP_H)
+
+
+def around(a_deg, y, extra):
+    a = math.radians(a_deg)
+    r = cup_r(y) + extra
+    return Vector((CUP_C.x + math.sin(a) * r, y, CUP_C.z + math.cos(a) * r))
+
+
+def cup_hand(b, wrist):
+    """Hand gripping the cup: palm on the body side, four fingers wrapped around the
+    front, thumb round the back."""
+    palm_a = 105
+    palm = around(palm_a, CUP_C.y - 0.005, 0.016)
+    A.limb(b, "skin", [wrist, lerp(wrist, palm, 0.6), palm],
+           [(0.026, 0.02), (0.03, 0.019), (0.034, 0.018)], sides=12,
+           ref=lambda i, q: q - Vector((CUP_C.x, q.y, CUP_C.z)), cap1="flat")
+    A.blob(b, "skin", palm, (0.034, 0.042, 0.022), rot=A.grot(-palm_a + 90, (0, 1, 0)), u=12, v=8)
+    for k, (dy, reach) in enumerate(((0.020, 16), (0.002, 25), (-0.016, 18), (-0.032, 4))):
+        y = CUP_C.y + dy
+        r = 0.0078 - 0.0008 * (k == 3)
+        pts = [around(a, y + 0.004 * math.sin(math.radians(a)), r * 0.9)
+               for a in (palm_a - 12, palm_a - 35, 50, 25, reach)]
+        A.limb(b, "skin", pts, [(r, r)] * len(pts), sides=8, steps=2, cap1="flat")
+    thumb = [around(a, CUP_C.y + 0.03 + 0.01 * i, 0.01) for i, a in enumerate((palm_a - 20, 70, 45, 20))]
+    A.limb(b, "skin", thumb, [(0.012, 0.012)] * 4, sides=8, steps=2)
+
+
+def build_arm_r():
     b = C.Builder(MATS)
-    c = hand + Vector((-0.035, 0.05, 0.03))
-    bot, h = c.y - 0.1, 0.19
-    b.tube("coffee", g(c.x, bot, c.z), g(c.x, bot + 0.13, c.z), 0.044, 0.053, sides=12)
-    b.tube("cup", g(c.x, bot + 0.13, c.z), g(c.x, bot + h, c.z), 0.053, 0.057, sides=12)
-    b.tube("cup", g(c.x, bot + h, c.z), g(c.x, bot + h + 0.022, c.z), 0.06, 0.032, sides=12)
-    b.tube("straw", g(c.x, bot + 0.12, c.z), g(c.x - 0.015, bot + h + 0.085, c.z - 0.012), 0.008, 0.008,
-           sides=6)
-    return b.to_object("cup", MATS_BY_NAME, pivot=gv(c), parent=parent, smooth_angle=SMOOTH)
+    elbow = Vector((0.28, 1.165, -0.03))
+    wrist = around(125, CUP_C.y - 0.06, 0.026)
+    sleeve_arm(b, SHOULDER_R, elbow, wrist, roll_at=0.46)
+    cup_hand(b, wrist)
+    o = b.to_object("arm_R", MATS_BY_NAME, pivot=gv(SHOULDER_R), parent=ROOT, smooth_angle=SMOOTH)
+    A.fill_uv(o, "shirt", (0.01, 0.99))  # sleeves: plain shirt patch of the texture
+    return o
 
+
+def build_arm_l():
+    b = C.Builder(MATS)
+    elbow = Vector((-0.25, 1.18, -0.025))
+    wrist = Vector((-0.146, 0.974, 0.076))
+    sleeve_arm(b, SHOULDER_L, elbow, wrist, roll_at=0.46)
+    # Fingers enter the pocket; visible palm and a distinct hooked thumb stay out.
+    A.limb(b, "skin", [wrist, Vector((-.121,.955,.069)), Vector((-.105,.925,.040))],
+           [(.026,.018),(.029,.017),(.020,.012)], sides=12, steps=2)
+    A.limb(b, "skin", [Vector((-.133,.954,.083)),Vector((-.139,.942,.085)),Vector((-.134,.936,.080))],
+           [(.011,.009),(.010,.008),(.005,.005)], sides=8,steps=3)
+    o = b.to_object("arm_L", MATS_BY_NAME, pivot=gv(SHOULDER_L), parent=ROOT, smooth_angle=SMOOTH)
+    A.fill_uv(o, "shirt", (0.01, 0.99))
+    return o
+
+
+def build_cup(parent):
+    """Iced cold brew in a clear cup: coffee body, icy band, flat lid, black straw."""
+    b = C.Builder(MATS)
+    c = CUP_C
+    bot = c.y - CUP_H / 2
+    y1 = bot + CUP_H * 0.94
+    A.loft(b, "coffee", [A.ring((c.x, bot, c.z), CUP_R0, CUP_R0), A.ring((c.x, y1, c.z), cup_r(y1), cup_r(y1))], 20)
+    top = bot + CUP_H
+    A.loft(b, "cup", [A.ring((c.x, y1, c.z), cup_r(y1) + 0.0005, cup_r(y1) + 0.0005),
+                      A.ring((c.x, top, c.z), CUP_R1, CUP_R1)], 20)
+    A.loft(b, "cup", [A.ring((c.x, top, c.z), CUP_R1 + 0.004, CUP_R1 + 0.004),
+                      A.ring((c.x, top + 0.005, c.z), CUP_R1 + 0.004, CUP_R1 + 0.004),
+                      A.ring((c.x, top + 0.008, c.z), CUP_R1 - 0.006, CUP_R1 - 0.006)], 20)
+    for dx,dz in [(-.017,.018),(.015,.018),(0,-.012)]:
+        A.blob(b,"ice",Vector((c.x+dx,top-.012,c.z+dz)),(.014,.012,.013),u=6,v=4)
+    A.limb(b, "straw", [Vector((c.x, top - 0.02, c.z)), Vector((c.x - 0.012, top + 0.1, c.z - 0.01))],
+           [(0.0045, 0.0045)] * 2, sides=8, steps=1)
+    o = b.to_object("cup", MATS_BY_NAME, pivot=gv(c), parent=parent, smooth_angle=SMOOTH)
+    A.set_flat(o, {"cup"})
+    return o
+
+
+# --- build, export, preview ----------------------------------------------------
+
+def export_character():
+    import bpy
+    C.MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    bpy.ops.export_scene.gltf(filepath=str(C.MODELS_DIR / "techbro.glb"), export_format="GLB",
+        export_yup=True, export_apply=True, export_cameras=False, export_lights=False,
+        export_texcoords=True, export_normals=True, export_materials="EXPORT",
+        export_animations=False, export_skins=False, export_morph=False)
 
 C.reset_scene()
-MATS_BY_NAME = C.make_materials(PALETTE)
+FACE_PNG = paint_head(A, PALETTE)
+VEST_PNG = paint_vest()
+MATS_BY_NAME = A.make_materials(PALETTE, {"face": FACE_PNG, "vest": VEST_PNG, "shirt": paint_shirt(), "hair": paint_hair(A, PALETTE), "pants": paint_pants()})
 ROOT = C.empty("techbro")
-parts = [build_legs(), build_torso(), build_head()]
-# Left hand shoved in the front pocket; the hand itself sinks into the khakis.
-arm_l, _ = build_arm("arm_L", SHOULDER_L, Vector((-0.282, 1.115, -0.05)), Vector((-0.17, 0.935, 0.07)),
-                     (0.03, 0.026, 0.04))
-# Right forearm bent up and forward, holding the cup at chest height.
-arm_r, hand_r = build_arm("arm_R", SHOULDER_R, Vector((0.262, 1.13, -0.045)), Vector((0.19, 1.26, 0.17)),
-                          (0.042, 0.038, 0.052))
-parts += [arm_l, arm_r, build_cup(hand_r, arm_r)]
+arm_r = build_arm_r()
+parts = [build_legs(), build_torso(), build_head(), build_arm_l(), arm_r, build_cup(arm_r)]
 C.report(parts)
-assert C.triangle_count(parts) <= 4000, "techbro over its triangle budget"
-C.export_glb("techbro")
-C.render_contact_sheet(ROOT, "techbro", outline=0.008, fill=1.0, skip_outline=("line_dark",))
+assert "quick" in ARGS or C.triangle_count(parts) <= TRI_BUDGET, "techbro over its triangle budget"
+if "quick" not in ARGS:
+    export_character()
 
-# Head close-up (front, 3/4, side, back) to check the hair and face.
-cam = bpy.context.scene.camera
-head_c = gv(HEAD_C + Vector((0.03, 0.0, 0.0)))
-cam.data.lens = 70.0
-dist = 0.26 / math.tan(math.atan(cam.data.sensor_width / (2 * 70.0)))
-el = math.radians(6)
-cam.location = head_c + Vector((0, -dist * math.cos(el), dist * math.sin(el)))
-cam.rotation_euler = (head_c - cam.location).to_track_quat("-Z", "Y").to_euler()
-views = (("front", 0), ("3/4 front", -35), ("side", -90), ("back", 180))
-C.save_sheet(C.render_views(ROOT, "techbro-head", views, 480), "techbro-head", 480)
+pv = A.Preview(ROOT, outline=0.004, shadow_muls={
+    "skin": (0.70, 0.49, 0.40), "face": (0.70, 0.49, 0.40), "hair": (0.55, 0.55, 0.7)})
+head_c = HEAD_C + Vector((0.015, 0.012, 0))
+if "wave" in ARGS:  # the game waves arm_R by rotating it about Z (game) by 2.6 rad
+    arm_r.rotation_euler = (0, -2.6, 0)
+    pv.sheet("techbro-wave", (("front", 0), ("3/4", -35)), Vector((0, 1.0, 0)), 2.2, 480, aspect=0.7)
+    raise SystemExit
+pv.sheet("techbro-head", (("front", 0), ("3/4", -35), ("side", -90)), head_c, 0.35, 600)
+if "quick" not in ARGS or "body" in ARGS:
+    pv.sheet("techbro", (("front", 0), ("3/4", -35), ("side", -90), ("back", 180)),
+             Vector((0, 0.9, 0)), 1.95, 720, aspect=0.6)
+if "quick" not in ARGS:
+    pv.aim(Vector((0, 0.9, 0)), 1.9)
+    hero = pv.render(20, 700, 1400)
+    A.compare("techbro-compare", C.REPO / "docs/art/cast.jpg", (0, 95, 218, 734), hero, mirror_ref=True,
+              labels=("cast.jpg (mirrored for +X cup)", "v4 render"))
+    pv.sheet("techbro-small", (("front", 0), ("3/4", -35), ("side", -90), ("back", 180)),
+             Vector((0, 0.90, 0)), 2.0, 180, aspect=0.6)
