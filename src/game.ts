@@ -344,9 +344,7 @@ export class Game {
     this.howTo = false;
     this.rank?.setCarsVisible(true);
     this.car.model.root.visible = false;
-    let rating = '5.00';
-    try { rating = localStorage.getItem('clankers.rating') ?? '5.00'; } catch { /* storage unavailable */ }
-    $('#overlay').innerHTML = titleHTML(rating, padName);
+    $('#overlay').innerHTML = titleHTML(padName);
   }
 
   simulate(dt: number, inp: Input) {

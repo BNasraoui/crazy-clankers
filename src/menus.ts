@@ -18,13 +18,12 @@ const LOGO = `<h1 class="logo">CRAZY<span>CLANKERS</span></h1>`;
 const KEYART = ['jump', 'rank', 'chaos'];
 let keyartIndex = Math.floor(Math.random() * KEYART.length);
 
-export function titleHTML(rating: string, padName: string) {
+export function titleHTML(padName: string) {
   const art = KEYART[keyartIndex++ % KEYART.length];
   return `
     <div class="menu title-screen">
       <img class="keyart" src="/keyart/${art}.jpg" alt="">
       <div class="logo-block">${LOGO}<div class="tag">You are AGI. Drive like it.</div></div>
-      <div class="rating-sticker"><small>DRIVER RATING</small><b>${rating}</b><span class="star">★</span></div>
       <div class="press-start">PRESS <i class="glyph a">A</i> TO START</div>
       <div class="corner-prompts">${btn('Y', 'HOW TO PLAY')}${btn('B', 'OPTIONS')}</div>
       <div class="pad-note">${padName ? `🎮 ${padName}` : 'Press any button on a controller to use it.'}</div>
