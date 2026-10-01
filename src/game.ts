@@ -11,6 +11,7 @@ import { Traffic } from './traffic';
 import { sfx, setEngine, unlockAudio } from './audio';
 import { BLOCKS_SIDES, CELL, HALF, WATER, buildWorld, curb, landmarks, N, type Curb, type Landmark } from './world';
 import { buildFeatures, groundAt } from './features';
+import { Moments } from './manga';
 import { Geysers, Particles, Props, type PropKind } from './props';
 import type { Pedestrians } from './pedestrians';
 import { SpritePerson, type SpriteSet } from './spritepeople';
@@ -83,6 +84,9 @@ export class Game {
   private lowWarned = false;
   private driftT = 0;
   private shake = 0;
+  private moments = new Moments();
+  private rising = false; // the cab was still climbing last frame
+  private apexDone = true; // this jump has had its slow motion
   private camYaw = START.yaw;
   private sun: THREE.DirectionalLight;
   private look: Look;
@@ -239,7 +243,7 @@ export class Game {
       this.idleAnimations(dt);
     } else {
       if (inp.pause) this.setState('paused');
-      else this.simulate(dt, inp);
+      else this.simulate(dt * this.moments.timeScale(dt), inp);
     }
     setEngine(this.car.forward, inp.throttle, this.state === 'play');
     this.car.sync(dt);
@@ -432,12 +436,25 @@ export class Game {
     if (tev.honk) sfx.honk();
 
     if (impact > 5) this.onCrash(impact);
+    // Slow motion at the top of a big jump.
+    if (this.car.grounded) this.apexDone = false;
+    else {
+      const height = this.car.pos.y - groundAt(this.car.pos.x, this.car.pos.z);
+      if (this.rising && this.car.vy <= 0 && height > 7 && !this.apexDone) this.moments.slowMotion(0.9);
+      if (this.car.vy <= 0) this.apexDone = true;
+    }
+    this.rising = !this.car.grounded && this.car.vy > 0;
+    if (landed > 0.6) {
+      // Dust kicked up by the landing.
+      this.particles.emit(this.car.pos.clone().setY(this.car.pos.y + 0.3), Math.round(10 + landed * 10), 0xd9cfbd, 4 + landed * 3, 1.5, 0.45);
+    }
     // A plain hop is about 0.7 s of air, so it takes a real jump to earn a tip.
     if (landed > 0.85) {
       sfx.land(landed * 4);
       this.maxAir = Math.max(this.maxAir, landed);
       this.safetyHit(landed * 3);
       if (landed > 1.8) {
+        this.moments.panel('land', landed / 3);
         this.popup('CRAZY AIR!!', 'big');
         if (!this.ride) this.quips.say('cab', 'bigAir', { force: true });
       }
@@ -473,6 +490,7 @@ export class Game {
     this.shake = Math.min(1, impact / 20);
     this.combo = 0;
     this.safetyHit(THREE.MathUtils.clamp(impact * 0.9, 4, 22));
+    if (impact > 16) this.moments.panel('crash', impact / 30);
     if (impact > 12) this.popup('CRASH!', 'bad');
     const r = this.ride;
     if (r && r.firedT <= 0) {

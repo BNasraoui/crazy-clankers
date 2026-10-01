@@ -309,3 +309,47 @@ body { font-family: var(--body); color: var(--paper); user-select: none; }
   .inspect-tag { left: 18%; }
 }
 @media (prefers-reduced-motion: reduce) { .press-start, .burst, .title-screen .keyart { animation: none; } }
+
+/* ----- manga moments: focus lines, halftone and a sound word on the hardest hits ----- */
+#moment { position: absolute; inset: 0; pointer-events: none; overflow: hidden; display: none; }
+#moment.on { display: block; animation: moment-out 0.95s ease-in forwards; }
+#moment .focus {
+  position: absolute; inset: -20%;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 26%, #fff0 26%),
+    repeating-conic-gradient(from 3deg at 50% 50%, var(--ink) 0 0.7deg, transparent 0.7deg 4.3deg);
+  -webkit-mask: radial-gradient(circle at 50% 50%, transparent 0 22%, #000 46%);
+  mask: radial-gradient(circle at 50% 50%, transparent 0 22%, #000 46%);
+  opacity: 0.55;
+}
+#moment .focus::after {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle, #1b172240 1.6px, transparent 1.9px) 0 0 / 9px 9px;
+  -webkit-mask: radial-gradient(circle at 50% 50%, transparent 0 30%, #000 60%);
+  mask: radial-gradient(circle at 50% 50%, transparent 0 30%, #000 60%);
+}
+#moment.on .focus { animation: moment-flash 0.95s ease-out forwards; }
+#moment .sfx {
+  position: absolute; left: 50%; top: 40%; display: grid; justify-items: center; line-height: 0.95;
+  transform: translate(-50%, -50%) rotate(var(--tilt, -4deg));
+  font-family: var(--num); paint-order: stroke fill; -webkit-text-stroke: 10px var(--ink);
+}
+#moment .sfx .jp { font-size: 112px; color: #fff; text-shadow: 8px 8px 0 var(--ink); letter-spacing: -0.04em; }
+#moment .sfx .en { font-size: 40px; color: var(--yellow); -webkit-text-stroke-width: 7px; margin-top: 6px; transform: rotate(-3deg); }
+#moment.on .sfx { animation: moment-pop 0.95s cubic-bezier(.2, 1.6, .4, 1) forwards; }
+@keyframes moment-pop {
+  0% { transform: translate(-50%, -50%) rotate(var(--tilt)) scale(2.2); }
+  18% { transform: translate(-50%, -50%) rotate(var(--tilt)) scale(1); }
+  100% { transform: translate(-50%, -50%) rotate(var(--tilt)) scale(1.06); }
+}
+@keyframes moment-flash {
+  0% { opacity: 0.95; background-color: #fffbe8b0; }
+  12% { opacity: 0.6; background-color: transparent; }
+  100% { opacity: 0.35; }
+}
+@keyframes moment-out { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+@media (max-height: 820px) {
+  #moment .sfx .jp { font-size: 84px; }
+  #moment .sfx .en { font-size: 30px; }
+}
+@media (prefers-reduced-motion: reduce) { #moment.on, #moment.on .focus, #moment.on .sfx { animation-duration: 0.01s; } }
