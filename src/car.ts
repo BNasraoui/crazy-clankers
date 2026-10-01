@@ -17,11 +17,14 @@ export const CAR_RADIUS = 1.6;
 export interface StepEvents { impact: number; landed: number; hop: boolean; launch: number; armed: boolean; splash: boolean } // launch: -1 = none, else charge 0..1
 
 const HOP = 11; // upward speed of a Crazy Hop
-// Launch Mode: from a stop, hold handbrake + gas to charge, release the handbrake to launch.
+// Launch Mode: hold handbrake + gas to charge (standing still or drifting), release the handbrake to launch.
 const LAUNCH_ARM = 0.35; // seconds of charge before a release does anything
 const LAUNCH_FULL = 0.8; // seconds to a full charge
 const LAUNCH_MIN = 12; // speed from a minimal launch
 const LAUNCH_MAX = 30; // speed from a full launch
+const KICK_MIN = 5; // speed added by a minimal launch out of a drift
+const KICK_MAX = 16; // speed added by a full launch out of a drift
+const OVERSPEED = 52; // launches may briefly beat MAX_SPEED, up to this
 const STEP_UP = 1.1; // anything taller than this is a wall, not a slope
 
 // Arcade physics: grip-based steering on the ground, ballistic in the air.
@@ -76,31 +79,40 @@ export class Car {
     this.steerInput = inp.steer;
 
     if (this.grounded) {
-      // Launch Mode: only from (nearly) a standstill, handbrake and gas held together.
-      const charging = inp.handbrake && inp.throttle > 0.5 && (this.launchCharge > 0 || Math.abs(vf) < 2);
+      // Launch Mode: handbrake and gas held together, at any speed.
+      const charging = inp.handbrake && inp.throttle > 0.5;
+      const standing = Math.abs(vf) < 2 && this.speed < 3;
       if (charging) {
         const before = this.launchCharge;
         this.launchCharge = Math.min(LAUNCH_FULL, this.launchCharge + dt);
         if (before < LAUNCH_ARM && this.launchCharge >= LAUNCH_ARM) ev.armed = true;
-        vf = 0;
-        vs *= Math.exp(-10 * dt);
+        if (standing) {
+          vf = 0;
+          vs *= Math.exp(-10 * dt);
+        }
       } else if (this.launchCharge > 0) {
         // Releasing the handbrake with the gas still down fires the launch; letting go of the gas cancels it.
         if (this.launchCharge >= LAUNCH_ARM && inp.throttle > 0.5 && !inp.handbrake) {
           const t = (this.launchCharge - LAUNCH_ARM) / (LAUNCH_FULL - LAUNCH_ARM);
-          vf = LAUNCH_MIN + (LAUNCH_MAX - LAUNCH_MIN) * t;
+          if (vf < 4) vf = LAUNCH_MIN + (LAUNCH_MAX - LAUNCH_MIN) * t;
+          else {
+            // Out of a drift: straighten up and kick forward along the nose.
+            vf = Math.min(OVERSPEED, Math.max(vf, this.speed) + KICK_MIN + (KICK_MAX - KICK_MIN) * t);
+            vs *= 0.3;
+          }
           ev.launch = t;
         }
         this.launchCharge = 0;
       }
+      const holding = charging && standing;
       const top = wet ? MAX_SPEED * 0.5 : MAX_SPEED;
-      if (!charging && inp.throttle > 0 && vf >= -0.5) vf += ACCEL * (wet ? 0.5 : 1) * inp.throttle * Math.max(0, 1 - (vf / top) ** 2) * dt;
+      if (!holding && inp.throttle > 0 && vf >= -0.5) vf += ACCEL * (wet ? 0.5 : 1) * inp.throttle * Math.max(0, 1 - (vf / top) ** 2) * dt;
       if (wet) vf -= vf * 0.5 * dt;
-      if (!charging && inp.brake > 0) {
+      if (!holding && inp.brake > 0) {
         if (vf > 0.5) vf -= BRAKE * inp.brake * dt;
         else vf = Math.max(-REVERSE_MAX, vf - 14 * inp.brake * dt);
       }
-      if (!charging && inp.throttle > 0 && vf < -0.5) vf += BRAKE * inp.throttle * dt;
+      if (!holding && inp.throttle > 0 && vf < -0.5) vf += BRAKE * inp.throttle * dt;
       vf -= vf * 0.35 * dt + Math.sign(vf) * Math.min(Math.abs(vf), 1.5 * dt);
       // Hills slow you going up and speed you up going down.
       const slope = (groundAt(this.pos.x + fx, this.pos.z + fz) - groundAt(this.pos.x - fx, this.pos.z - fz)) / 2;
@@ -108,7 +120,7 @@ export class Car {
 
       const grip = inp.handbrake ? 1.3 : 7;
       vs *= Math.exp(-grip * dt);
-      if (inp.handbrake && !charging) vf -= Math.sign(vf) * Math.min(Math.abs(vf), 5 * dt);
+      if (inp.handbrake && !holding) vf -= Math.sign(vf) * Math.min(Math.abs(vf), 5 * dt);
 
       const s = Math.abs(vf);
       const turn = STEER * Math.min(1, s / 6) * (1 - 0.4 * Math.min(1, s / MAX_SPEED)) * (inp.handbrake ? 1.5 : 1);
@@ -183,7 +195,7 @@ export class Car {
     if (this.grounded) {
       const sf = (groundAt(this.pos.x + fx * 1.6, this.pos.z + fz * 1.6) - groundAt(this.pos.x - fx * 1.6, this.pos.z - fz * 1.6)) / 3.2;
       const sr = (groundAt(this.pos.x - fz, this.pos.z + fx) - groundAt(this.pos.x + fz, this.pos.z - fx)) / 2;
-      tp = -Math.atan(sf) + (this.launchCharge > 0 ? 0.05 + 0.05 * Math.min(1, this.launchCharge / LAUNCH_FULL) : 0);
+      tp = -Math.atan(sf) + (this.launchCharge > 0 && this.speed < 3 ? 0.05 + 0.05 * Math.min(1, this.launchCharge / LAUNCH_FULL) : 0);
       tr = -Math.atan(sr) + THREE.MathUtils.clamp(this.lateral * 0.012, -0.08, 0.08);
     } else {
       tp = -Math.atan2(this.vy, Math.max(4, this.speed)) * 0.6;

@@ -258,7 +258,7 @@ export class Game {
       <div class="controls">
         <b>Gas</b> RT / W &nbsp; <b>Brake / reverse</b> LT / S &nbsp; <b>Steer</b> stick / A D<br>
         <b>Drift</b> B or RB / Space (hold) &nbsp; <b>Hop</b> A / E &nbsp; <b>Pause</b> Start / Esc<br>
-        <b>Launch Mode</b> from a stop, hold handbrake + gas, release handbrake &nbsp; Smash junk, hit hydrants, jump off the piers.<br>
+        <b>Launch Mode</b> hold handbrake + gas (stopped or drifting), release handbrake &nbsp; Smash junk, hit hydrants, jump off the piers.<br>
         Stop in a ring to pick up. Stop in the beam to drop off.<br>
         Jumps, near misses and drifts earn tips but cost your <b>DMV permit</b>.
       </div>
