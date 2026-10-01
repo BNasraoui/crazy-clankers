@@ -1,0 +1,170 @@
+{
+  "salesfarce_tower": {
+    "triangles": 17096,
+    "budget": 20000,
+    "min": [
+      -20.2,
+      -20.2,
+      -4.1
+    ],
+    "max": [
+      20.2,
+      20.2,
+      165.0
+    ],
+    "nodes": [
+      "crown",
+      "plaza",
+      "salesfarce_tower",
+      "tower"
+    ],
+    "materials": [
+      "fin",
+      "frame",
+      "glass",
+      "glass_band",
+      "ink",
+      "leaf",
+      "light_crown",
+      "lobby",
+      "planter",
+      "plaza",
+      "roof",
+      "stone",
+      "trunk"
+    ]
+  },
+  "pyramid": {
+    "triangles": 5648,
+    "budget": 20000,
+    "min": [
+      -20.0,
+      -20.0,
+      -16.0
+    ],
+    "max": [
+      20.0,
+      20.0,
+      119.9
+    ],
+    "nodes": [
+      "plaza",
+      "pyramid",
+      "tower"
+    ],
+    "materials": [
+      "column",
+      "frame",
+      "ink",
+      "leaf",
+      "light_beacon",
+      "lobby",
+      "plaza",
+      "precast",
+      "spire",
+      "stone",
+      "trunk",
+      "window",
+      "wing"
+    ]
+  },
+  "ferry_building": {
+    "triangles": 12412,
+    "budget": 20000,
+    "min": [
+      -18.0,
+      -20.0,
+      -3.1
+    ],
+    "max": [
+      18.0,
+      20.0,
+      55.26
+    ],
+    "nodes": [
+      "ferry_building",
+      "ground",
+      "hall"
+    ],
+    "materials": [
+      "arch",
+      "cap",
+      "ink",
+      "light_clock",
+      "light_lamp",
+      "pave",
+      "plinth",
+      "rail",
+      "roof",
+      "skylight",
+      "stone",
+      "stone_dark",
+      "trim",
+      "window",
+      "wood"
+    ]
+  },
+  "coit_tower": {
+    "triangles": 7228,
+    "budget": 20000,
+    "min": [
+      -9.7,
+      -9.7,
+      -10.0
+    ],
+    "max": [
+      9.7,
+      9.73,
+      33.15
+    ],
+    "nodes": [
+      "base",
+      "coit_tower",
+      "terrace",
+      "tower"
+    ],
+    "materials": [
+      "arch",
+      "base",
+      "concrete",
+      "course",
+      "door",
+      "flute",
+      "ink",
+      "light_lamp",
+      "pave",
+      "rail",
+      "roof",
+      "trim",
+      "wall",
+      "wood"
+    ]
+  },
+  "golden_gate": {
+    "triangles": 10680,
+    "budget": 20000,
+    "min": [
+      -260.2,
+      -9.0,
+      -16.0
+    ],
+    "max": [
+      260.2,
+      9.0,
+      91.7
+    ],
+    "nodes": [
+      "cables",
+      "deck",
+      "golden_gate",
+      "towers"
+    ],
+    "materials": [
+      "concrete",
+      "light_beacon",
+      "orange",
+      "orange_dark",
+      "road"
+    ]
+  }
+}

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { glslColor, toon } from './look';
 import { districtOf, type District } from './districts';
-import { instance, kit, sag, wirePoints } from './scenery';
+import { instance, kit, landmarkModels, sag, wirePoints } from './scenery';
 import { FacadeBuilder, facadeSets, houseSet, type FacadeImage } from './facades';
 
 // The city is a 10x10 grid of blocks. Street centerlines sit every CELL units.
@@ -989,59 +989,85 @@ function blockCenter(bi: number, bj: number) {
 
 function addLandmarks(scene: THREE.Scene) {
   const lam = (c: number) => toon({ color: c });
+  // The modelled landmarks (assets/blender/landmarks.py) sit level at the highest ground
+  // under their footprint; their plinths reach down the slope. Without a model, primitives.
+  const seat = (x: number, z: number, hx: number, hz: number) => {
+    let top = -Infinity;
+    for (const u of [-1, 0, 1]) for (const v of [-1, 0, 1]) top = Math.max(top, heightAt(x + u * hx, z + v * hz));
+    return top;
+  };
+  const place = (id: string, x: number, y: number, z: number) => {
+    const model = landmarkModels[id];
+    if (!model) return false;
+    model.position.set(x, y, z);
+    scene.add(model);
+    return true;
+  };
 
-  // Salesfarce Tower: tapered rounded obelisk with a glowing crown.
+  // Salesfarce Tower: tapered rounded obelisk with a glowing crown (the model's `crown` node).
   {
     const { x, z, y } = blockCenter(8, 2);
-    const tower = new THREE.Mesh(new THREE.CylinderGeometry(8, 13, 150, 10), lam(0xc9d2d8));
-    tower.position.set(x, y + 75, z);
-    const crown = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 8, 14, 10), new THREE.MeshBasicMaterial({ color: 0x9fe6ff }));
-    crown.position.set(x, y + 157, z);
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(6.5, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), lam(0xc9d2d8));
-    cap.position.set(x, y + 164, z);
-    const base = new THREE.Mesh(new THREE.BoxGeometry(40, 10, 40), lam(0x8c96a0));
-    base.position.set(x, y + 3, z);
-    tower.castShadow = base.castShadow = true;
-    scene.add(tower, crown, cap, base);
+    if (!place('salesfarce_tower', x, seat(x, z, 19.5, 19.5), z)) {
+      const tower = new THREE.Mesh(new THREE.CylinderGeometry(8, 13, 150, 10), lam(0xc9d2d8));
+      tower.position.set(x, y + 75, z);
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 8, 14, 10), new THREE.MeshBasicMaterial({ color: 0x9fe6ff }));
+      crown.position.set(x, y + 157, z);
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(6.5, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), lam(0xc9d2d8));
+      cap.position.set(x, y + 164, z);
+      const base = new THREE.Mesh(new THREE.BoxGeometry(40, 10, 40), lam(0x8c96a0));
+      base.position.set(x, y + 3, z);
+      tower.castShadow = base.castShadow = true;
+      scene.add(tower, crown, cap, base);
+    }
   }
   // The Pyramid.
   {
     const { x, z, y } = blockCenter(7, 1);
-    const pyr = new THREE.Mesh(new THREE.ConeGeometry(19, 110, 4), lam(0xe6e2d6));
-    pyr.rotation.y = Math.PI / 4;
-    pyr.position.set(x, y + 53, z);
-    const spire = new THREE.Mesh(new THREE.ConeGeometry(1.2, 22, 4), lam(0xe6e2d6));
-    spire.position.set(x, y + 118, z);
-    const base = new THREE.Mesh(new THREE.BoxGeometry(40, 4, 40), lam(0x9d988c));
-    base.position.set(x, y + 1, z);
-    pyr.castShadow = true;
-    scene.add(pyr, spire, base);
+    if (!place('pyramid', x, seat(x, z, 19.5, 19.5), z)) {
+      const pyr = new THREE.Mesh(new THREE.ConeGeometry(19, 110, 4), lam(0xe6e2d6));
+      pyr.rotation.y = Math.PI / 4;
+      pyr.position.set(x, y + 53, z);
+      const spire = new THREE.Mesh(new THREE.ConeGeometry(1.2, 22, 4), lam(0xe6e2d6));
+      spire.position.set(x, y + 118, z);
+      const base = new THREE.Mesh(new THREE.BoxGeometry(40, 4, 40), lam(0x9d988c));
+      base.position.set(x, y + 1, z);
+      pyr.castShadow = true;
+      scene.add(pyr, spire, base);
+    }
   }
-  // Ferry Building with clock tower.
+  // Ferry Building with clock tower; the model's tower faces west, its promenade the bay.
   {
     const { x, z, y } = blockCenter(9, 1);
-    const hall = new THREE.Mesh(new THREE.BoxGeometry(36, 12, 40), lam(0xd8cdb2));
-    hall.position.set(x + 2, y + 5, z);
-    const tower = new THREE.Mesh(new THREE.BoxGeometry(7, 44, 7), lam(0xe4dac0));
-    tower.position.set(x + 2, y + 22, z);
-    const cap = new THREE.Mesh(new THREE.ConeGeometry(5.5, 9, 4), lam(0x8a7a5a));
-    cap.rotation.y = Math.PI / 4;
-    cap.position.set(x + 2, y + 48.5, z);
-    const clock = new THREE.Mesh(new THREE.CircleGeometry(2.4, 16), new THREE.MeshBasicMaterial({ color: 0xfffbe8 }));
-    clock.position.set(x + 2, y + 36, z + 3.6);
-    hall.castShadow = tower.castShadow = true;
-    scene.add(hall, tower, cap, clock);
+    if (!place('ferry_building', x + 2, seat(x + 2, z, 17.5, 19.5), z)) {
+      const hall = new THREE.Mesh(new THREE.BoxGeometry(36, 12, 40), lam(0xd8cdb2));
+      hall.position.set(x + 2, y + 5, z);
+      const tower = new THREE.Mesh(new THREE.BoxGeometry(7, 44, 7), lam(0xe4dac0));
+      tower.position.set(x + 2, y + 22, z);
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(5.5, 9, 4), lam(0x8a7a5a));
+      cap.rotation.y = Math.PI / 4;
+      cap.position.set(x + 2, y + 48.5, z);
+      const clock = new THREE.Mesh(new THREE.CircleGeometry(2.4, 16), new THREE.MeshBasicMaterial({ color: 0xfffbe8 }));
+      clock.position.set(x + 2, y + 36, z + 3.6);
+      hall.castShadow = tower.castShadow = true;
+      scene.add(hall, tower, cap, clock);
+    }
   }
-  // Coit Tower on the Russian Hill park.
+  // Coit Tower on the Russian Hill park, on a round terrace walled against the slope.
   {
     const { x, z, y } = blockCenter(3, 0);
-    const col = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.8, 30, 14), lam(0xece5d3));
-    col.position.set(x, y + 15, z);
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 3.4, 3, 14), lam(0xddd4bf));
-    top.position.set(x, y + 31, z);
-    col.castShadow = true;
-    scene.add(col, top);
-    blocks[0 * N + 3].circles.push({ x, z, r: 4.2 });
+    let ground = -Infinity;
+    for (let k = 0; k < 16; k++) ground = Math.max(ground, heightAt(x + 9.5 * Math.cos(k * Math.PI / 8), z + 9.5 * Math.sin(k * Math.PI / 8)));
+    if (place('coit_tower', x, ground + 0.2, z)) {
+      blocks[0 * N + 3].circles.push({ x, z, r: 9.6 });
+    } else {
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.8, 30, 14), lam(0xece5d3));
+      col.position.set(x, y + 15, z);
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 3.4, 3, 14), lam(0xddd4bf));
+      top.position.set(x, y + 31, z);
+      col.castShadow = true;
+      scene.add(col, top);
+      blocks[0 * N + 3].circles.push({ x, z, r: 4.2 });
+    }
   }
 }
 
@@ -1086,6 +1112,15 @@ function addGoldenGate(scene: THREE.Scene) {
   const red = toon({ color: 0xc0392b });
   const zc = -HALF - 110;
   const towers = [-340, -150];
+  // The model (assets/blender/landmarks.py): origin at the water line midway between the
+  // towers, deck and cables included. Each tower stands on a 10 x 18 m pier.
+  const model = landmarkModels.golden_gate;
+  if (model) {
+    model.position.set((towers[0] + towers[1]) / 2, 0, zc);
+    scene.add(model);
+    for (const tx of towers) for (const off of [-4.5, 0, 4.5]) extraCircles.push({ x: tx, z: zc + off, r: 5 });
+    return;
+  }
   for (const tx of towers) {
     for (const off of [-5, 5]) {
       extraCircles.push({ x: tx, z: zc + off, r: 2.2 });

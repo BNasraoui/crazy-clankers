@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Rebuild Tech Bro v6 and its measured turnaround acceptance artifacts, the cab, the robotaxis,
-# or the San Francisco street kit.
+# the San Francisco street kit or its landmarks.
 set -euo pipefail
 cd "$(dirname "$0")"
 if [[ -z "${BLENDER:-}" ]]; then
@@ -32,8 +32,15 @@ case "${1:-techbro}" in
       "$BLENDER" --background --factory-startup --python-exit-code 1 --python street_kit.py -- "$step"
     done
     exit ;;
+  landmarks)
+    # Salesforce Tower, the Pyramid, the Ferry Building, Coit Tower and the Golden Gate to
+    # public/models/landmarks with a toon sheet each, then a reimport check.
+    for step in all check; do
+      "$BLENDER" --background --factory-startup --python-exit-code 1 --python landmarks.py -- "$step"
+    done
+    exit ;;
   techbro) ;;
-  *) echo 'Usage: build.sh [techbro|cab|robotaxis|sheet-robotaxis|street]' >&2; exit 2 ;;
+  *) echo 'Usage: build.sh [techbro|cab|robotaxis|sheet-robotaxis|street|landmarks]' >&2; exit 2 ;;
 esac
 "$ASSET_PYTHON" test_sheets.py
 "$ASSET_PYTHON" test_profile.py
