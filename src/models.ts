@@ -74,11 +74,24 @@ export const CABS: CabInfo[] = [
 
 const carTemplates = new Map<string, THREE.Object3D>();
 
+// Per-car colour overrides by material role, applied when the model loads, so each
+// brand has its own look regardless of what the Blender export used.
+const CAR_PALETTES: Record<string, Record<string, number>> = {
+  // The real Cybercab is champagne gold with no livery: hide the accent swoosh in the body colour.
+  cybercab: { body: 0xc8b48c, accent: 0xc8b48c, hub: 0x8c7a5c },
+};
+
 export async function loadCars(): Promise<void> {
   const loader = new GLTFLoader();
   await Promise.all(CABS.map(async ({ id }) => {
     try {
       const gltf = await loader.loadAsync(`/models/${id}.glb`);
+      const palette = CAR_PALETTES[id];
+      if (palette)
+        gltf.scene.traverse((o) => {
+          const mat = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+          if (mat && palette[mat.name] !== undefined) mat.color.setHex(palette[mat.name]);
+        });
       carTemplates.set(id, gltf.scene);
     } catch (err) {
       console.warn(`No ${id}.glb:`, err);
