@@ -11,9 +11,15 @@ ASSET_PYTHON="${ASSET_PYTHON:-$(dirname "$(readlink -f "$BLENDER")")/5.2/python/
 case "${1:-techbro}" in
   cab) "$BLENDER" --background --factory-startup --python-exit-code 1 --python cab.py; exit ;;
   robotaxis)
-    # Downloads the Sketchfab sources once (needs ~/.config/sketchfab/token).
-    "$ASSET_PYTHON" fetch_sources.py
-    for car in wayfarer cybercab lineup style; do
+    # The bodies are built from profiles traced off the Sketchfab sources, so the build
+    # needs no download; `robotaxis.py -- trace` re-measures them (run fetch_sources.py
+    # first, it needs ~/.config/sketchfab/token). The silhouette sheet compares against
+    # the previous shrink-wrapped versions from PR #16.
+    mkdir -p sources/prev
+    for car in wayfarer cybercab; do
+      git show "2fd5d4e:public/models/$car.glb" > "sources/prev/$car.glb"
+    done
+    for car in wayfarer cybercab lineup style silhouettes; do
       "$BLENDER" --background --factory-startup --python-exit-code 1 --python robotaxis.py -- "$car"
     done
     exit ;;
