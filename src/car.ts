@@ -212,7 +212,10 @@ export class Car {
         this.grounded = true;
         ev.landed = this.airTime;
         this.vel.multiplyScalar(this.airTime > 0.8 ? 0.9 : 0.97);
-        this.vy = 0;
+        // Land moving with the slope, not level: with vy = 0 a downhill falls away faster
+        // than the car next step, which reads as a crest and launches it again (hop, hop).
+        const ahead = 0.05;
+        this.vy = Math.min(0, (groundAt(this.pos.x + this.vel.x * ahead, this.pos.z + this.vel.y * ahead) - ground) / ahead);
       }
     }
     if (wasDry && this.pos.y <= WATER) ev.splash = true;
