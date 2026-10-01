@@ -169,6 +169,17 @@ export class QuipDirector {
     return true;
   }
 
+  // A one-off line not drawn from the bags (what a passenger wants from the ride).
+  line(speaker: Speaker, text: string) {
+    const seconds = Math.min(5, Math.max(2.2, 1.4 + text.length * 0.05));
+    const s = SPEAKERS[speaker];
+    this.show(s.name, s.color, text, seconds, speaker);
+    babble(text, s.pitch);
+    this.busyUntil = this.now + seconds;
+    this.busyPriority = 3;
+    this.lastAt = this.now;
+  }
+
   update(now: number) {
     this.now = now;
     const due = this.queue.filter((q) => q.at <= now);

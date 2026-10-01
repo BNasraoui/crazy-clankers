@@ -575,10 +575,9 @@ export class Game {
   private showWantCard(r: Ride) {
     const w = r.want, el = $('#want-card');
     const face = `/portraits/${r.type.id}.jpg`;
-    const targets = w.targets.map((t, i) => `<span><i>${'★'.repeat(i + 1)}</i>${t}</span>`).join('');
+    const goal = w.targets.length ? `<i>★★★★★</i> ${w.targets.at(-1)}` : 'No bumps';
     el.innerHTML = `<img class="face" src="${face}" alt=""><div class="body"><div class="who">${r.type.label.replace('★ ', '')} WANTS</div>
-      <div class="title">${w.def.icon} ${w.def.title}</div><div class="ask">“${w.ask}”</div>
-      <div class="targets">${targets || `<span>${w.def.how}</span>`}</div></div>`;
+      <div class="title">${w.def.icon} ${w.def.title}</div><div class="goal">${goal}</div></div>`;
     el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
     clearTimeout(this.cardTimer);
     this.cardTimer = window.setTimeout(() => el.classList.remove('show'), 4300);
@@ -692,7 +691,7 @@ export class Game {
     this.setDest(w.dest);
     sfx.pickup();
     this.popup(w.type.label.replace('★ ', ''), 'big');
-    this.quips.say(w.type.id, 'pickup', { force: true });
+    this.quips.line(w.type.id, this.ride.want.ask); // they say what they want
     if (this.rand() < 0.35) this.quips.say('cab', 'pickup', { delay: 3 });
     while (this.waiting.length < WAITING_COUNT) this.spawnWaiting();
   }
