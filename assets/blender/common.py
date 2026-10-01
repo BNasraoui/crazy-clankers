@@ -295,15 +295,19 @@ def outline_material():
     return m
 
 
-def add_outlines(objs, width):
+def add_outlines(objs, width, skip_mats=()):
     """Inverted-hull outlines: a culled, inside-out copy of each mesh pushed out along
-    its normals. The hull is its own object so it can skip casting shadows."""
+    its normals. The hull is its own object so it can skip casting shadows. Faces using
+    a material named in `skip_mats` (e.g. painted-on face details) get no hull."""
     om = outline_material()
     for o in objs:
         if o.type != "MESH":
             continue
         bm = bmesh.new()
         bm.from_mesh(o.data)
+        skip = {i for i, s in enumerate(o.material_slots) if s.material and s.material.name in skip_mats}
+        if skip:
+            bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.material_index in skip], context="FACES")
         bm.normal_update()
         for v in bm.verts:
             v.co += v.normal * width * min(v.calc_shell_factor(), 2.0)
@@ -322,7 +326,8 @@ def add_outlines(objs, width):
 
 
 def render_contact_sheet(root, name, outline, size=640, fill=0.9, elevation=10.0, lens=70.0,
-                         views=(("front", 0), ("3/4 front", -35), ("side", -90), ("back", 180))):
+                         views=(("front", 0), ("3/4 front", -35), ("side", -90), ("back", 180)),
+                         skip_outline=()):
     """Turntable preview: rotate `root` about Z under a fixed sun and camera, render
     each view with Eevee, and stitch them into docs/renders/<name>.png. `fill` scales
     the camera distance (lower = tighter framing)."""
@@ -330,7 +335,7 @@ def render_contact_sheet(root, name, outline, size=640, fill=0.9, elevation=10.0
     model_objs = [o for o in scene.objects if o.type == "MESH"]
     for m in {s.material for o in model_objs for s in o.material_slots if s.material}:
         toonify(m)
-    add_outlines(model_objs, outline)
+    add_outlines(model_objs, outline, skip_outline)
 
     # Bounds for framing.
     dg = bpy.context.evaluated_depsgraph_get()
@@ -383,6 +388,15 @@ def render_contact_sheet(root, name, outline, size=640, fill=0.9, elevation=10.0
     scene.view_settings.look = "None"
     scene.eevee.taa_render_samples = 16
 
+    tiles = render_views(root, name, views, size)
+    save_sheet(tiles, name, size)
+
+
+def render_views(root, name, views, size):
+    """Render `root` turned to each (label, degrees) view; returns RGB tiles over BG."""
+    scene = bpy.context.scene
+    r = scene.render
+    r.resolution_x = r.resolution_y = size
     tmp = RENDERS_DIR / f".{name}_tmp"
     tmp.mkdir(parents=True, exist_ok=True)
     tiles = []
@@ -402,7 +416,11 @@ def render_contact_sheet(root, name, outline, size=640, fill=0.9, elevation=10.0
         os.remove(r.filepath)
     tmp.rmdir()
     root.rotation_euler = (0, 0, 0)
+    return tiles
 
+
+def save_sheet(tiles, name, size):
+    """Stitch tiles left to right into docs/renders/<name>.png."""
     gap = np.ones((size, 8, 3), dtype=np.float32) * np.array(BG, dtype=np.float32)
     row = []
     for t in tiles:
