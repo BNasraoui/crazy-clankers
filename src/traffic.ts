@@ -1,0 +1,156 @@
+import * as THREE from 'three';
+import { Car } from './car';
+import { CELL, HALF, N, heightAt, rng } from './world';
+import { makeSedan, makeToaster, makeWedge, type CarModel } from './models';
+
+interface TCar {
+  model: CarModel;
+  axis: 'x' | 'z';
+  line: number; // street centreline
+  dir: 1 | -1;
+  s: number; // position along the street
+  speed: number;
+  cruise: number;
+  stopped: number; // seconds left sitting still after being hit
+  blockedFor: number;
+  near: boolean;
+  hitAt: number;
+  honkAt: number;
+  x: number;
+  z: number;
+}
+
+export interface TrafficEvents { impact: number; nearMisses: number; honk: boolean }
+
+const COLORS = [0x2d4a7a, 0x8a2b2b, 0x1f1f22, 0xd8d8d8, 0x4a6a3a, 0xc9a227, 0x6a6f78, 0x7a3f8a];
+const LANE = 4;
+// Each car is three circles along its length.
+const PARTS = [-1.4, 0, 1.4];
+const PART_R = 1.1;
+
+export class Traffic {
+  cars: TCar[] = [];
+  private clock = 0;
+
+  constructor(scene: THREE.Scene, count: number) {
+    const r = rng(5);
+    for (let k = 0; k < count; k++) {
+      const pick = r();
+      const model = pick < 0.12 ? makeWedge() : pick < 0.27 ? makeToaster() : makeSedan(COLORS[Math.floor(r() * COLORS.length)]);
+      scene.add(model.root);
+      const cruise = 9 + r() * 4;
+      this.cars.push({
+        model, axis: r() < 0.5 ? 'x' : 'z', line: -HALF + Math.floor(r() * (N + 1)) * CELL,
+        dir: r() < 0.5 ? 1 : -1, s: 0, speed: cruise, cruise, stopped: 0, blockedFor: 0,
+        near: false, hitAt: -99, honkAt: -99, x: 0, z: 0,
+      });
+    }
+    this.scatter();
+  }
+
+  scatter() {
+    const r = rng(77);
+    for (const c of this.cars) {
+      for (let tries = 0; tries < 20; tries++) {
+        c.s = -HALF + r() * 2 * HALF;
+        this.place(c);
+        if (Math.hypot(c.x, c.z + 30) > 40 && !this.cars.some((o) => o !== c && Math.hypot(o.x - c.x, o.z - c.z) < 10)) break;
+      }
+      c.speed = c.cruise;
+      c.stopped = 0;
+    }
+  }
+
+  private place(c: TCar) {
+    // Drive on the right.
+    if (c.axis === 'z') { c.x = c.line - LANE * c.dir; c.z = c.s; }
+    else { c.x = c.s; c.z = c.line + LANE * c.dir; }
+  }
+
+  private heading(c: TCar): [number, number] {
+    return c.axis === 'z' ? [0, c.dir] : [c.dir, 0];
+  }
+
+  update(dt: number, player: Car): TrafficEvents {
+    this.clock += dt;
+    const ev: TrafficEvents = { impact: 0, nearMisses: 0, honk: false };
+    const pf = player.fwd;
+    const playerParts = PARTS.map((o) => [player.pos.x + pf.x * o, player.pos.z + pf.y * o]);
+
+    for (const c of this.cars) {
+      const [fx, fz] = this.heading(c);
+      let blocked = false;
+      let byPlayer = false;
+      const check = (ox: number, oz: number) => {
+        const dx = ox - c.x, dz = oz - c.z;
+        const along = dx * fx + dz * fz;
+        const lat = Math.abs(dx * fz - dz * fx);
+        return along > 0 && along < 8 && lat < 2.6;
+      };
+      if (check(player.pos.x, player.pos.z)) { blocked = true; byPlayer = true; }
+      if (!blocked && c.blockedFor < 3)
+        for (const o of this.cars) if (o !== c && check(o.x, o.z)) { blocked = true; break; }
+
+      if (c.stopped > 0) { c.stopped -= dt; c.speed = 0; }
+      else if (blocked) { c.blockedFor += dt; c.speed = Math.max(0, c.speed - 25 * dt); }
+      else { c.blockedFor = 0; c.speed = Math.min(c.cruise, c.speed + 6 * dt); }
+      if (byPlayer && c.blockedFor > 0.8 && this.clock - c.honkAt > 3) {
+        c.honkAt = this.clock;
+        if (Math.hypot(player.pos.x - c.x, player.pos.z - c.z) < 25) ev.honk = true;
+      }
+
+      c.s += c.dir * c.speed * dt;
+      if (c.s > HALF + 6) c.s = -HALF - 6;
+      if (c.s < -HALF - 6) c.s = HALF + 6;
+      this.place(c);
+
+      // Player contact.
+      const dxp = player.pos.x - c.x, dzp = player.pos.z - c.z;
+      if (Math.abs(dxp) > 12 || Math.abs(dzp) > 12) { c.near = false; continue; }
+      const overTop = player.pos.y > heightAt(c.x, c.z) + 1.7;
+      let minD = Infinity;
+      for (const o of PARTS) {
+        const cx = c.x + fx * o, cz = c.z + fz * o;
+        for (const [px, pz] of playerParts) minD = Math.min(minD, Math.hypot(px - cx, pz - cz));
+      }
+      if (!overTop && minD < PART_R * 2) {
+        const d = Math.hypot(dxp, dzp) || 1;
+        const nx = dxp / d, nz = dzp / d;
+        const push = PART_R * 2 - minD;
+        player.pos.x += nx * push;
+        player.pos.z += nz * push;
+        const rvx = player.vel.x - fx * c.speed, rvz = player.vel.y - fz * c.speed;
+        const vn = rvx * nx + rvz * nz;
+        if (vn < 0) {
+          player.vel.x -= nx * vn * 1.4;
+          player.vel.y -= nz * vn * 1.4;
+          if (-vn > 3) {
+            ev.impact = Math.max(ev.impact, -vn);
+            c.stopped = 2;
+            c.hitAt = this.clock;
+          }
+        }
+        c.near = false;
+      } else if (player.speed > 16 && minD < 3.4) {
+        c.near = true;
+      } else if (c.near && minD > 6) {
+        c.near = false;
+        if (this.clock - c.hitAt > 1.5) ev.nearMisses++;
+      }
+    }
+    return ev;
+  }
+
+  sync(dt: number) {
+    for (const c of this.cars) {
+      const [fx, fz] = this.heading(c);
+      const y = heightAt(c.x, c.z);
+      const slope = (heightAt(c.x + fx * 1.5, c.z + fz * 1.5) - heightAt(c.x - fx * 1.5, c.z - fz * 1.5)) / 3;
+      const { root, body, wheels } = c.model;
+      root.position.set(c.x, y, c.z);
+      root.rotation.y = Math.atan2(fx, fz);
+      body.rotation.x = -Math.atan(slope);
+      for (const w of wheels) w.rotation.x += (c.speed * dt) / 0.42;
+    }
+  }
+}
