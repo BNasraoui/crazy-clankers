@@ -14,9 +14,15 @@ const btn = (k: 'A' | 'B' | 'Y' | 'pad', text: string) =>
 
 const LOGO = `<h1 class="logo">CRAZY<span>CLANKERS</span></h1>`;
 
+// Painted key art behind the title, a different one each visit.
+const KEYART = ['jump', 'rank', 'chaos'];
+let keyartIndex = Math.floor(Math.random() * KEYART.length);
+
 export function titleHTML(rating: string, padName: string) {
+  const art = KEYART[keyartIndex++ % KEYART.length];
   return `
     <div class="menu title-screen">
+      <img class="keyart" src="/keyart/${art}.jpg" alt="">
       <div class="logo-block">${LOGO}<div class="tag">You are the robotaxi. Drive like it.</div></div>
       <div class="rating-sticker"><small>DRIVER RATING</small><b>${rating}</b><span class="star">★</span></div>
       <div class="press-start">PRESS <i class="glyph a">A</i> TO START</div>

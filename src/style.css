@@ -255,6 +255,12 @@ body { font-family: var(--body); color: var(--paper); user-select: none; }
 .howto > b { font: 22px var(--num); }
 .howto div b { font: 16px var(--pen); color: var(--magenta); }
 
+/* Painted key art fills the title screen; the logo and prompts sit on top. */
+.title-screen .keyart { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 40%;
+  animation: kenburns 24s ease-in-out infinite alternate; }
+@keyframes kenburns { from { transform: scale(1.02); } to { transform: scale(1.08) translate(-1%, 1%); } }
+.title-screen > :not(.keyart) { z-index: 1; }
+
 /* Picker */
 .inspect-tag { position: absolute; left: 27%; bottom: 23%; padding: 2px 10px; font: 15px var(--pen); color: var(--ink);
   background: var(--paper); border: 2px solid var(--ink); border-radius: 6px; transform: rotate(-4deg); }
@@ -302,4 +308,4 @@ body { font-family: var(--body); color: var(--paper); user-select: none; }
   .picker-panel { width: 52vw; }
   .inspect-tag { left: 18%; }
 }
-@media (prefers-reduced-motion: reduce) { .press-start, .burst { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .press-start, .burst, .title-screen .keyart { animation: none; } }
