@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Car, MAX_SPEED } from './car';
 import { readInput, padName, padDebug, type Input } from './input';
-import { CABS, makeCar, makePerson, makeLabel, personFrom, type PersonModel } from './models';
+import { CABS, EXTRA_CARS, makeCar, makePerson, makeLabel, personFrom, type PersonModel } from './models';
 import { Look, SKY, makeSky } from './look';
 import { CHARACTER_LAYER, makeCharacter, sunDir } from './anime';
 import { pickPassenger, type PassengerType } from './passengers';
@@ -319,7 +319,7 @@ export class Game {
   }
 
   private rivals() {
-    return CABS.map((c) => c.id).filter((id) => id !== CABS[this.cabIndex].id);
+    return [...CABS.map((c) => c.id).filter((id) => id !== CABS[this.cabIndex].id), ...EXTRA_CARS];
   }
 
   private chooseCab(i: number) {

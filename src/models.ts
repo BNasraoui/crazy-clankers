@@ -67,10 +67,13 @@ export function personFrom(template: THREE.Object3D): PersonModel {
 // body, wheel_FL/FR/RL/RR and optionally lidar.
 export interface CabInfo { id: string; name: string; tagline: string }
 export const CABS: CabInfo[] = [
-  { id: 'cab', name: 'CLANKER CAB', tagline: 'The original. Polite. Chunky. Spins its puck.' },
   { id: 'wayfarer', name: 'WAYFARER', tagline: 'Jaguar-based. Sensors everywhere. Apologises a lot.' },
   { id: 'cybercab', name: 'CYBER CAB', tagline: 'Two seats, no wheel, delivery date TBC.' },
+  { id: 'zoox', name: 'ZOOMBOX', tagline: 'Both ends are the front. No steering wheel. No regrets.' },
+  { id: 'apollo', name: 'ARTEMIS GO', tagline: 'Cheapest fare in town. Swaps its own battery. Never sleeps.' },
 ];
+// Cars that can appear in traffic but aren't playable.
+export const EXTRA_CARS = ['cab'];
 
 const carTemplates = new Map<string, THREE.Object3D>();
 
@@ -83,7 +86,7 @@ const CAR_PALETTES: Record<string, Record<string, number>> = {
 
 export async function loadCars(): Promise<void> {
   const loader = new GLTFLoader();
-  await Promise.all(CABS.map(async ({ id }) => {
+  await Promise.all([...CABS.map((c) => c.id), ...EXTRA_CARS].map(async (id) => {
     try {
       const gltf = await loader.loadAsync(`/models/${id}.glb`);
       const palette = CAR_PALETTES[id];
