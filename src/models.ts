@@ -60,7 +60,7 @@ export function personFrom(template: THREE.Object3D): PersonModel {
   const body = template.clone(true);
   root.add(body);
   const part = (name: string) => body.getObjectByName(name) ?? new THREE.Object3D();
-  return { root, armL: part('arm_L'), armR: part('arm_R') };
+  return { root, armL: part('arm_L'), armR: part('arm_R'), raise: 0.3 };
 }
 
 // The player's cab, built in Blender (assets/blender/cab.py). Falls back to the
@@ -168,7 +168,9 @@ export function makeToaster(): CarModel {
 
 export interface PersonSpec { shirt: number; pants: number; hair: number; skin: number; height?: number; longHair?: boolean; vest?: number; glasses?: boolean; curly?: boolean }
 
-export interface PersonModel { root: THREE.Group; armL: THREE.Object3D; armR: THREE.Object3D }
+// raise: how far the waving arm lifts (radians about Z). Box people wave the whole arm;
+// Blender people hold a cup in a bent arm, so they raise it in a small toast instead.
+export interface PersonModel { root: THREE.Group; armL: THREE.Object3D; armR: THREE.Object3D; raise: number }
 
 export function makePerson(p: PersonSpec): PersonModel {
   const root = new THREE.Group();
@@ -196,7 +198,7 @@ export function makePerson(p: PersonSpec): PersonModel {
     inner.add(pivot);
     return pivot;
   };
-  return { root, armL: arm(-0.47), armR: arm(0.47) };
+  return { root, armL: arm(-0.47), armR: arm(0.47), raise: 2.6 };
 }
 
 // Billboard text that always faces the camera.

@@ -383,7 +383,8 @@ export class Game {
   private idleAnimations(dt: number) {
     for (const w of this.waiting) {
       w.phase += dt;
-      w.person.armR.rotation.z = 2.6 + Math.sin(w.phase * 8) * 0.4;
+      const p = w.person;
+      p.armR.rotation.z = p.raise + Math.sin(w.phase * 8) * p.raise * 0.15;
       w.person.root.position.y = w.curb.walk.y + Math.abs(Math.sin(w.phase * 4)) * 0.12;
     }
   }
@@ -420,7 +421,7 @@ export class Game {
 
     if (r.firedT > 0) {
       r.firedT -= dt;
-      if (r.ejected) r.ejected.armR.rotation.z = 2.6 + Math.sin(this.clock * 9) * 0.4;
+      if (r.ejected) r.ejected.armR.rotation.z = r.ejected.raise + Math.sin(this.clock * 9) * r.ejected.raise * 0.15;
       if (r.firedT <= 0) {
         if (r.ejected) this.scene.remove(r.ejected.root);
         r.ejected = undefined;
