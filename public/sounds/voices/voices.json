@@ -1,0 +1,1017 @@
+{
+ "clips": [
+  {
+   "file": "line01-is-that-thing-even-licensed.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "Is that thing even LICENSED?!",
+   "voice": "am_puck",
+   "scream": false,
+   "dur": 1.33
+  },
+  {
+   "file": "line02-is-that-thing-even-licensed.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "Is that thing even LICENSED?!",
+   "voice": "af_nicole",
+   "scream": false,
+   "dur": 1.94
+  },
+  {
+   "file": "line03-not-again-not-on-valencia.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "Not again! Not on Valencia!",
+   "voice": "am_echo",
+   "scream": false,
+   "dur": 1.79
+  },
+  {
+   "file": "line04-not-again-not-on-valencia.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "Not again! Not on Valencia!",
+   "voice": "af_heart",
+   "scream": false,
+   "dur": 1.59
+  },
+  {
+   "file": "line05-who-s-driving-that-nobody.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "Who's driving that?! NOBODY?!",
+   "voice": "am_liam",
+   "scream": false,
+   "dur": 1.63
+  },
+  {
+   "file": "line06-who-s-driving-that-nobody.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "Who's driving that?! NOBODY?!",
+   "voice": "af_sarah",
+   "scream": false,
+   "dur": 1.62
+  },
+  {
+   "file": "line07-learn-to-drive-you-toaster.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "Learn to drive, you toaster!",
+   "voice": "am_liam",
+   "scream": false,
+   "dur": 1.61
+  },
+  {
+   "file": "line08-learn-to-drive-you-toaster.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "Learn to drive, you toaster!",
+   "voice": "af_nicole",
+   "scream": false,
+   "dur": 1.75
+  },
+  {
+   "file": "line09-this-is-a-sidewalk-not-a-bet.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "This is a sidewalk, not a beta test!",
+   "voice": "bm_lewis",
+   "scream": false,
+   "dur": 2.13
+  },
+  {
+   "file": "line10-this-is-a-sidewalk-not-a-bet.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "This is a sidewalk, not a beta test!",
+   "voice": "af_heart",
+   "scream": false,
+   "dur": 1.93
+  },
+  {
+   "file": "line11-i-m-calling-three-one-one.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "I'm calling three one one!",
+   "voice": "am_michael",
+   "scream": false,
+   "dur": 1.51
+  },
+  {
+   "file": "line12-i-m-calling-three-one-one.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "I'm calling three one one!",
+   "voice": "af_sarah",
+   "scream": false,
+   "dur": 1.34
+  },
+  {
+   "file": "line13-somebody-file-a-bug-report.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "Somebody file a bug report!",
+   "voice": "am_onyx",
+   "scream": false,
+   "dur": 1.8
+  },
+  {
+   "file": "line14-somebody-file-a-bug-report.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "Somebody file a bug report!",
+   "voice": "af_nicole",
+   "scream": false,
+   "dur": 2.14
+  },
+  {
+   "file": "line15-third-one-today.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "Third one today!",
+   "voice": "am_adam",
+   "scream": false,
+   "dur": 1.05
+  },
+  {
+   "file": "line16-third-one-today.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "Third one today!",
+   "voice": "af_heart",
+   "scream": false,
+   "dur": 0.93
+  },
+  {
+   "file": "line17-that-s-going-in-the-group-ch.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "That's going in the group chat!",
+   "voice": "am_fenrir",
+   "scream": false,
+   "dur": 1.16
+  },
+  {
+   "file": "line18-that-s-going-in-the-group-ch.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "That's going in the group chat!",
+   "voice": "af_sarah",
+   "scream": false,
+   "dur": 1.39
+  },
+  {
+   "file": "line19-only-in-san-francisco.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "Only in San Francisco!",
+   "voice": "am_santa",
+   "scream": false,
+   "dur": 1.58
+  },
+  {
+   "file": "line20-only-in-san-francisco.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "Only in San Francisco!",
+   "voice": "af_nicole",
+   "scream": false,
+   "dur": 1.69
+  },
+  {
+   "file": "line21-i-ve-lived-here-thirty-years.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "I've lived here thirty years!",
+   "voice": "am_puck",
+   "scream": false,
+   "dur": 1.18
+  },
+  {
+   "file": "line22-i-ve-lived-here-thirty-years.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "I've lived here thirty years!",
+   "voice": "af_heart",
+   "scream": false,
+   "dur": 1.37
+  },
+  {
+   "file": "line23-get-its-license-plate-it-doe.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "Get its license plate! It doesn't HAVE one!",
+   "voice": "am_echo",
+   "scream": false,
+   "dur": 2.32
+  },
+  {
+   "file": "line24-get-its-license-plate-it-doe.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "Get its license plate! It doesn't HAVE one!",
+   "voice": "af_sarah",
+   "scream": false,
+   "dur": 2.07
+  },
+  {
+   "file": "line25-i-m-filing-a-ticket-on-jira.mp3",
+   "kinds": [
+    "jogger",
+    "scooter"
+   ],
+   "text": "I'm filing a ticket on Jira!",
+   "voice": "am_liam",
+   "scream": false,
+   "dur": 1.79
+  },
+  {
+   "file": "line26-my-patagonia.mp3",
+   "kinds": [
+    "jogger",
+    "scooter"
+   ],
+   "text": "My Patagonia!",
+   "voice": "am_puck",
+   "scream": false,
+   "dur": 0.95
+  },
+  {
+   "file": "line27-my-patagonia.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "My Patagonia!",
+   "voice": "af_nicole",
+   "scream": false,
+   "dur": 1.1
+  },
+  {
+   "file": "line28-my-oat-milk-latte.mp3",
+   "kinds": [
+    "jogger",
+    "scooter"
+   ],
+   "text": "My oat milk latte!",
+   "voice": "am_adam",
+   "scream": false,
+   "dur": 1.2
+  },
+  {
+   "file": "line29-my-oat-milk-latte.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "My oat milk latte!",
+   "voice": "af_heart",
+   "scream": false,
+   "dur": 1.18
+  },
+  {
+   "file": "line30-that-is-not-scalable-behavio.mp3",
+   "kinds": [
+    "jogger",
+    "scooter"
+   ],
+   "text": "That is NOT scalable behavior!",
+   "voice": "am_liam",
+   "scream": false,
+   "dur": 1.79
+  },
+  {
+   "file": "line31-my-watch-thinks-i-died.mp3",
+   "kinds": [
+    "jogger"
+   ],
+   "text": "My watch thinks I died!",
+   "voice": "am_liam",
+   "scream": false,
+   "dur": 1.52
+  },
+  {
+   "file": "line32-that-s-a-p-zero-incident.mp3",
+   "kinds": [
+    "jogger",
+    "scooter"
+   ],
+   "text": "That's a P-zero incident!",
+   "voice": "am_fenrir",
+   "scream": false,
+   "dur": 1.36
+  },
+  {
+   "file": "line33-i-invested-in-you-guys.mp3",
+   "kinds": [
+    "jogger",
+    "scooter"
+   ],
+   "text": "I INVESTED in you guys!",
+   "voice": "am_adam",
+   "scream": false,
+   "dur": 1.36
+  },
+  {
+   "file": "line34-i-m-putting-this-in-the-retr.mp3",
+   "kinds": [
+    "jogger",
+    "scooter"
+   ],
+   "text": "I'm putting this in the retro!",
+   "voice": "am_puck",
+   "scream": false,
+   "dur": 1.28
+  },
+  {
+   "file": "line35-my-heart-rate-just-hit-serie.mp3",
+   "kinds": [
+    "jogger"
+   ],
+   "text": "My heart rate just hit Series A!",
+   "voice": "am_liam",
+   "scream": false,
+   "dur": 1.88
+  },
+  {
+   "file": "line36-is-this-the-full-house-house.mp3",
+   "kinds": [
+    "tourist"
+   ],
+   "text": "Is this the Full House house?!",
+   "voice": "bm_george",
+   "scream": false,
+   "dur": 1.66
+  },
+  {
+   "file": "line37-linda-get-the-camera.mp3",
+   "kinds": [
+    "tourist"
+   ],
+   "text": "Linda! Get the camera!",
+   "voice": "bm_lewis",
+   "scream": false,
+   "dur": 1.33
+  },
+  {
+   "file": "line38-they-warned-us-about-the-hil.mp3",
+   "kinds": [
+    "tourist"
+   ],
+   "text": "They warned us about the hills, not the ROBOTS!",
+   "voice": "am_santa",
+   "scream": false,
+   "dur": 2.49
+  },
+  {
+   "file": "line39-is-this-part-of-the-tour.mp3",
+   "kinds": [
+    "tourist"
+   ],
+   "text": "Is this part of the tour?!",
+   "voice": "bm_george",
+   "scream": false,
+   "dur": 1.48
+  },
+  {
+   "file": "line40-i-just-wanted-a-sourdough-bo.mp3",
+   "kinds": [
+    "tourist"
+   ],
+   "text": "I just wanted a sourdough bowl!",
+   "voice": "bm_lewis",
+   "scream": false,
+   "dur": 1.75
+  },
+  {
+   "file": "line41-is-this-a-cable-car.mp3",
+   "kinds": [
+    "tourist"
+   ],
+   "text": "Is this a cable car?!",
+   "voice": "am_santa",
+   "scream": false,
+   "dur": 1.37
+  },
+  {
+   "file": "line42-we-have-these-in-ohio-but-sl.mp3",
+   "kinds": [
+    "tourist"
+   ],
+   "text": "We have these in Ohio, but slower!",
+   "voice": "bm_george",
+   "scream": false,
+   "dur": 2.23
+  },
+  {
+   "file": "line43-whoa-man-bad-vibes.mp3",
+   "kinds": [
+    "hippie"
+   ],
+   "text": "Whoa, man! BAD vibes!",
+   "voice": "am_onyx",
+   "scream": false,
+   "dur": 1.42
+  },
+  {
+   "file": "line44-duuude-not-cool.mp3",
+   "kinds": [
+    "hippie",
+    "scooter",
+    "courier"
+   ],
+   "text": "Duuude! Not cool!",
+   "voice": "am_michael",
+   "scream": false,
+   "dur": 1.05
+  },
+  {
+   "file": "line45-go-back-to-palo-alto.mp3",
+   "kinds": [
+    "hippie",
+    "courier"
+   ],
+   "text": "Go back to Palo Alto!",
+   "voice": "am_echo",
+   "scream": false,
+   "dur": 1.6
+  },
+  {
+   "file": "line46-go-back-to-palo-alto.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "Go back to Palo Alto!",
+   "voice": "af_sarah",
+   "scream": false,
+   "dur": 1.26
+  },
+  {
+   "file": "line47-this-was-a-nice-street-in-19.mp3",
+   "kinds": [
+    "hippie"
+   ],
+   "text": "This was a nice street. In 1967.",
+   "voice": "am_onyx",
+   "scream": false,
+   "dur": 2.56
+  },
+  {
+   "file": "line48-peace-and-love-man-you-mania.mp3",
+   "kinds": [
+    "hippie"
+   ],
+   "text": "Peace and love, man! You MANIAC!",
+   "voice": "am_echo",
+   "scream": false,
+   "dur": 2.17
+  },
+  {
+   "file": "line49-robots-don-t-have-souls-man.mp3",
+   "kinds": [
+    "hippie"
+   ],
+   "text": "Robots don't have souls, man!",
+   "voice": "am_onyx",
+   "scream": false,
+   "dur": 1.84
+  },
+  {
+   "file": "line50-watch-it-i-m-on-a-scooter.mp3",
+   "kinds": [
+    "scooter"
+   ],
+   "text": "Watch it! I'm on a SCOOTER!",
+   "voice": "am_liam",
+   "scream": false,
+   "dur": 1.49
+  },
+  {
+   "file": "line51-i-have-four-percent-battery.mp3",
+   "kinds": [
+    "scooter"
+   ],
+   "text": "I have four percent battery!",
+   "voice": "am_fenrir",
+   "scream": false,
+   "dur": 1.3
+  },
+  {
+   "file": "line52-that-s-my-lane-that-s-my-lan.mp3",
+   "kinds": [
+    "scooter",
+    "courier"
+   ],
+   "text": "That's my lane! That's my LANE!",
+   "voice": "am_puck",
+   "scream": false,
+   "dur": 1.35
+  },
+  {
+   "file": "line53-my-scooter-has-more-ethics-t.mp3",
+   "kinds": [
+    "scooter"
+   ],
+   "text": "My scooter has more ethics than you!",
+   "voice": "am_puck",
+   "scream": false,
+   "dur": 1.53
+  },
+  {
+   "file": "line54-biscuit-no-stay.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "Biscuit, NO! Stay!",
+   "voice": "af_nicole",
+   "scream": false,
+   "dur": 1.24
+  },
+  {
+   "file": "line55-you-scared-mochi.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "You scared Mochi!",
+   "voice": "af_heart",
+   "scream": false,
+   "dur": 1.02
+  },
+  {
+   "file": "line56-one-star-on-nextdoor.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "One star on Nextdoor!",
+   "voice": "af_sarah",
+   "scream": false,
+   "dur": 1.29
+  },
+  {
+   "file": "line57-not-in-front-of-the-dog.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "Not in front of the dog!",
+   "voice": "af_nicole",
+   "scream": false,
+   "dur": 1.54
+  },
+  {
+   "file": "line58-i-have-seven-deliveries-man.mp3",
+   "kinds": [
+    "courier"
+   ],
+   "text": "I have SEVEN deliveries, man!",
+   "voice": "am_michael",
+   "scream": false,
+   "dur": 1.62
+  },
+  {
+   "file": "line59-that-s-a-bike-lane-a-bike-la.mp3",
+   "kinds": [
+    "courier"
+   ],
+   "text": "That's a bike lane! A BIKE LANE!",
+   "voice": "am_puck",
+   "scream": false,
+   "dur": 1.62
+  },
+  {
+   "file": "line60-somebody-s-burrito-just-died.mp3",
+   "kinds": [
+    "courier"
+   ],
+   "text": "Somebody's burrito just died!",
+   "voice": "am_michael",
+   "scream": false,
+   "dur": 1.77
+  },
+  {
+   "file": "line61-you-took-my-job-and-my-lane.mp3",
+   "kinds": [
+    "courier"
+   ],
+   "text": "You took my job AND my lane?!",
+   "voice": "am_puck",
+   "scream": false,
+   "dur": 1.39
+  },
+  {
+   "file": "line62-not-the-farmers-market.mp3",
+   "kinds": [
+    "hippie",
+    "tourist"
+   ],
+   "text": "Not the farmers' market!",
+   "voice": "am_echo",
+   "scream": false,
+   "dur": 1.6
+  },
+  {
+   "file": "line63-not-the-farmers-market.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "Not the farmers' market!",
+   "voice": "af_heart",
+   "scream": false,
+   "dur": 1.22
+  },
+  {
+   "file": "line64-i-don-t-even-have-health-ins.mp3",
+   "kinds": [
+    "courier",
+    "hippie"
+   ],
+   "text": "I don't even have health insurance!",
+   "voice": "am_michael",
+   "scream": false,
+   "dur": 1.69
+  },
+  {
+   "file": "scream65-aaaaah.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "AAAAAH!",
+   "voice": "am_adam",
+   "scream": true,
+   "dur": 0.67
+  },
+  {
+   "file": "scream66-aaaaah.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "AAAAAH!",
+   "voice": "af_sarah",
+   "scream": true,
+   "dur": 0.67
+  },
+  {
+   "file": "scream67-aieeee.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "AIEEEE!",
+   "voice": "am_liam",
+   "scream": true,
+   "dur": 0.97
+  },
+  {
+   "file": "scream68-aieeee.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "AIEEEE!",
+   "voice": "af_nicole",
+   "scream": true,
+   "dur": 0.91
+  },
+  {
+   "file": "scream69-whoa-there.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "WHOA THERE!",
+   "voice": "am_onyx",
+   "scream": true,
+   "dur": 0.75
+  },
+  {
+   "file": "scream70-whoa-there.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "WHOA THERE!",
+   "voice": "af_heart",
+   "scream": true,
+   "dur": 0.69
+  },
+  {
+   "file": "scream71-oh-no-no-no.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "OH NO NO NO!",
+   "voice": "am_adam",
+   "scream": true,
+   "dur": 0.97
+  },
+  {
+   "file": "scream72-oh-no-no-no.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "OH NO NO NO!",
+   "voice": "af_sarah",
+   "scream": true,
+   "dur": 0.83
+  },
+  {
+   "file": "scream73-hey-hey-hey.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "HEY HEY HEY!",
+   "voice": "am_liam",
+   "scream": true,
+   "dur": 1.05
+  },
+  {
+   "file": "scream74-hey-hey-hey.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "HEY HEY HEY!",
+   "voice": "af_nicole",
+   "scream": true,
+   "dur": 0.92
+  },
+  {
+   "file": "scream75-look-out.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "LOOK OUT!",
+   "voice": "bm_lewis",
+   "scream": true,
+   "dur": 0.69
+  },
+  {
+   "file": "scream76-look-out.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "LOOK OUT!",
+   "voice": "af_heart",
+   "scream": true,
+   "dur": 0.69
+  },
+  {
+   "file": "scream77-watch-out.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "WATCH OUT!",
+   "voice": "am_puck",
+   "scream": true,
+   "dur": 0.69
+  },
+  {
+   "file": "scream78-watch-out.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "WATCH OUT!",
+   "voice": "af_sarah",
+   "scream": true,
+   "dur": 0.8
+  },
+  {
+   "file": "scream79-uh-oh.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "UH OH!",
+   "voice": "am_echo",
+   "scream": true,
+   "dur": 0.82
+  },
+  {
+   "file": "scream80-uh-oh.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "UH OH!",
+   "voice": "af_nicole",
+   "scream": true,
+   "dur": 0.78
+  },
+  {
+   "file": "scream81-oh-no.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "OH NO!",
+   "voice": "am_liam",
+   "scream": true,
+   "dur": 0.79
+  },
+  {
+   "file": "scream82-oh-no.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "OH NO!",
+   "voice": "af_heart",
+   "scream": true,
+   "dur": 0.64
+  },
+  {
+   "file": "scream83-oh-my-god.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "OH MY GOD!",
+   "voice": "am_fenrir",
+   "scream": true,
+   "dur": 0.71
+  },
+  {
+   "file": "scream84-oh-my-god.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "OH MY GOD!",
+   "voice": "af_sarah",
+   "scream": true,
+   "dur": 0.81
+  },
+  {
+   "file": "scream85-yikes.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "YIKES!",
+   "voice": "am_santa",
+   "scream": true,
+   "dur": 0.57
+  },
+  {
+   "file": "scream86-yikes.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "YIKES!",
+   "voice": "af_nicole",
+   "scream": true,
+   "dur": 0.75
+  },
+  {
+   "file": "scream87-nope.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "NOPE!",
+   "voice": "am_michael",
+   "scream": true,
+   "dur": 1.03
+  },
+  {
+   "file": "scream88-nope.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "NOPE!",
+   "voice": "af_heart",
+   "scream": true,
+   "dur": 0.94
+  },
+  {
+   "file": "scream89-hey.mp3",
+   "kinds": [
+    "courier",
+    "hippie",
+    "jogger",
+    "scooter",
+    "tourist"
+   ],
+   "text": "HEY!",
+   "voice": "am_onyx",
+   "scream": true,
+   "dur": 0.47
+  },
+  {
+   "file": "scream90-hey.mp3",
+   "kinds": [
+    "dogwalker"
+   ],
+   "text": "HEY!",
+   "voice": "af_sarah",
+   "scream": true,
+   "dur": 0.53
+  }
+ ]
+}

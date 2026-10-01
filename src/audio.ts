@@ -101,3 +101,6 @@ export const sfx = {
   timber: () => { noise(0.5, 0.3, 700); tone(160, 0.5, 'sawtooth', 0.08, 0, 50); noise(0.6, 0.12, 3500); },
   yelp: () => tone(700 + Math.random() * 400, 0.22, 'triangle', 0.07, 0, 1300 + Math.random() * 500),
 };
+
+// For src/sfx.ts and src/voices.ts: the shared context and master bus, once unlocked.
+export const audioOut = () => (ctx ? { ctx, master } : null);

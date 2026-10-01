@@ -1,0 +1,410 @@
+{
+  "_comment": "Pedestrian shouts. kinds: which sprite people may say a line ('any' = everyone). Re-run tools/voices/generate.py after editing.",
+  "voices": {
+    "courier": [
+      "am_michael",
+      "am_puck"
+    ],
+    "dogwalker": [
+      "af_sarah",
+      "af_nicole",
+      "af_heart"
+    ],
+    "hippie": [
+      "am_onyx",
+      "am_echo"
+    ],
+    "jogger": [
+      "am_adam",
+      "am_liam"
+    ],
+    "scooter": [
+      "am_puck",
+      "am_liam",
+      "am_fenrir"
+    ],
+    "tourist": [
+      "bm_george",
+      "bm_lewis",
+      "am_santa"
+    ]
+  },
+  "lines": [
+    {
+      "text": "Is that thing even LICENSED?!",
+      "kinds": [
+        "any"
+      ]
+    },
+    {
+      "text": "Not again! Not on Valencia!",
+      "kinds": [
+        "any"
+      ]
+    },
+    {
+      "text": "Who's driving that?! NOBODY?!",
+      "kinds": [
+        "any"
+      ],
+      "say": "Who's driving that?! Nobody?!"
+    },
+    {
+      "text": "Learn to drive, you toaster!",
+      "kinds": [
+        "any"
+      ],
+      "say": "Learn to drive, you, toaster!"
+    },
+    {
+      "text": "This is a sidewalk, not a beta test!",
+      "kinds": [
+        "any"
+      ],
+      "say": "This is a sidewalk! Not a beta test!"
+    },
+    {
+      "text": "I'm calling three one one!",
+      "say": "I'm calling three, one, one!",
+      "kinds": [
+        "any"
+      ]
+    },
+    {
+      "text": "Somebody file a bug report!",
+      "kinds": [
+        "any"
+      ]
+    },
+    {
+      "text": "Third one today!",
+      "kinds": [
+        "any"
+      ]
+    },
+    {
+      "text": "That's going in the group chat!",
+      "kinds": [
+        "any"
+      ]
+    },
+    {
+      "text": "Only in San Francisco!",
+      "kinds": [
+        "any"
+      ]
+    },
+    {
+      "text": "I've lived here thirty years!",
+      "kinds": [
+        "any"
+      ]
+    },
+    {
+      "text": "Get its license plate! It doesn't HAVE one!",
+      "kinds": [
+        "any"
+      ]
+    },
+    {
+      "text": "I'm filing a ticket on Jira!",
+      "kinds": [
+        "jogger",
+        "scooter"
+      ]
+    },
+    {
+      "text": "My Patagonia!",
+      "kinds": [
+        "jogger",
+        "scooter",
+        "dogwalker"
+      ]
+    },
+    {
+      "text": "My oat milk latte!",
+      "kinds": [
+        "jogger",
+        "scooter",
+        "dogwalker"
+      ]
+    },
+    {
+      "text": "That is NOT scalable behavior!",
+      "kinds": [
+        "jogger",
+        "scooter"
+      ]
+    },
+    {
+      "text": "My watch thinks I died!",
+      "kinds": [
+        "jogger"
+      ]
+    },
+    {
+      "text": "That's a P-zero incident!",
+      "say": "That's a P zero incident!",
+      "kinds": [
+        "jogger",
+        "scooter"
+      ]
+    },
+    {
+      "text": "I INVESTED in you guys!",
+      "kinds": [
+        "jogger",
+        "scooter"
+      ]
+    },
+    {
+      "text": "I'm putting this in the retro!",
+      "kinds": [
+        "jogger",
+        "scooter"
+      ]
+    },
+    {
+      "text": "My heart rate just hit Series A!",
+      "kinds": [
+        "jogger"
+      ]
+    },
+    {
+      "text": "Is this the Full House house?!",
+      "kinds": [
+        "tourist"
+      ]
+    },
+    {
+      "text": "Linda! Get the camera!",
+      "kinds": [
+        "tourist"
+      ]
+    },
+    {
+      "text": "They warned us about the hills, not the ROBOTS!",
+      "kinds": [
+        "tourist"
+      ]
+    },
+    {
+      "text": "Is this part of the tour?!",
+      "kinds": [
+        "tourist"
+      ]
+    },
+    {
+      "text": "I just wanted a sourdough bowl!",
+      "kinds": [
+        "tourist"
+      ]
+    },
+    {
+      "text": "Is this a cable car?!",
+      "kinds": [
+        "tourist"
+      ]
+    },
+    {
+      "text": "We have these in Ohio, but slower!",
+      "kinds": [
+        "tourist"
+      ]
+    },
+    {
+      "text": "Whoa, man! BAD vibes!",
+      "kinds": [
+        "hippie"
+      ],
+      "say": "Woah, man! Bad vibes!"
+    },
+    {
+      "text": "Duuude! Not cool!",
+      "say": "Dude! Not cool!",
+      "kinds": [
+        "hippie",
+        "scooter",
+        "courier"
+      ]
+    },
+    {
+      "text": "Go back to Palo Alto!",
+      "kinds": [
+        "hippie",
+        "courier",
+        "dogwalker"
+      ],
+      "say": "Go back to Pallo Alto!"
+    },
+    {
+      "text": "This was a nice street. In 1967.",
+      "say": "This was a nice street. In nineteen sixty seven.",
+      "kinds": [
+        "hippie"
+      ]
+    },
+    {
+      "text": "Peace and love, man! You MANIAC!",
+      "kinds": [
+        "hippie"
+      ],
+      "say": "Peace and love, man! You... maniac!"
+    },
+    {
+      "text": "Robots don't have souls, man!",
+      "kinds": [
+        "hippie"
+      ]
+    },
+    {
+      "text": "Watch it! I'm on a SCOOTER!",
+      "kinds": [
+        "scooter"
+      ]
+    },
+    {
+      "text": "I have four percent battery!",
+      "kinds": [
+        "scooter"
+      ]
+    },
+    {
+      "text": "That's my lane! That's my LANE!",
+      "kinds": [
+        "scooter",
+        "courier"
+      ]
+    },
+    {
+      "text": "My scooter has more ethics than you!",
+      "kinds": [
+        "scooter"
+      ]
+    },
+    {
+      "text": "Biscuit, NO! Stay!",
+      "kinds": [
+        "dogwalker"
+      ],
+      "say": "Biscuit! No! Stay!"
+    },
+    {
+      "text": "You scared Mochi!",
+      "kinds": [
+        "dogwalker"
+      ],
+      "say": "You scared Moe chee!"
+    },
+    {
+      "text": "One star on Nextdoor!",
+      "kinds": [
+        "dogwalker"
+      ]
+    },
+    {
+      "text": "Not in front of the dog!",
+      "kinds": [
+        "dogwalker"
+      ]
+    },
+    {
+      "text": "I have SEVEN deliveries, man!",
+      "kinds": [
+        "courier"
+      ]
+    },
+    {
+      "text": "That's a bike lane! A BIKE LANE!",
+      "kinds": [
+        "courier"
+      ],
+      "say": "That's a bike lane! A bike... lane!"
+    },
+    {
+      "text": "Somebody's burrito just died!",
+      "kinds": [
+        "courier"
+      ]
+    },
+    {
+      "text": "You took my job AND my lane?!",
+      "kinds": [
+        "courier"
+      ]
+    },
+    {
+      "text": "Not the farmers' market!",
+      "kinds": [
+        "dogwalker",
+        "hippie",
+        "tourist"
+      ]
+    },
+    {
+      "text": "I don't even have health insurance!",
+      "kinds": [
+        "courier",
+        "hippie"
+      ]
+    }
+  ],
+  "screams": [
+    {
+      "text": "AAAAAH!",
+      "say": "ˈɑːɑːɑːɑː!",
+      "phonemes": true,
+      "scream": true
+    },
+    {
+      "text": "AIEEEE!",
+      "say": "ˈæːːːːːh!",
+      "phonemes": true,
+      "scream": true
+    },
+    {
+      "text": "WHOA THERE!",
+      "say": "Whoa there!"
+    },
+    {
+      "text": "OH NO NO NO!",
+      "say": "Oh no no no!"
+    },
+    {
+      "text": "HEY HEY HEY!",
+      "say": "Hey hey hey!"
+    },
+    {
+      "text": "LOOK OUT!",
+      "say": "Look out!"
+    },
+    {
+      "text": "WATCH OUT!",
+      "say": "Watch out!"
+    },
+    {
+      "text": "UH OH!",
+      "say": "Uh oh!"
+    },
+    {
+      "text": "OH NO!",
+      "say": "Oh no!"
+    },
+    {
+      "text": "OH MY GOD!",
+      "say": "Oh my god!"
+    },
+    {
+      "text": "YIKES!",
+      "say": "Yikes!"
+    },
+    {
+      "text": "NOPE!",
+      "say": "Nope nope nope!"
+    },
+    {
+      "text": "HEY!",
+      "say": "Hey!"
+    }
+  ]
+}
