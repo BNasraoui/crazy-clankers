@@ -111,12 +111,12 @@ export class Game {
     this.look = new Look(renderer);
     this.look.onChange = () => this.refreshPassengers();
     this.scene.background = new THREE.Color(SKY.horizon);
-    this.scene.fog = new THREE.Fog(SKY.horizon, 170, 560);
+    this.scene.fog = new THREE.Fog(SKY.horizon, 320, 900); // crisp air, haze only far away
     this.scene.add(this.sky);
-    const sky = new THREE.HemisphereLight(0xdfeaff, 0x8a7a66, 1.25);
+    const sky = new THREE.HemisphereLight(0xd8e8ff, 0x8f7f9a, 1.2);
     sky.layers.enable(CHARACTER_LAYER);
     this.scene.add(sky);
-    this.sun = new THREE.DirectionalLight(0xfff1dc, 2.6);
+    this.sun = new THREE.DirectionalLight(0xffecd0, 2.9);
     this.sun.layers.enable(CHARACTER_LAYER);
     this.sun.shadow.camera.layers.enable(CHARACTER_LAYER);
     this.sun.castShadow = true;
@@ -245,8 +245,8 @@ export class Game {
       this.underwaterView = under;
       const fog = this.scene.fog as THREE.Fog;
       fog.color.set(under ? 0x1d6a86 : SKY.horizon);
-      fog.near = under ? 4 : 170;
-      fog.far = under ? 110 : 560;
+      fog.near = under ? 4 : 320;
+      fog.far = under ? 110 : 900;
       (this.scene.background as THREE.Color).set(under ? 0x1d6a86 : SKY.horizon);
       this.sky.visible = !under;
     }

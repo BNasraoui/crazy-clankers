@@ -22,7 +22,7 @@ export const glslColor = (hex: THREE.ColorRepresentation) => {
   return `vec3(${c.r.toFixed(4)}, ${c.g.toFixed(4)}, ${c.b.toFixed(4)})`;
 };
 
-export const SKY = { zenith: 0x2c74d6, horizon: 0xd3e6f3 };
+export const SKY = { zenith: 0x1a64d8, horizon: 0xbfdcf2 }; // the key art's deep, saturated blue
 
 export function makeSky() {
   const mat = new THREE.ShaderMaterial({
@@ -63,8 +63,8 @@ export function makeSky() {
 }
 
 export interface LookSettings { height: number; grain: number; outline: boolean; speedLines: boolean; people: number; camBack: number; camUp: number; fov: number; paxSprites: boolean }
-const DEFAULTS: LookSettings = { height: 480, grain: 0, outline: true, speedLines: true, people: 1.2, camBack: 6.5, camUp: 3, fov: 60, paxSprites: true };
-const STORE = 'clankers.look.v4'; // bump when defaults change, so old saved tweaks don't hide them
+const DEFAULTS: LookSettings = { height: 720, grain: 0, outline: true, speedLines: true, people: 1.2, camBack: 6.5, camUp: 3, fov: 60, paxSprites: true };
+const STORE = 'clankers.look.v5'; // bump when defaults change, so old saved tweaks don't hide them
 
 function loadSettings(): LookSettings {
   try {
@@ -189,7 +189,16 @@ export class Look {
           // Film grain on the world only, re-rolled 12 times a second (film, not TV static).
           float frame = floor(uTime * 12.0);
           col += (hash(floor(gl_FragCoord.xy / 2.0) + fract(frame * 0.6180339) * 517.0) - 0.5) * uGrain * (1.0 - isChar);
-          col *= 1.0 - 0.2 * smoothstep(0.5, 0.95, length((vUv - 0.5) * vec2(uAspect, 1.0)));
+          // Grade the world towards the key art: punchier saturation and contrast,
+          // cool violet shadows and warm highlights. Characters keep their drawn colours.
+          if (isChar < 0.5) {
+            float luma = dot(col, vec3(0.299, 0.587, 0.114));
+            col = mix(vec3(luma), col, 1.22);
+            col = (col - 0.5) * 1.07 + 0.5;
+            col *= mix(vec3(0.9, 0.93, 1.1), vec3(1.05, 1.01, 0.94), smoothstep(0.2, 0.75, luma));
+            col = clamp(col, 0.0, 1.0);
+          }
+          col *= 1.0 - 0.14 * smoothstep(0.55, 0.98, length((vUv - 0.5) * vec2(uAspect, 1.0)));
           gl_FragColor = vec4(col, 1.0);
           #include <colorspace_fragment>
         }`,
