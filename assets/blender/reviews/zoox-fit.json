@@ -1,0 +1,10 @@
+{
+  "asset": "public/models/zoox.glb",
+  "triangles": 13660,
+  "iou": {
+    "front": 0.9644,
+    "side": 0.9693,
+    "back": 0.9605,
+    "top": 0.9073
+  }
+}

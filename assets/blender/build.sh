@@ -17,8 +17,15 @@ case "${1:-techbro}" in
       "$BLENDER" --background --factory-startup --python-exit-code 1 --python robotaxis.py -- "$car"
     done
     exit ;;
+  sheet-robotaxis)
+    # Zoox and Apollo, modelled from docs/art/vehicles; no downloads. Scores each glb
+    # against its sheet, then renders the four robotaxis together.
+    for step in zoox apollo fit-zoox fit-apollo four; do
+      "$BLENDER" --background --factory-startup --python-exit-code 1 --python sheet_robotaxis.py -- "$step"
+    done
+    exit ;;
   techbro) ;;
-  *) echo 'Usage: build.sh [techbro|cab|robotaxis]' >&2; exit 2 ;;
+  *) echo 'Usage: build.sh [techbro|cab|robotaxis|sheet-robotaxis]' >&2; exit 2 ;;
 esac
 "$ASSET_PYTHON" test_sheets.py
 "$ASSET_PYTHON" test_profile.py
