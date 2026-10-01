@@ -10,7 +10,7 @@ const FALL_TIME = 0.7;
 const RESPAWN_AFTER = 25; // seconds lying down
 const RESPAWN_DISTANCE = 70; // only when the cab is this far away
 
-export interface TreeHit { at: THREE.Vector3; size: number }
+export interface TreeHit { at: THREE.Vector3; size: number; kind: TreeRef['kind'] }
 
 export class Trees {
   private falling: Falling[] = [];
@@ -31,7 +31,7 @@ export class Trees {
       const axis = new THREE.Vector3(0, 1, 0).cross(dir).normalize();
       this.falling.push({ ref, axis, t: 0, angle: 0, spin: (Math.random() - 0.5) * 0.6 });
       ref.base.decompose(this.pos, this.quat, this.scl);
-      hits.push({ at: this.pos.clone(), size: this.scl.x });
+      hits.push({ at: this.pos.clone(), size: this.scl.x, kind: ref.kind });
     }
     for (const f of this.falling) {
       f.t += dt;
@@ -60,10 +60,10 @@ export class Trees {
 
   private restore(ref: TreeRef) {
     ref.circle.down = false;
-    for (const mesh of ref.meshes) {
-      mesh.setMatrixAt(ref.index, ref.base);
+    ref.meshes.forEach((mesh, k) => {
+      mesh.setMatrixAt(ref.index, this.m.multiplyMatrices(ref.base, ref.locals[k]));
       mesh.instanceMatrix.needsUpdate = true;
-    }
+    });
   }
 
   private draw(f: Falling) {
@@ -72,10 +72,11 @@ export class Trees {
     const twist = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), f.spin * f.angle);
     const q = tilt.multiply(twist).multiply(this.quat);
     this.m.compose(this.pos, q, this.scl);
-    for (const mesh of f.ref.meshes) {
-      mesh.setMatrixAt(f.ref.index, this.m);
+    const part = new THREE.Matrix4();
+    f.ref.meshes.forEach((mesh, k) => {
+      mesh.setMatrixAt(f.ref.index, part.multiplyMatrices(this.m, f.ref.locals[k]));
       mesh.instanceMatrix.needsUpdate = true;
-    }
+    });
   }
 }
 

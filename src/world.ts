@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { makeLabel } from './models';
 import { glslColor, toon } from './look';
 import { districtOf, type District } from './districts';
+import { instance, kit, sag, wirePoints } from './scenery';
 
 // The city is a 10x10 grid of blocks. Street centerlines sit every CELL units.
 // SF-style hills: intersections are flat and the streets between them are
@@ -90,9 +91,11 @@ export interface Circle { x: number; z: number; r: number; breakable?: boolean; 
 // Trees knock over when hit hard enough. collide() queues them here; the game animates them.
 export const TREE_BREAK_SPEED = 7; // m/s (about 16 mph); slower than this, a tree is solid
 export const brokenTrees: Circle[] = [];
-export interface TreeRef { circle: Circle; base: THREE.Matrix4; meshes: THREE.InstancedMesh[]; index: number }
+// Anything that topples when hit (trees, lamps, poles). locals: each instanced part's offset within the model.
+export interface TreeRef { circle: Circle; base: THREE.Matrix4; meshes: THREE.InstancedMesh[]; locals: THREE.Matrix4[]; index: number; kind: 'tree' | 'lamp' | 'pole' }
 export const treeRefs = new Map<Circle, TreeRef>();
-type TreeSpot = { m: THREE.Matrix4; c: Circle };
+type Species = 'plane' | 'cypress' | 'palm';
+type TreeSpot = { m: THREE.Matrix4; c: Circle; species: Species };
 export interface Block {
   bi: number;
   bj: number;
@@ -310,7 +313,9 @@ export function buildWorld(scene: THREE.Scene) {
         const circle: Circle = { x: tx, z: tz, r: 1.1, breakable: true };
         b.circles.push(circle);
         const s = 0.8 + r() * 0.6;
-        trees.push({ c: circle, m: new THREE.Matrix4().compose(
+        // Palms in Dolores Park, cypresses and plane trees elsewhere.
+        const species: Species = b.bi === 2 && b.bj === 7 ? 'palm' : r() < 0.35 ? 'cypress' : 'plane';
+        trees.push({ species, c: circle, m: new THREE.Matrix4().compose(
           new THREE.Vector3(tx, heightAt(tx, tz), tz),
           new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), r() * 6),
           new THREE.Vector3(s, s, s),
@@ -356,6 +361,7 @@ export function buildWorld(scene: THREE.Scene) {
 
   scene.add(makeTrees(trees));
   scene.add(makeTrees(streetTrees));
+  buildStreetFurniture(scene, streetTrees);
   addLandmarks(scene);
   addGoldenGate(scene);
 
@@ -614,7 +620,7 @@ function addStreetTrees(b: Block, r: () => number, out: TreeSpot[]) {
       const circle: Circle = { x, z, r: 0.4, breakable: true };
       b.circles.push(circle);
       const s = 0.55 + r() * 0.15;
-      out.push({ c: circle, m: new THREE.Matrix4().compose(
+      out.push({ species: 'plane', c: circle, m: new THREE.Matrix4().compose(
         new THREE.Vector3(x, heightAt(x, z), z),
         new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), r() * 6),
         new THREE.Vector3(s, s * 1.1, s),
@@ -754,21 +760,152 @@ function makeSeaWall() {
   return inst;
 }
 
+// Kit trees are full-size models; these factors map the old scale numbers onto them.
+const SPECIES_SCALE: Record<Species, number> = { plane: 0.8, cypress: 0.75, palm: 0.95 };
+
 function makeTrees(spots: TreeSpot[]) {
   const g = new THREE.Group();
-  const trunkGeo = new THREE.CylinderGeometry(0.25, 0.35, 2.4, 6).translate(0, 1.2, 0);
-  const topGeo = new THREE.IcosahedronGeometry(2.2, 0).translate(0, 3.6, 0);
-  const trunks = new THREE.InstancedMesh(trunkGeo, toon({ color: 0x6b4a2f }), spots.length);
-  const tops = new THREE.InstancedMesh(topGeo, toon({ color: 0x4f8f45 }), spots.length);
-  spots.forEach(({ m, c }, i) => {
-    trunks.setMatrixAt(i, m);
-    tops.setMatrixAt(i, m);
-    treeRefs.set(c, { circle: c, base: m.clone(), meshes: [trunks, tops], index: i });
-  });
-  trunks.frustumCulled = tops.frustumCulled = false;
-  tops.castShadow = trunks.castShadow = true;
-  g.add(trunks, tops);
+  for (const species of ['plane', 'cypress', 'palm'] as Species[]) {
+    const list = spots.filter((t) => t.species === species);
+    if (!list.length) continue;
+    const template = kit[`tree_${species}`];
+    if (template) {
+      const k = SPECIES_SCALE[species];
+      const mats = list.map((t) => t.m.clone().multiply(new THREE.Matrix4().makeScale(k, k, k)));
+      const { group, meshes, locals } = instance(template, mats);
+      list.forEach((t, i) => treeRefs.set(t.c, { circle: t.c, base: mats[i], meshes, locals, index: i, kind: 'tree' }));
+      g.add(group);
+      continue;
+    }
+    // Fallback: the old low-poly trees.
+    const trunkGeo = new THREE.CylinderGeometry(0.25, 0.35, 2.4, 6).translate(0, 1.2, 0);
+    const topGeo = new THREE.IcosahedronGeometry(2.2, 0).translate(0, 3.6, 0);
+    const trunks = new THREE.InstancedMesh(trunkGeo, toon({ color: 0x6b4a2f }), list.length);
+    const tops = new THREE.InstancedMesh(topGeo, toon({ color: 0x4f8f45 }), list.length);
+    const id = new THREE.Matrix4();
+    list.forEach(({ m, c }, i) => {
+      trunks.setMatrixAt(i, m);
+      tops.setMatrixAt(i, m);
+      treeRefs.set(c, { circle: c, base: m.clone(), meshes: [trunks, tops], locals: [id, id], index: i, kind: 'tree' });
+    });
+    trunks.frustumCulled = tops.frustumCulled = false;
+    tops.castShadow = trunks.castShadow = true;
+    g.add(trunks, tops);
+  }
   return g;
+}
+
+// Street furniture: lamps on every block, utility poles and wires in the residential
+// districts, Muni trolley lines with shelters, and planters under street trees.
+const TROLLEY_LINES: { axis: 'x' | 'z'; line: number }[] = [{ axis: 'z', line: -128 }, { axis: 'x', line: 64 }];
+const RESIDENTIAL = new Set(['haight', 'mission', 'sunset', 'potrero', 'northbeach', 'pacheights']);
+
+function streetPoint(axis: 'x' | 'z', line: number, along: number, offset: number) {
+  const x = axis === 'z' ? line + offset : along;
+  const z = axis === 'z' ? along : line + offset;
+  return new THREE.Vector3(x, heightAt(x, z), z);
+}
+
+function addSolid(p: THREE.Vector3, r: number): Circle | null {
+  const b = blockAt(p.x, p.z);
+  if (!b) return null;
+  const c: Circle = { x: p.x, z: p.z, r, breakable: true };
+  b.circles.push(c);
+  return c;
+}
+
+function nearRankOrSign(p: THREE.Vector3) {
+  if (Math.hypot(p.x + 69, p.z + 28) < 18) return true;
+  return landmarks.some((l) => Math.hypot(l.curb.walk.x - p.x, l.curb.walk.z - p.z) < 6);
+}
+
+function buildStreetFurniture(scene: THREE.Scene, streetTrees: TreeSpot[]) {
+  const yawFor = (axis: 'x' | 'z', side: number) => (axis === 'z' ? (side > 0 ? -Math.PI / 2 : Math.PI / 2) : side > 0 ? Math.PI : 0);
+  const onTrolley = (axis: 'x' | 'z', line: number) => TROLLEY_LINES.some((t) => t.axis === axis && t.line === line);
+  const lamps: { m: THREE.Matrix4; c: Circle | null }[] = [];
+  const poles: { m: THREE.Matrix4; c: Circle | null }[] = [];
+  const trolley: THREE.Matrix4[] = [];
+  const shelters: THREE.Matrix4[] = [];
+  const wires: number[] = [];
+  const q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0);
+  const utilWires = wirePoints('utility_pole'), trolleyWire = wirePoints('trolley_pole')[0];
+
+  for (const axis of ['x', 'z'] as const)
+    for (let k = 0; k <= N; k++) {
+      const line = -HALF + k * CELL;
+      const trolleyLine = onTrolley(axis, line);
+      let lastPole: THREE.Vector3[] | null = null;
+      let lastSpan: THREE.Vector3[] | null = null;
+      for (let j = 0; j < N; j++) {
+        const mid = -HALF + j * CELL + CELL / 2;
+        // A lamp per block side, alternating sides; the arm reaches over the road.
+        const lside = (j + k) % 2 ? 1 : -1;
+        const lp = streetPoint(axis, line, mid + lside * 10, lside * (STREET_HALF + 0.6));
+        if (!nearRankOrSign(lp)) lamps.push({ m: new THREE.Matrix4().compose(lp, q.setFromAxisAngle(up, yawFor(axis, lside)), one), c: addSolid(lp, 0.25) });
+
+        if (trolleyLine) {
+          // Trolley poles both sides every 32 m, span wires across and two contact wires along.
+          for (const a of [mid - 16, mid + 16]) {
+            const span: THREE.Vector3[] = [];
+            for (const side of [-1, 1]) {
+              const p = streetPoint(axis, line, a, side * (STREET_HALF + 0.5));
+              if (nearRankOrSign(p)) continue;
+              trolley.push(new THREE.Matrix4().compose(p, q.setFromAxisAngle(up, yawFor(axis, side)), one));
+              addSolid(p, 0.3);
+              span.push(p.clone().add(new THREE.Vector3(0, trolleyWire.y, 0)));
+            }
+            if (span.length === 2) {
+              sag(span[0], span[1], wires, 0.15, 4);
+              const contact = [-1.4, 1.4].map((o) => streetPoint(axis, line, a, o).add(new THREE.Vector3(0, trolleyWire.y - 0.5, 0)));
+              if (lastSpan) for (let w = 0; w < 2; w++) sag(lastSpan[w], contact[w], wires, 0.25, 6);
+              lastSpan = contact;
+            }
+          }
+          if (j % 2 === 0) {
+            const side = j % 4 === 0 ? 1 : -1;
+            const p = streetPoint(axis, line, mid, side * (STREET_HALF + 2.3));
+            if (!nearRankOrSign(p)) {
+              shelters.push(new THREE.Matrix4().compose(p, q.setFromAxisAngle(up, yawFor(axis, side) + Math.PI / 2), one));
+              addSolid(p, 1.2);
+            }
+          }
+          continue;
+        }
+
+        // Utility poles and wires through the residential districts.
+        const side = axis === 'z' ? -1 : 1;
+        const bi = axis === 'z' ? Math.max(0, Math.min(N - 1, k - (side < 0 ? 1 : 0))) : j;
+        const bj = axis === 'z' ? j : Math.max(0, Math.min(N - 1, k - (side < 0 ? 1 : 0)));
+        if (!RESIDENTIAL.has(districtOf(bi, bj).id)) { lastPole = null; continue; }
+        for (const a of [mid - 16, mid + 16]) {
+          const p = streetPoint(axis, line, a, side * (STREET_HALF + 1.6));
+          if (nearRankOrSign(p)) { lastPole = null; continue; }
+          const yaw = axis === 'z' ? 0 : Math.PI / 2;
+          const m = new THREE.Matrix4().compose(p, q.setFromAxisAngle(up, yaw), one);
+          poles.push({ m, c: addSolid(p, 0.3) });
+          const tops = utilWires.map((w) => w.clone().applyMatrix4(m));
+          if (lastPole) for (let w = 0; w < Math.min(tops.length, lastPole.length); w++) sag(lastPole[w], tops[w], wires, 0.5, 8);
+          lastPole = tops;
+        }
+      }
+    }
+
+  const register = (template: THREE.Object3D | undefined, list: { m: THREE.Matrix4; c: Circle | null }[], kind: TreeRef['kind']) => {
+    if (!template || !list.length) return;
+    const { group, meshes, locals } = instance(template, list.map((l) => l.m));
+    list.forEach((l, i) => { if (l.c) treeRefs.set(l.c, { circle: l.c, base: l.m, meshes, locals, index: i, kind }); });
+    scene.add(group);
+  };
+  register(kit.street_lamp, lamps, 'lamp');
+  register(kit.utility_pole, poles, 'pole');
+  if (kit.trolley_pole && trolley.length) scene.add(instance(kit.trolley_pole, trolley).group);
+  if (kit.muni_shelter && shelters.length) scene.add(instance(kit.muni_shelter, shelters).group);
+  if (kit.planter && streetTrees.length) scene.add(instance(kit.planter, streetTrees.map((t) => new THREE.Matrix4().makeTranslation(t.c.x, heightAt(t.c.x, t.c.z), t.c.z))).group);
+  if (wires.length) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(wires, 3));
+    scene.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x1b1722 })));
+  }
 }
 
 function blockCenter(bi: number, bj: number) {

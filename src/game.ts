@@ -389,14 +389,20 @@ export class Game {
       this.popup('GEYSER LAUNCH!', 'big');
     }
     for (const hit of this.trees.update(dt, this.car.pos, this.car.vel)) {
-      sfx.timber();
       this.shake = Math.max(this.shake, 0.4);
-      this.particles.emit(hit.at.clone().setY(hit.at.y + 3 * hit.size), 22, 0x4f8f45, 6, 6, 0.4);
-      this.particles.emit(hit.at.clone().setY(hit.at.y + 0.5), 8, 0x6b4a2f, 4, 5, 0.25);
-      this.popup('TIMBER!', 'big');
+      if (hit.kind === 'tree') {
+        sfx.timber();
+        this.particles.emit(hit.at.clone().setY(hit.at.y + 3 * hit.size), 22, 0x4f8f45, 6, 6, 0.4);
+        this.particles.emit(hit.at.clone().setY(hit.at.y + 0.5), 8, 0x6b4a2f, 4, 5, 0.25);
+        this.popup('TIMBER!', 'big');
+        if (Math.random() < 0.4) this.quips.say('cab', 'timber');
+      } else {
+        sfx.smash();
+        this.particles.emit(hit.at.clone().setY(hit.at.y + 1), 12, 0x2f4f45, 5, 6, 0.25);
+        this.popup(hit.kind === 'lamp' ? 'LIGHTS OUT!' : 'POLE DOWN!');
+      }
       this.safetyHit(1.5);
-      if (Math.random() < 0.4) this.quips.say('cab', 'timber');
-      this.tip('smash', 2, 'TIMBER');
+      this.tip('smash', 2, hit.kind === 'tree' ? 'TIMBER' : 'SMASH');
     }
     this.particles.update(dt);
     if (this.peds) {
