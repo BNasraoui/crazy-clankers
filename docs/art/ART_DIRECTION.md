@@ -28,3 +28,18 @@ on shoes and cups in them.
 
 ## The cab
 - White robotaxi SUV, black lidar puck on the roof, teal accent stripe.
+
+## Decision (2026-10-01): people are sprites
+
+Passengers and pedestrians are 2D anime sprites standing in the 3D world, not 3D
+models. They always face the camera and show the drawing for the viewing angle.
+Seven rounds of scripted Blender modelling (Opus, then Astra) never matched the
+drawings; sprites are the drawings, so they stay on-model and read better at speed.
+
+- Passengers: `docs/art/sprites/passengers/` (standing with prop, two hailing frames, side, back).
+- Pedestrians: `docs/art/sprites/` (front/back/side walk cycles, dive).
+- Recipe: generate a 5-pose sheet with Codex image generation, attaching the
+  character's turnaround sheet and portrait, then cut it with the `slice.py` next to it.
+  Ask for plain shoes; the image model adds brand marks otherwise.
+- The 3D Tech Bro and the Blender pipeline stay in the repo for reference. The cab
+  stays 3D.

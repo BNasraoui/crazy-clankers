@@ -62,9 +62,9 @@ export function makeSky() {
   return sky;
 }
 
-export interface LookSettings { height: number; grain: number; outline: boolean; speedLines: boolean }
-const DEFAULTS: LookSettings = { height: 480, grain: 0.07, outline: true, speedLines: true };
-const STORE = 'clankers.look';
+export interface LookSettings { height: number; grain: number; outline: boolean; speedLines: boolean; people: number; camBack: number; camUp: number; fov: number; paxSprites: boolean }
+const DEFAULTS: LookSettings = { height: 480, grain: 0.07, outline: true, speedLines: true, people: 1.2, camBack: 6.5, camUp: 3, fov: 60, paxSprites: true };
+const STORE = 'clankers.look.v2'; // bump when defaults change, so old saved tweaks don't hide them
 
 function loadSettings(): LookSettings {
   try {
@@ -236,25 +236,68 @@ export class Look {
       </select></label>
       <label>Grain <input id="lk-grain" type="range" min="0" max="0.25" step="0.01"></label>
       <label><input id="lk-outline" type="checkbox"> Outlines</label>
-      <label><input id="lk-speed" type="checkbox"> Speed lines</label>`;
+      <label><input id="lk-speed" type="checkbox"> Speed lines</label>
+      <label>People size <input id="lk-people" type="range" min="0.8" max="2" step="0.05"><output id="lk-people-v"></output></label>
+      <label>Camera distance <input id="lk-back" type="range" min="4" max="12" step="0.25"><output id="lk-back-v"></output></label>
+      <label>Camera height <input id="lk-up" type="range" min="1.5" max="7" step="0.1"><output id="lk-up-v"></output></label>
+      <label>Field of view <input id="lk-fov" type="range" min="45" max="90" step="1"><output id="lk-fov-v"></output></label>
+      <label><input id="lk-pax" type="checkbox"> Passengers as sprites</label>
+      <button id="lk-reset" type="button">Reset</button>`;
     document.body.appendChild(panel);
     const res = panel.querySelector<HTMLSelectElement>('#lk-res')!;
     const grain = panel.querySelector<HTMLInputElement>('#lk-grain')!;
     const outline = panel.querySelector<HTMLInputElement>('#lk-outline')!;
     const speed = panel.querySelector<HTMLInputElement>('#lk-speed')!;
+    const people = panel.querySelector<HTMLInputElement>('#lk-people')!;
+    const peopleV = panel.querySelector<HTMLOutputElement>('#lk-people-v')!;
+    const slider = (id: string) => [panel.querySelector<HTMLInputElement>(`#lk-${id}`)!, panel.querySelector<HTMLOutputElement>(`#lk-${id}-v`)!] as const;
+    const [back, backV] = slider('back'), [up, upV] = slider('up'), [fov, fovV] = slider('fov');
+    const pax = panel.querySelector<HTMLInputElement>('#lk-pax')!;
+    const show = () => {
+      peopleV.value = `${this.settings.people.toFixed(2)}×`;
+      backV.value = `${this.settings.camBack.toFixed(1)} m`;
+      upV.value = `${this.settings.camUp.toFixed(1)} m`;
+      fovV.value = `${this.settings.fov}°`;
+    };
+    const fill = () => {
+      res.value = String(this.settings.height);
+      grain.value = String(this.settings.grain);
+      outline.checked = this.settings.outline;
+      speed.checked = this.settings.speedLines;
+      people.value = String(this.settings.people);
+      back.value = String(this.settings.camBack);
+      up.value = String(this.settings.camUp);
+      fov.value = String(this.settings.fov);
+      pax.checked = this.settings.paxSprites;
+      show();
+    };
     res.value = String(this.settings.height);
     grain.value = String(this.settings.grain);
     outline.checked = this.settings.outline;
     speed.checked = this.settings.speedLines;
+    fill();
     const apply = () => {
-      this.settings = { height: +res.value, grain: +grain.value, outline: outline.checked, speedLines: speed.checked };
+      this.settings = {
+        height: +res.value, grain: +grain.value, outline: outline.checked, speedLines: speed.checked,
+        people: +people.value, camBack: +back.value, camUp: +up.value, fov: +fov.value, paxSprites: pax.checked,
+      };
+      show();
+      this.onChange();
       try { localStorage.setItem(STORE, JSON.stringify(this.settings)); } catch { /* storage unavailable */ }
       this.setSize(this.w, this.h);
     };
-    for (const el of [res, grain, outline, speed]) el.addEventListener('input', apply);
+    for (const el of [res, grain, outline, speed, people, back, up, fov, pax]) el.addEventListener('input', apply);
+    panel.querySelector('#lk-reset')!.addEventListener('click', () => {
+      this.settings = { ...DEFAULTS };
+      try { localStorage.removeItem(STORE); } catch { /* storage unavailable */ }
+      fill();
+      this.setSize(this.w, this.h);
+      this.onChange();
+    });
     addEventListener('keydown', (e) => { if (e.code === 'Backquote') panel.hidden = !panel.hidden; });
     this.togglePanel = () => { panel.hidden = !panel.hidden; };
   }
 
   togglePanel = () => {};
+  onChange = () => {};
 }

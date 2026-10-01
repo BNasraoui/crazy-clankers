@@ -5,12 +5,14 @@ import { makePerson, makeLabel, personFrom, type CarModel, type PersonModel } fr
 import { Look, SKY, makeSky } from './look';
 import { CHARACTER_LAYER, makeCharacter, sunDir } from './anime';
 import { pickPassenger, type PassengerType } from './passengers';
-import { QuipDirector } from './quips';
+import { QuipDirector, SPEAKERS } from './quips';
 import { Traffic } from './traffic';
 import { sfx, setEngine, unlockAudio } from './audio';
 import { BLOCKS_SIDES, WATER, buildWorld, curb, landmarks, N, type Curb, type Landmark } from './world';
 import { buildFeatures, groundAt } from './features';
 import { Geysers, Particles, Props, type PropKind } from './props';
+import type { Pedestrians } from './pedestrians';
+import { SpritePerson, type SpriteSet } from './spritepeople';
 
 const STEP = 1 / 120;
 const START_TIME = 75;
@@ -82,6 +84,8 @@ export class Game {
   private props: Props;
   private particles: Particles;
   private geysers: Geysers;
+  peds: Pedestrians | null = null;
+  paxSprites: Record<string, SpriteSet> = {};
   private maxAir = 0;
   private underwaterView = false;
   private sky = makeSky();
@@ -93,6 +97,7 @@ export class Game {
 
   constructor(public renderer: THREE.WebGLRenderer, cab: CarModel, private people: Partial<Record<string, THREE.Object3D>> = {}) {
     this.look = new Look(renderer);
+    this.look.onChange = () => this.refreshPassengers();
     this.scene.background = new THREE.Color(SKY.horizon);
     this.scene.fog = new THREE.Fog(SKY.horizon, 170, 560);
     this.scene.add(this.sky);
@@ -180,6 +185,7 @@ export class Game {
     this.traffic.scatter();
     this.props.reset();
     this.geysers.reset();
+    this.peds?.reset();
     this.maxAir = 0;
     for (const w of this.waiting) this.scene.remove(w.person.root, w.marker);
     this.waiting = [];
@@ -200,6 +206,7 @@ export class Game {
       if (inp.confirm) this.start();
       this.titleCamera(dt);
       this.traffic.update(dt, this.car);
+      this.peds?.update(dt, this.car, this.camera);
       this.idleAnimations(dt);
     } else if (this.state === 'paused') {
       if (inp.confirm || inp.pause) this.setState('play');
@@ -260,7 +267,7 @@ export class Game {
         <b>Drift</b> B or RB / Space (hold) &nbsp; <b>Hop</b> A / E &nbsp; <b>Pause</b> Start / Esc<br>
         <b>Launch Mode</b> hold handbrake + gas (stopped or drifting), release handbrake &nbsp; Smash junk, hit hydrants, jump off the piers.<br>
         Stop in a ring to pick up. Stop in the beam to drop off.<br>
-        Jumps, near misses and drifts earn tips but cost your <b>DMV permit</b>.
+        Jumps, near misses and drifts earn tips but cost you <b>rating</b>. Below 4.00, you're deactivated.
       </div>
       <div class="pad" id="padstatus"></div>`;
   }
@@ -307,7 +314,19 @@ export class Game {
       this.popup('GEYSER LAUNCH!', 'big');
     }
     this.particles.update(dt);
-    const tev = this.traffic.update(dt, this.car);
+    if (this.peds) {
+      this.peds.size = this.look.settings.people;
+      const pev = this.peds.update(dt, this.car, this.camera);
+      if (pev.dives.length) {
+        sfx.yelp();
+        if (Math.random() < 0.3) this.quips.say('cab', 'pedDive');
+      }
+      for (let k = 0; k < pev.closeCalls; k++) {
+        this.safetyHit(1);
+        this.tip('nearMiss', 1, 'CLOSE CALL');
+      }
+    }
+    const tev = this.traffic.update(dt, this.car, this.peds?.inRoad() ?? []);
     impact = Math.max(impact, tev.impact);
     if (tev.honk) sfx.honk();
 
@@ -373,14 +392,23 @@ export class Game {
     this.tip('smash', kind === 'fruit' ? 3 : 1, kind === 'cone' ? 'CONE' : 'SMASH');
   }
 
+  // The rating is the safety meter shown Uber-style: 5.00 at full, deactivated at 4.00.
+  get rating() { return 4 + this.safety / 100; }
+
   private safetyHit(n: number) {
     this.safety -= n;
+    if (n >= 3) {
+      const el = $('#rating');
+      el.classList.remove('hit');
+      void el.offsetWidth;
+      el.classList.add('hit');
+    }
     this.lastIncident = this.clock;
     if (this.safety < 30 && !this.lowWarned) {
       this.lowWarned = true;
       this.quips.say('cab', 'safetyLow', { force: true });
     }
-    if (this.safety <= 0) { this.safety = 0; this.gameOver('PERMIT REVOKED'); }
+    if (this.safety <= 0) { this.safety = 0; this.gameOver('DEACTIVATED'); }
   }
 
   private tip(kind: 'jump' | 'nearMiss' | 'drift' | 'smash', base: number, label: string) {
@@ -447,6 +475,8 @@ export class Game {
   }
 
   private makePassenger(type: PassengerType): PersonModel {
+    const sprite = this.paxSprites[type.id];
+    if (sprite && this.look.settings.paxSprites) return new SpritePerson(sprite);
     const template = this.people[type.id];
     if (template) return personFrom(template);
     const person = makePerson(type.person);
@@ -460,6 +490,22 @@ export class Game {
       const p = w.person;
       p.armR.rotation.z = p.raise + Math.sin(w.phase * 8) * p.raise * 0.15;
       w.person.root.position.y = w.curb.walk.y + Math.abs(Math.sin(w.phase * 4)) * 0.12;
+      if (p instanceof SpritePerson) {
+        // Hail the cab when it's close enough to matter.
+        p.hailing = !this.ride && Math.hypot(w.curb.walk.x - this.car.pos.x, w.curb.walk.z - this.car.pos.z) < 80;
+        p.tick(this.camera, this.clock, this.look.settings.people);
+      }
+    }
+  }
+
+  // Swap waiting passengers between sprites and 3D models (look panel toggle).
+  refreshPassengers() {
+    for (const w of this.waiting) {
+      this.scene.remove(w.person.root);
+      w.person = this.makePassenger(w.type);
+      w.person.root.position.copy(w.curb.walk);
+      w.person.root.rotation.y = w.curb.facing;
+      this.scene.add(w.person.root);
     }
   }
 
@@ -496,6 +542,7 @@ export class Game {
     if (r.firedT > 0) {
       r.firedT -= dt;
       if (r.ejected) r.ejected.armR.rotation.z = r.ejected.raise + Math.sin(this.clock * 9) * r.ejected.raise * 0.15;
+      if (r.ejected instanceof SpritePerson) r.ejected.tick(this.camera, this.clock, this.look.settings.people);
       if (r.firedT <= 0) {
         if (r.ejected) this.scene.remove(r.ejected.root);
         r.ejected = undefined;
@@ -574,10 +621,10 @@ export class Game {
 
   private dropoff(r: Ride) {
     const ratio = r.left / r.total;
-    const [rating, bonus, mul] = ratio > 0.45 ? ['SPEEDY!', 10, 1.3] as const : ratio > 0.15 ? ['NICE', 5, 1] as const : ['SLOW...', 2, 0.8] as const;
+    const [grade, bonus, mul] = ratio > 0.45 ? ['SPEEDY!', 10, 1.3] as const : ratio > 0.15 ? ['NICE', 5, 1] as const : ['SLOW...', 2, 0.8] as const;
     const fare = Math.round(r.base * r.fareMul * mul);
     this.cash += fare;
-    this.popup(`${rating}  +${bonus}s`, 'big');
+    this.popup(`${grade}  +${bonus}s`, 'big');
     this.popup(`FARE ${money(fare)}`, 'good');
     if (r.type.id === 'rocket') {
       const promise = Math.max(1, r.tips) * 100000;
@@ -631,14 +678,14 @@ export class Game {
     }
     const airLine = this.maxAir > 0.85 ? `<div>Biggest air: <b>${this.maxAir.toFixed(1)} s</b></div>` : '';
     const promiseLine = this.promised ? `<div>Tips promised for next year: <b>${money(this.promised)}</b> (received: $0)</div>` : '';
-    const sub = reason === 'PERMIT REVOKED' ? 'The DMV has suspended your driverless permit.' : 'Your shift is over.';
+    const sub = reason === 'DEACTIVATED' ? 'Your driver rating fell below 4.00. Your account has been deactivated.' : 'Your shift is over.';
     const ov = $('#overlay');
     ov.className = 'dim';
     ov.innerHTML = `
       <h2>${reason}</h2>
       <div class="stats">
         <div>${sub}</div>
-        <div>Fares delivered: <b>${this.fares}</b></div>
+        <div>Fares delivered: <b>${this.fares}</b> · Final rating: <b>${this.rating.toFixed(2)} ★</b></div>
         ${airLine}${equityLine}${promiseLine}
         <div class="total">${money(this.cash)}</div>
       </div>
@@ -654,7 +701,8 @@ export class Game {
     diff = Math.atan2(Math.sin(diff), Math.cos(diff));
     this.camYaw += diff * (1 - Math.exp(-4 * dt));
     const speedT = Math.min(1, car.speed / MAX_SPEED);
-    const back = 8.5 + speedT * 2, up = 4.3 + speedT * 0.6;
+    const tune = this.look.settings;
+    const back = tune.camBack + speedT * 2, up = tune.camUp + speedT * 0.6;
     const want = new THREE.Vector3(car.pos.x - Math.sin(this.camYaw) * back, car.pos.y + up, car.pos.z - Math.cos(this.camYaw) * back);
     want.y = Math.max(want.y, groundAt(want.x, want.z) + 1.5);
     this.camera.position.lerp(want, 1 - Math.exp(-10 * dt));
@@ -663,7 +711,7 @@ export class Game {
     this.shake *= Math.exp(-6 * dt);
     if (this.shake > 0.01) this.camera.position.add(new THREE.Vector3((this.rand() - 0.5) * this.shake, (this.rand() - 0.5) * this.shake, 0));
     this.camera.lookAt(car.pos.x + Math.sin(this.camYaw) * 4, car.pos.y + 1.6, car.pos.z + Math.cos(this.camYaw) * 4);
-    const fov = 68 + speedT * 14;
+    const fov = tune.fov + speedT * 14;
     if (Math.abs(this.camera.fov - fov) > 0.1) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
     this.sun.position.set(car.pos.x + 60, car.pos.y + 110, car.pos.z + 35);
     this.sun.target.position.copy(car.pos);
@@ -692,7 +740,7 @@ export class Game {
       const c = t > 0.45 ? 0x7dff6a : t > 0.15 ? 0xffd23a : 0xff4a3a;
       this.arrowMat.color.set(c);
       this.arrowMat.emissive.set(c);
-      this.arrow.scale.setScalar(1);
+      this.arrow.scale.setScalar(0.8);
     } else {
       let best = Infinity;
       for (const w of this.waiting) {
@@ -701,14 +749,21 @@ export class Game {
       }
       this.arrowMat.color.set(0xffffff);
       this.arrowMat.emissive.set(0x888888);
-      this.arrow.scale.setScalar(0.6);
+      this.arrow.scale.setScalar(0.5);
     }
     this.arrow.visible = !!target && this.state === 'play';
     if (!target) return;
     const p = this.car.pos;
     const ahead = new THREE.Vector3(target.x - p.x, 0, target.z - p.z).normalize();
     // Centre the arrow over the cab; its pivot is the tail.
-    this.arrow.position.set(p.x - ahead.x * 1.65 * this.arrow.scale.x, p.y + 4.1 + Math.sin(this.clock * 4) * 0.1, p.z - ahead.z * 1.65 * this.arrow.scale.x);
+    // Float just under the camera's eye line, a little ahead of the cab, so it never blocks the road.
+    const height = Math.min(3.4, this.look.settings.camUp * 0.62 + 1.25);
+    const fwd = this.car.fwd;
+    this.arrow.position.set(
+      p.x + fwd.x * 2.2 - ahead.x * 1.65 * this.arrow.scale.x,
+      p.y + height + Math.sin(this.clock * 4) * 0.08,
+      p.z + fwd.y * 2.2 - ahead.z * 1.65 * this.arrow.scale.x,
+    );
     // Point level along the ground, but roll the arrow about its own length so
     // its face turns towards the camera and never reads as an edge-on slab.
     const dir = new THREE.Vector3(target.x - p.x, 0, target.z - p.z).normalize();
@@ -724,14 +779,14 @@ export class Game {
   }
 
   private updateHud() {
-    const t = $('#time');
-    t.textContent = String(Math.ceil(this.time));
-    t.classList.toggle('low', this.time < 10);
+    $('#time').textContent = String(Math.ceil(this.time));
+    $('#clock').classList.toggle('low', this.time < 10);
     $('#money').textContent = money(this.cash);
-    $('#permit .fill').style.width = `${this.safety}%`;
-    $('#permit').classList.toggle('low', this.safety < 30);
-    $('#speed').innerHTML = `${Math.round(this.car.speed * 2.237)} <small>MPH</small>`;
-    $('#combo').textContent = this.combo > 1 ? `COMBO x${this.combo}` : '';
+    $('#rating .score b').textContent = this.rating.toFixed(2);
+    $('#rating .fill').style.width = `${this.safety}%`;
+    $('#rating').classList.toggle('low', this.safety < 30);
+    $('#speed b').textContent = String(Math.round(this.car.speed * 2.237));
+    $('#combo').textContent = this.combo > 1 ? `COMBO ×${this.combo}` : '';
     const lc = this.car.launchCharge;
     $('#launch').hidden = lc <= 0;
     $('#launch .fill').style.width = `${Math.min(100, (lc / 0.8) * 100)}%`;
@@ -740,9 +795,17 @@ export class Game {
     const r = this.ride;
     fare.classList.toggle('hidden', !r);
     if (r) {
-      $('#fare .who').textContent = r.type.label;
-      $('#fare .dest').textContent = r.firedT > 0 ? 'Passenger temporarily fired…' : `→ ${r.dest.name}`;
+      const face = $<HTMLImageElement>('#fare .face');
+      const src = `/portraits/${r.type.id}.jpg`;
+      if (!face.src.endsWith(src)) face.src = src;
+      const who = $('#fare .who');
+      who.textContent = r.type.label.replace('★ ', '★ ');
+      who.style.color = SPEAKERS[r.type.id].color;
+      $('#fare .dest').textContent = r.firedT > 0 ? 'Temporarily fired by the board…' : `→ ${r.dest.name}`;
       $('#fare .clock').textContent = r.firedT > 0 ? `${Math.ceil(r.firedT)}` : `${Math.ceil(r.left)}`;
+      const t = r.left / r.total;
+      fare.classList.toggle('warn', t <= 0.45 && t > 0.15);
+      fare.classList.toggle('urgent', t <= 0.15);
     }
   }
 
@@ -750,6 +813,7 @@ export class Game {
     const el = document.createElement('div');
     el.className = `popup ${cls}`;
     el.textContent = text;
+    el.style.setProperty('--tilt', `${(Math.random() * 8 - 4).toFixed(1)}deg`);
     $('#popups').appendChild(el);
     setTimeout(() => el.remove(), 1600);
   }

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { toon } from './look';
 import { groundAt } from './features';
-import { BLOCKS_SIDES, CELL, HALF, N, blocks, curb, landmarks, rng, type Side } from './world';
+import { BLOCKS_SIDES, CELL, CURB_ROAD, CURB_WALK, HALF, N, STREET_HALF, blocks, curb, landmarks, rng, type Side } from './world';
 import type { Car } from './car';
 
 // Street junk that goes flying when you hit it. Blockout shapes, merged per kind
@@ -109,8 +109,8 @@ export class Props {
     const pick = <T,>(a: T[]) => a[Math.floor(r() * a.length)];
     const sidewalk = (bi: number, bj: number, side: Side, t: number, fromCurb: number) => {
       const c = curb(bi, bj, side, t);
-      // walk is 10 from the street centreline, road is 4: step along that line.
-      const k = (fromCurb + 8 - 4) / 6;
+      // fromCurb is measured from the curb edge; walk and road are known distances from the centreline.
+      const k = (STREET_HALF + fromCurb - CURB_ROAD) / (CURB_WALK - CURB_ROAD);
       return { x: c.road.x + (c.walk.x - c.road.x) * k, z: c.road.z + (c.walk.z - c.road.z) * k, yaw: c.facing };
     };
     const farFromLandmarks = (x: number, z: number) => landmarks.every((l) => Math.hypot(l.curb.walk.x - x, l.curb.walk.z - z) > 6);
@@ -145,12 +145,12 @@ export class Props {
       sites++;
       for (let k = -4; k <= 4; k++) {
         if (k === 0) continue;
-        const o = k * 1.6;
+        const o = k * 1.35;
         places.push({ kind: 'cone', x: alongZ ? cx + o : cx, z: alongZ ? cz : cz + o, yaw: r() * 6 });
       }
       places.push({ kind: 'sawhorse', x: cx, z: cz, yaw: alongZ ? 0 : Math.PI / 2 });
       for (const s of [-1, 1]) {
-        const o = s * 9.5;
+        const o = s * 7.2;
         places.push({ kind: 'placard', x: alongZ ? cx + o : cx, z: alongZ ? cz : cz + o, yaw: alongZ ? (s < 0 ? Math.PI / 2 : -Math.PI / 2) : (s < 0 ? 0 : Math.PI) });
       }
     }

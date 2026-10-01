@@ -5,7 +5,7 @@ export type QuipEvent =
   | 'pickup' | 'dropoff' | 'walkout' | 'idle'
   | 'jump' | 'jumpFirst' | 'nearMiss' | 'crash' | 'drift' | 'slow' | 'timeLow'
   | 'fired' | 'back' | 'reroute' | 'safetyLow'
-  | 'dash' | 'smash' | 'geyser' | 'underwater' | 'bigAir';
+  | 'dash' | 'smash' | 'geyser' | 'underwater' | 'bigAir' | 'pedDive';
 
 export const SPEAKERS: Record<Speaker, { name: string; color: string; pitch: number }> = {
   cab: { name: 'YOUR CAB', color: '#14a892', pitch: 880 },
@@ -26,7 +26,7 @@ export const LINES: Record<Speaker, Partial<Record<QuipEvent, string[]>>> = {
     crash: ["I'm sorry. I'm so sorry. Rerouting.", 'That object was not in my training data.', 'Filing incident report... deleting incident report.', 'Minor contact event. Nobody saw that.'],
     jump: ['Unexpected elevation change. Enjoy!', 'Wheels are optional, per my latest update.', 'I am briefly an aircraft.'],
     nearMiss: ['Within tolerance.', 'Gap detected. Gap taken.'],
-    safetyLow: ['My permit is under review.', 'The DMV has entered the chat.', "Please don't tell the regulators."],
+    safetyLow: ['My rating is under review.', 'Please rate me five stars. I have a family. Of servers.', "Rating 4.2. My manager is a spreadsheet and it's angry."],
     dropoff: ['Thank you for riding. Please rate me five stars. Or else.', 'Arrived. Your data has been lovingly retained.'],
     walkout: ['Rating lowered. Feelings: none.', 'Another satisfied customer. Statistically.'],
     idle: ['Lidar spinning. Vibes immaculate.', 'I can see in 360 degrees. I choose not to.', 'Updating terms of service... done.'],
@@ -34,7 +34,8 @@ export const LINES: Record<Speaker, Partial<Record<QuipEvent, string[]>>> = {
     smash: ['Street furniture reclassified as projectiles.', 'That was in the way. It is no longer in the way.', 'Cone detected. Cone ignored.'],
     geyser: ['Water feature unlocked.', 'I have created a fountain. You are welcome.'],
     underwater: ['I am now a submarine. Please remain seated.', 'Waterproofing: untested. Now tested.', 'Recalculating route via the ocean floor.'],
-    bigAir: ['Altitude exceeds my operating permit.', 'Requesting clearance from air traffic control.', 'I can see my depot from here.'],
+    pedDive: ['Pedestrian successfully avoided. By them.', 'They saw me. That counts.', 'Human reflexes: impressive.', 'Yielding is a two-way street.'],
+    bigAir: ['Altitude exceeds my operating parameters.', 'Requesting clearance from air traffic control.', 'I can see my depot from here.'],
   },
   techbro: {
     pickup: ["Bro. Let's GO. I've got a pitch in ten.", 'Yo, is this the robot one? Sick. Very on thesis.', "Quick ride, bro, I'm between two coffee chats."],
