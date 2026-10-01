@@ -65,7 +65,7 @@ let horizons: THREE.Group | null = null;
 
 export function paintSky(sky: THREE.Object3D) {
   const strips: [string, number, number, number, number][] = [
-    ['horizon-north', -15, 40, 0.1, 1], ['horizon-east', 35, 145, 0.14, 1], ['horizon-south', 150, 230, 0.05, 0.7],
+    ['horizon-north', -38, 40, 0.1, 0.7], ['horizon-east', 35, 145, 0.14, 1], ['horizon-south', 150, 230, 0.05, 0.7],
   ];
   horizons = new THREE.Group();
   for (const [id, a0, a1, shore, squash] of strips) {
