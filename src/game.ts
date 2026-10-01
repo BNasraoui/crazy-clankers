@@ -193,9 +193,10 @@ export class Game {
     this.safety = 100;
     this.lowWarned = false;
     this.clock = 0;
-    this.car.reset(START.x, START.z, START.yaw);
-    this.camYaw = START.yaw;
-    this.camera.position.set(START.x - Math.sin(START.yaw) * 9, this.car.pos.y + 4, START.z - Math.cos(START.yaw) * 9);
+    const st = this.rank?.start ?? START;
+    this.car.reset(st.x, st.z, st.yaw);
+    this.camYaw = st.yaw;
+    this.camera.position.set(st.x - Math.sin(st.yaw) * 9, this.car.pos.y + 4, st.z - Math.cos(st.yaw) * 9);
     this.traffic.scatter();
     this.props.reset();
     this.geysers.reset();
@@ -257,7 +258,7 @@ export class Game {
     unlockAudio();
     burst();
     this.reset();
-    this.rank.setVisible(false);
+    this.rank.setCarsVisible(false);
     this.car.model.root.visible = true;
     this.setState('play');
     this.popup('GO!', 'big');
@@ -300,7 +301,7 @@ export class Game {
 
   private showPicker() {
     this.setState('picker');
-    this.rank.setVisible(true);
+    this.rank.setCarsVisible(true);
     this.car.model.root.visible = false;
     this.renderCabPicker();
   }
@@ -341,7 +342,7 @@ export class Game {
   private showTitle() {
     this.setState('title');
     this.howTo = false;
-    this.rank?.setVisible(true);
+    this.rank?.setCarsVisible(true);
     this.car.model.root.visible = false;
     let rating = '5.00';
     try { rating = localStorage.getItem('clankers.rating') ?? '5.00'; } catch { /* storage unavailable */ }
