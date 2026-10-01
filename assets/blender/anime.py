@@ -1,8 +1,8 @@
 """Shared character modelling, albedo painting and game-equivalent cel previews.
 
 Model in game coordinates (Y up, +Z forward, metres), convert to Blender only at
-mesh construction. Head topology and its cylindrical atlas live in techbro_head.py;
-this module contains only reusable lofts, cloth shells, painting and preview tools.
+mesh construction. Shared head surfaces live in head_shape.py, UV-preserving
+head construction in anime_head.py, and character hair/paint in techbro_head.py.
 The untouched common.py remains the cab pipeline's stable dependency.
 """
 import math

@@ -1,8 +1,9 @@
 {
+  "public/models/techbro.glb": "ae49a272bb7edcea0adbd3431183c2e91eabd7ccd91317d460b4fa560368fc8f",
   "public/models/cab.glb": "c166f5c3f6e92ebd2c89c72f78c43c830ed1df1bf4c910afdd45353e2e40c33d",
-  "public/models/techbro.glb": "198a456aba797c3073984a19893a0725b5ba5fb4f3dcdb69a923bc1462088f83",
-  "docs/renders/techbro.png": "0692987727d1c41b20bea5695691dbc1392de769d2c640ef79bd52159b43b2c0",
-  "docs/renders/techbro-head.png": "0c7cfeecf1543d3d43c0ea6e9abf8272bc876e3b4f2f33b18830a9ba0f01ac64",
-  "docs/renders/techbro-compare.png": "74d2bf70aa241dd7602eb070ef0165443b3df5cced7d81dadec84690d2a789c3",
-  "docs/renders/techbro-small.png": "1d83bd9a3bddae59b0709d7aad6170ca5706acbe25f1aeb6cb5538a2a53ee4ae"
+  "docs/renders/techbro.png": "81610cd76b374e2f5c538f9c89301fc6674a415134b094d2caaa56ce70250e89",
+  "docs/renders/techbro-head.png": "b1a9f82b49db17cc451f62a27ed27dd317402a5446983374321963e9fecb2a85",
+  "docs/renders/techbro-head-compare.png": "9bca63f9bc60292dace88e8ddd8036121c78572acfdebe2b6a49b92144e40436",
+  "docs/renders/techbro-compare.png": "b53dffa755571c3a3763816d43a92f452b9a85f4a47f03cc951ae0d18c9ea0e5",
+  "docs/renders/techbro-small.png": "e6a18ebb0e3b202de02955278a9a67f6ac741b7db562a4d7d72a4bb3f54424d8"
 }

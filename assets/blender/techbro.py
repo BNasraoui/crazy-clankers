@@ -46,7 +46,7 @@ SMOOTH = 115  # degrees: everything reads as smooth, only real creases stay cris
 TRI_BUDGET = 30000
 
 # --- proportions (game space: Y up, +Z forward, metres) ---------------------------
-HEAD_C = Vector((0, 1.65, 0.012))
+HEAD_C = Vector((0, 1.625, 0.012))
 NECK = Vector((0, 1.44, -0.012))            # head pivot
 SHOULDER_R = Vector((0.172, 1.414, -0.014))  # cup arm (+X)
 SHOULDER_L = Vector((-0.172, 1.402, -0.014))
@@ -469,6 +469,6 @@ if "quick" not in ARGS:
     pv.aim(Vector((0, 0.9, 0)), 1.9)
     hero = pv.render(20, 700, 1400)
     A.compare("techbro-compare", C.REPO / "docs/art/cast.jpg", (0, 95, 218, 734), hero, mirror_ref=True,
-              labels=("cast.jpg (mirrored for +X cup)", "v4 render"))
+              labels=("cast.jpg (mirrored for +X cup)", "v5 render"))
     pv.sheet("techbro-small", (("front", 0), ("3/4", -35), ("side", -90), ("back", 180)),
              Vector((0, 0.90, 0)), 2.0, 180, aspect=0.6)
