@@ -1,6 +1,6 @@
 # Dashboard radio
 
-Three kinds of station: **internet radio** (the defaults), **YouTube** playlists or videos, and **your own files**. All of them play with the radio collapsed to a small sticker in the lower-left corner; click the sticker for the controls.
+Three kinds of station: **internet radio** (the defaults), **YouTube** playlists or videos, and **your own files**. All of them play with the radio collapsed to a small sticker in the lower-left corner (a YouTube station shows its video there instead); click the station name for the controls.
 
 ## Stations
 
@@ -8,7 +8,7 @@ Three kinds of station: **internet radio** (the defaults), **YouTube** playlists
 
 Open **Radio** on the title or pause menu with **M / X** to add a station (a YouTube playlist or video URL, or any `https://` stream URL), rename, reorder or remove stations. Stations and volume persist in localStorage (`clankers.radio.v2`; anything added under the first build's `v1` key is carried over, minus its two placeholder stations).
 
-YouTube stations play through the official IFrame API from a player kept off screen, so they behave like the others. That is outside YouTube's terms for embedded players (which want the player visible); it's Ben's call for a personal site. YouTube's own ads still play.
+YouTube stations play through the official IFrame API and show their video on the cab's **dash screen**: a 240×200 infotainment display in the lower-left corner, which meets YouTube's rule that embedded players stay visible (at least 200×200). The Radio screen's **Show YouTube videos on the dash screen** switch hides it; the player then plays from off screen, which is outside YouTube's terms (Ben's call for a personal site). YouTube's own ads still play.
 
 **Play my own files** / **Choose folder** play local audio through blob URLs; nothing is uploaded. Choose them again after a reload.
 

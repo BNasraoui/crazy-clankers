@@ -114,6 +114,7 @@ export class Radio {
   private playing = false;
   private interacted = false;
   private volume = 0.35;
+  private showVideo = true; // YouTube stations show their video on the cab's dash screen
   private ducked = false;
   private failedTracks = new Set<number>();
   private failedAttempts = 0;
@@ -148,6 +149,7 @@ export class Radio {
       if (saved && Array.isArray(saved.stations)) this.stations = keep(saved.stations);
       // From the first build: keep anything Ben added, drop its two placeholders, add the new defaults.
       else if (old && Array.isArray(old.stations)) this.stations = [...this.stations, ...keep(old.stations).filter((s) => !OLD_DEFAULTS.includes(s.source))];
+      if (typeof saved?.showVideo === 'boolean') this.showVideo = saved.showVideo;
       const vol = (saved ?? old)?.volume;
       if (typeof vol === 'number' && Number.isFinite(vol)) this.volume = Math.max(0, Math.min(1, vol));
     } catch { /* Storage is optional, including in private browsing. */ }
@@ -184,10 +186,14 @@ export class Radio {
     };
     const local = document.createElement('div'); local.className = 'radio-local';
     local.append(button('Play my own files', () => this.pickFiles(false)), button('Choose folder', () => this.pickFiles(true)));
+    const videoToggle = document.createElement('label'); videoToggle.className = 'radio-video-toggle';
+    const videoBox = document.createElement('input'); videoBox.type = 'checkbox'; videoBox.checked = this.showVideo;
+    videoBox.onchange = () => { this.showVideo = videoBox.checked; this.updateVideo(); this.save(); };
+    videoToggle.append(videoBox, ' Show YouTube videos on the dash screen');
     const privacy = document.createElement('p'); privacy.textContent = 'Radio stations stream straight from their broadcasters; YouTube plays through its own embedded player. Local files stay on this device; choose them again after reloading.';
     const transport = document.createElement('div'); transport.className = 'radio-controls';
     transport.append(button('Previous station', () => this.nextStation(-1)), button('Play / pause', () => this.playPause()), button('Skip track', () => this.nextTrack()), button('Next station', () => this.nextStation(1)), button('Radio off', () => this.off()), this.volumeControl());
-    this.screen.append(transport, this.rows, form, local, privacy, this.note, button('Back to game', () => this.close()));
+    this.screen.append(transport, this.rows, form, local, videoToggle, privacy, this.note, button('Back to game', () => this.close()));
     document.body.append(this.dashboard, this.collapsed, this.screen, this.toast);
     this.renderStations();
     this.audio.onended = () => (this.isStream() ? this.tune(this.selected, true) : this.nextTrack());
@@ -255,9 +261,11 @@ export class Radio {
   private isStream() { const s = this.stations[this.selected]; return !!s && !!streamSource(s.source); }
   private isYouTube() { const s = this.stations[this.selected]; return !!s && !!youtubeSource(s.source); }
   private setMini(mini: boolean) { this.dashboard.classList.toggle('mini', mini); }
+  // The dash screen: a YouTube station's video, visible in the corner (unless switched off).
+  private updateVideo() { this.dashboard.classList.toggle('video', this.enabled && this.isYouTube() && this.showVideo); }
 
   private save() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ stations: this.stations, volume: this.volume })); } catch { /* Play without persistence. */ }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ stations: this.stations, volume: this.volume, showVideo: this.showVideo })); } catch { /* Play without persistence. */ }
   }
 
   private message(text: string) {
@@ -280,6 +288,7 @@ export class Radio {
     this.stopSource(); // Destroy the iframe before hiding it: never hidden YouTube audio.
     this.enabled = this.playing = false;
     this.dashboard.hidden = true; this.collapsed.hidden = false;
+    this.updateVideo();
   }
 
   nextStation(direction: number) {
@@ -294,6 +303,7 @@ export class Radio {
     const station = this.stations[index];
     this.enabled = this.playing = true;
     this.dashboard.hidden = false; this.collapsed.hidden = true;
+    this.updateVideo();
     this.toggle.textContent = 'Pause';
     this.stationLabel.textContent = station?.name || 'Play my own files';
     this.trackLabel.textContent = 'Tuning…';
