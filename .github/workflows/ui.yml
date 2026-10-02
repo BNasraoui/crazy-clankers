@@ -33,8 +33,10 @@ jobs:
         run: npx playwright test ${{ inputs.update_snapshots && '--update-snapshots' || '' }}
         env:
           CI: '1'
+      # A new screen's first snapshot fails its test by design (Playwright writes it and flags it), so
+      # commit whatever was written even when the run failed; the next run compares against it.
       - name: Commit new or updated snapshots
-        if: ${{ github.event_name != 'pull_request' }}
+        if: ${{ always() && github.event_name != 'pull_request' }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config user.name "github-actions[bot]"
