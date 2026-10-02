@@ -231,7 +231,7 @@ export function makePerson(p: PersonSpec): PersonModel {
 
 // Billboard text that always faces the camera.
 export function makeLabel(text: string, opts: { bg?: string; fg?: string; height?: number } = {}) {
-  const font = '700 56px Bungee, Impact, sans-serif';
+  const font = '700 56px Bungee, Impact, "Noto Sans SC", sans-serif'; // Chinese falls through to Noto Sans SC
   const c = document.createElement('canvas');
   const ctx = c.getContext('2d')!;
   ctx.font = font;

@@ -19,6 +19,11 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@500;700;900&display=swap" />
     <link rel="preload" as="image" href="/keyart/jump.avif" fetchpriority="high" />
     <link rel="stylesheet" href="/src/style.css" />
+    <script>
+      // The boot screen in the player's language before the game loads (src/i18n.ts takes over from here).
+      try { var l = localStorage.getItem('clankers.lang'); } catch (e) {}
+      if (l === 'zh' || (!l && /^zh/i.test(navigator.language))) document.documentElement.lang = 'zh-Hans';
+    </script>
     <style>
       /* Until the game is ready only the boot screen shows: no bare canvas, no unstyled HUD. */
       html, body { background: #1b1722; }

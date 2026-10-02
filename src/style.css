@@ -15,6 +15,14 @@
   --body: Inter, system-ui, sans-serif;
   --halftone: radial-gradient(circle, #0000001f 1.2px, transparent 1.4px) 0 0 / 6px 6px;
 }
+/* Chinese: Dela Gothic One and Permanent Marker lack Simplified characters, so headlines and
+   labels use ZCOOL KuaiLe (hand-drawn, manga-friendly) and small text Noto Sans SC. */
+html:lang(zh-Hans) #overlay .menu .logo { font-family: 'Dela Gothic One', sans-serif; } /* the logo stays the logo */
+html:lang(zh-Hans) {
+  --num: 'ZCOOL KuaiLe', 'Noto Sans SC', 'Arial Black', sans-serif;
+  --pen: 'ZCOOL KuaiLe', 'Noto Sans SC', cursive;
+  --body: Inter, 'Noto Sans SC', system-ui, sans-serif;
+}
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #d3e6f3; }
@@ -614,3 +622,18 @@ html.touch .radio-menu-button { min-height: 48px; padding: 8px 18px; font-size: 
 #lookpanel .lk-head { display: flex; align-items: center; justify-content: space-between; }
 #lk-close { width: 34px; height: 34px; padding: 0; font: 800 16px var(--body); color: var(--ink); background: var(--paper);
   border: 2px solid var(--ink); border-radius: 50%; box-shadow: 2px 2px 0 var(--ink); cursor: pointer; pointer-events: auto; touch-action: manipulation; }
+
+/* EN / 中文 switch on the title screen. */
+.lang-switch { position: absolute; top: 4%; right: 3%; display: flex; align-items: center; gap: 2px; padding: 4px; pointer-events: auto; cursor: pointer;
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 10px; box-shadow: 4px 4px 0 var(--ink); transform: rotate(2deg); color: var(--ink); }
+.lang-switch > b { padding: 4px 12px; border-radius: 6px; font: 18px/1.1 'Dela Gothic One', 'ZCOOL KuaiLe', 'Noto Sans SC', sans-serif; opacity: 0.45; }
+.lang-switch > b:last-of-type { font-family: 'ZCOOL KuaiLe', 'Noto Sans SC', sans-serif; }
+.lang-switch > b.on { background: var(--yellow); opacity: 1; box-shadow: inset 0 0 0 2px var(--ink); }
+.lang-switch .keycap { margin-left: 6px; font-size: 12px; }
+#overlay .menu .logo-sub { margin-top: 6px; font: clamp(22px, 3.4vw, 44px)/1 var(--num); color: #fff; letter-spacing: 0.12em;
+  -webkit-text-stroke: 0.14em var(--ink); paint-order: stroke fill; text-shadow: 4px 4px 0 var(--ink); }
+#overlay .menu .logo-block.small .logo-sub { font-size: clamp(16px, 2vw, 26px); }
+@media (max-height: 500px) {
+  .lang-switch { top: auto; bottom: calc(18% + env(safe-area-inset-bottom, 0px)); right: calc(3% + env(safe-area-inset-right, 0px)); }
+  .lang-switch > b { font-size: 15px; padding: 3px 9px; }
+}

@@ -57,3 +57,6 @@ export function shortName(id: Exclude<Speaker, 'cab'>, i: number) {
   const name = fullName(id, i);
   return lang() === 'zh' ? name.replace('·', '') : name.split(' ')[0];
 }
+
+// Every Chinese name, so the label font can fetch their glyphs up front.
+export const allZhNames = () => Object.values(ZH).flat().join('');

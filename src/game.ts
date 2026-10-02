@@ -8,7 +8,7 @@ import { paintSky, updateSky } from './sky';
 import { CHARACTER_LAYER, makeCharacter, sunDir } from './anime';
 import { pickPassenger, roleOf, type PassengerType } from './passengers';
 import { QuipDirector, SPEAKERS, askLine, type QuipEvent } from './quips';
-import { fullName, nameCount, shortName } from './names';
+import { allZhNames, fullName, nameCount, shortName } from './names';
 import { lang, onLang, place, setLang, t } from './i18n';
 import { Traffic } from './traffic';
 import { sfx, setEngine, unlockAudio } from './audio';
@@ -231,6 +231,7 @@ export class Game {
     this.reset();
     this.showTitle();
     onLang(() => this.relanguage());
+    this.labelFont();
     // The EN / 中文 switch on the title screen: click it, or press L.
     const flip = () => setLang(lang() === 'zh' ? 'en' : 'zh');
     addEventListener('click', (e) => { if ((e.target as Element).closest?.('[data-lang]')) flip(); });
@@ -242,9 +243,22 @@ export class Game {
     if (this.state === 'title') this.showTitle();
     else if (this.state === 'picker') this.renderCabPicker();
     else if (this.state === 'paused') this.setState('paused');
+    this.relabels();
+    this.labelFont();
+  }
+
+  // The 3D tags (fares, drop-offs) are drawn once onto canvases.
+  private relabels() {
     this.relabelFares();
     this.setDest(this.ride?.dest ?? null);
     for (const p of this.pool) if (p.marker) { this.scene.remove(p.marker); p.marker = this.poolMarker(p.dest); }
+  }
+
+  // A canvas can't wait for a web font, so in Chinese fetch the glyphs the tags use, then redraw them.
+  private labelFont() {
+    if (lang() !== 'zh' || !document.fonts) return;
+    const text = [...this.waiting.map((w) => this.labelText(w.type, w.name, w.want, w.curb, w.dest)), ...landmarks.map((l) => place(l.name)), allZhNames()].join('');
+    document.fonts.load('700 56px "Noto Sans SC"', text).then(() => this.relabels(), () => {});
   }
 
   // A speaker's name tag: the rider of that type aboard (the lead first), else just the role.
@@ -730,13 +744,17 @@ export class Game {
   private get premium() { return CABS[this.cabIndex].id === 'wayfarer'; } // Waymo's perk: sees every fare, pays 1.3×
 
   // The tag over a waiting passenger. In the Wayfarer it also shows what they want and roughly what they'll pay.
-  private fareLabel(type: PassengerType, name: number, want: WantId, c: Curb, dest: Landmark) {
+  private labelText(type: PassengerType, name: number, want: WantId, c: Curb, dest: Landmark) {
     let text = nameTag(type, name);
     if (this.premium) {
       const pay = (4 + blocks(c.road, dest.curb.road) * 0.05) * type.fareMul * SURGE[this.surge][3] * 1.3;
       text += ` · ${WANTS[want].icon} ${WANTS[want].title} · $${Math.round(pay)}`;
     }
-    const label = makeLabel(text, { bg: type.vip ? '#3a2a00e0' : '#000000c0', fg: type.vip ? '#ffd23a' : '#ffffff', height: 1 });
+    return text;
+  }
+
+  private fareLabel(type: PassengerType, name: number, want: WantId, c: Curb, dest: Landmark) {
+    const label = makeLabel(this.labelText(type, name, want, c, dest), { bg: type.vip ? '#3a2a00e0' : '#000000c0', fg: type.vip ? '#ffd23a' : '#ffffff', height: 1 });
     label.position.copy(c.walk).add(new THREE.Vector3(0, 3.4, 0));
     return label;
   }
