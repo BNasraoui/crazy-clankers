@@ -14,6 +14,10 @@ const CARDS: Record<string, CabCard> = {
 const btn = (k: 'A' | 'B' | 'Y' | 'pad', text: string) =>
   `<span class="prompt"><i class="glyph ${k === 'pad' ? 'pad' : k.toLowerCase()}">${k === 'pad' ? '✚' : k}</i>${text}</span>`;
 
+// A sticker button for touch screens; tapping it acts like the pad button it stands for.
+export const tapButton = (action: 'confirm' | 'back' | 'alt' | 'restart', text: string, kind = '') =>
+  `<button type="button" class="tap-btn ${kind}" data-tap="${action}">${text}</button>`;
+
 const LOGO = `<h1 class="logo">CRAZY<span>CLANKERS</span></h1>`;
 
 // Painted key art behind the title, a different one each visit.
@@ -26,21 +30,25 @@ export function titleHTML(padName: string) {
     <div class="menu title-screen">
       <img class="keyart" src="/keyart/${art}.jpg" alt="">
       <div class="logo-block">${LOGO}<div class="tag">You are AGI. Drive like it.</div></div>
-      <div class="press-start">PRESS <i class="glyph a">A</i> TO START</div>
-      <button class="radio-menu-button" data-radio-open>Radio · M / X</button>
-      <div class="corner-prompts">${btn('Y', 'HOW TO PLAY')}${btn('B', 'OPTIONS')}</div>
+      <div class="press-start" data-tap="confirm"><span class="pad-only">PRESS <i class="glyph a">A</i> TO START</span><span class="touch-only">TAP TO START</span></div>
+      <button class="radio-menu-button" data-radio-open>Radio<span class="pad-only"> · M / X</span></button>
+      <div class="corner-prompts pad-only">${btn('Y', 'HOW TO PLAY')}${btn('B', 'OPTIONS')}</div>
+      <div class="corner-prompts tap-row touch-only">${tapButton('alt', 'HOW TO PLAY')}${tapButton('back', 'OPTIONS')}</div>
       <div class="pad-note">${padName ? `🎮 ${padName}` : 'Press any button on a controller to use it.'}</div>
     </div>`;
 }
 
 export function howToHTML() {
   return `
-    <div class="howto">
+    <div class="howto" data-tap="back">
       <b>HOW TO PLAY</b>
-      <div><b>Gas</b> RT / W · <b>Brake / reverse</b> LT / S · <b>Steer</b> stick / A D</div>
-      <div><b>Drift</b> B or RB / Space (hold) · <b>Hop</b> A / E · <b>Pause</b> Start / Esc</div>
-      <div><b>Radio</b> T / LB: next station · N / X: skip track · M / X in menus: stations</div>
-      <div><b>Launch Mode</b> hold handbrake + gas (stopped or drifting), release the handbrake</div>
+      <div class="pad-only"><b>Gas</b> RT / W · <b>Brake / reverse</b> LT / S · <b>Steer</b> stick / A D</div>
+      <div class="pad-only"><b>Drift</b> B or RB / Space (hold) · <b>Hop</b> A / E · <b>Pause</b> Start / Esc</div>
+      <div class="pad-only"><b>Radio</b> T / LB: next station · N / X: skip track · M / X in menus: stations</div>
+      <div class="pad-only"><b>Launch Mode</b> hold handbrake + gas (stopped or drifting), release the handbrake</div>
+      <div class="touch-only"><b>Steer</b> drag sideways on the left · <b>Gas · Brake · Drift · Hop</b> on the right</div>
+      <div class="touch-only"><b>Radio</b> tap the station sticker: next · hold it, drag to a station, let go</div>
+      <div class="touch-only"><b>Launch Mode</b> hold DRIFT + GAS (stopped or drifting), let go of DRIFT</div>
       <div>Stop in a ring to pick up. Stop in the beam to drop off.</div>
       <div>Every passenger wants something: speed, air, drifts, close calls, chaos or a smooth ride. Give it to them for up to five stars. Stars set your tip and your <b>rating</b>; so do crashes. Below 4.00 you're deactivated.</div>
     </div>`;
@@ -51,7 +59,7 @@ export function pickerHTML(selected: number, thumbs: Record<string, string>) {
     const card = CARDS[c.id];
     const sel = i === selected;
     return `
-      <div class="cab-row${sel ? ' selected' : ''}">
+      <div class="cab-row${sel ? ' selected' : ''}" data-cab="${i}">
         ${sel ? '<span class="sel-tab">SELECTED</span>' : ''}
         <img src="${thumbs[c.id] ?? ''}" alt="">
         <div class="cab-info">
@@ -68,15 +76,16 @@ export function pickerHTML(selected: number, thumbs: Record<string, string>) {
   return `
     <div class="menu picker-screen">
       <div class="logo-block small">${LOGO}</div>
-      <div class="inspect-tag">(R-STICK) INSPECT</div>
+      <div class="inspect-tag pad-only">(R-STICK) INSPECT</div>
       <div class="picker-panel">
         <div class="surge">SURGE<b>3.2x</b></div>
         <h2>CHOOSE YOUR AUTONOMOUS VEHICLE</h2>
         <div class="cab-list">${rows}</div>
         <div class="stats">${stats}</div>
-        <div class="confirm">${btn('A', 'CONFIRM CAB')}</div>
+        <div class="confirm" data-tap="confirm"><span class="pad-only">${btn('A', 'CONFIRM CAB')}</span><span class="touch-only prompt">DRIVE ▶</span></div>
       </div>
-      <div class="prompt-strip">${btn('pad', 'CHOOSE')}${btn('A', 'DRIVE')}${btn('B', 'BACK')}</div>
+      ${tapButton('back', '◀ BACK', 'corner-back touch-only')}
+      <div class="prompt-strip pad-only">${btn('pad', 'CHOOSE')}${btn('A', 'DRIVE')}${btn('B', 'BACK')}</div>
     </div>`;
 }
 

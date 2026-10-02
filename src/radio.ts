@@ -199,6 +199,8 @@ export class Radio {
       if ((e.target as Element).closest('[data-radio-open]')) this.open();
       else if (!this.interacted && e.isTrusted) this.gesture();
     });
+    // Phones: driving taps never become clicks, so start on the first lifted finger (iOS counts touchend as a gesture).
+    document.addEventListener('touchend', e => { if (!this.interacted && e.isTrusted) this.gesture(); });
   }
 
   /** Returns true when the radio screen consumes menu input. */

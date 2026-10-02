@@ -1,3 +1,5 @@
+import { mergeTouch, setTouchMode } from './touch';
+
 export interface Input {
   radioNext: boolean;
   radioSkip: boolean;
@@ -20,6 +22,7 @@ export interface Input {
   back: boolean; // edge-triggered: B / Esc / Backspace
   alt: boolean; // edge-triggered: Y / H
   lookX: number; // right stick (or Q/E) for inspecting, -1..1
+  select: number; // a cab tapped in the picker, or -1
 }
 
 const held = new Set<string>();
@@ -101,6 +104,7 @@ export function readInput(dt: number): Input {
     back: tapped('Escape', 'Backspace'),
     alt: tapped('KeyH'),
     lookX: (down('KeyX') ? 1 : 0) - (down('KeyZ') ? 1 : 0),
+    select: -1,
   };
 
   // Merge every connected pad. Some devices are listed but never send input
@@ -143,12 +147,14 @@ export function readInput(dt: number): Input {
     stickNav = { x: fx, y: fy };
     prevButtons.set(p.index, st.buttons);
     const busy = stick !== 0 || st.throttle > 0.05 || st.brake > 0.05 || st.buttons.some(Boolean);
+    if (busy) setTouchMode(false);
     if (busy || !active) active = p;
     debug.push(`#${p.index} ${p.id.slice(0, 40)} [${p.mapping || 'unmapped'}] ` +
       `axes ${p.axes.map((a) => a.toFixed(1)).join(' ')} | buttons ${p.buttons.map((b, i) => (b.pressed ? i : '')).filter(String).join(',') || '-'}`);
   }
   padName = active?.id ?? '';
   padDebug = pads.length ? debug.join('\n') : 'No gamepads reported by the browser. Press any button on the controller.';
+  mergeTouch(input);
   fresh.clear();
   return input;
 }
