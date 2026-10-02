@@ -24,7 +24,7 @@ const KEYS: Record<Act, [string, string, string]> = {
   confirm: ['A', 'a', 'Enter'],
   back: ['B', 'b', 'Esc'],
   alt: ['Y', 'y', 'H'],
-  choose: ['✚', 'pad', '← →'],
+  choose: ['✚', 'pad', '◀ ▶'],
   restart: ['Y', 'y', 'R'],
   menu: ['B', 'b', '⌫'],
   radio: ['X', 'x', 'M'],

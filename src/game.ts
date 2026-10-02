@@ -16,7 +16,7 @@ import { Voices } from './voices';
 import { BLOCKS_SIDES, CELL, HALF, WATER, buildWorld, curb, landmarks, N, type Curb, type Landmark } from './world';
 import { buildFeatures, groundAt } from './features';
 import { Moments } from './manga';
-import { Want, WANTS, type Feed } from './wants';
+import { Want, WANTS, type Feed, type WantId } from './wants';
 import { Geysers, Particles, Props, type PropKind } from './props';
 import type { Pedestrians } from './pedestrians';
 import { SpritePerson, type SpriteSet } from './spritepeople';
@@ -46,6 +46,8 @@ interface Waiting {
   curb: Curb;
   person: PersonModel;
   marker: THREE.Group;
+  label: THREE.Object3D;
+  want: WantId; // chosen as they arrive at the curb, so the Wayfarer can see it
   phase: number;
 }
 
@@ -371,6 +373,7 @@ export class Game {
     this.scene.remove(this.car.model.root);
     this.car.model = makeCar(CABS[this.cabIndex].id);
     this.car.h = handlingOf(CABS[this.cabIndex].id);
+    this.relabelFares();
     this.traffic.rammer = CABS[this.cabIndex].id === 'apollo';
     this.scene.add(this.car.model.root);
     this.traffic.setRivals(this.scene, this.rivals());
@@ -468,7 +471,7 @@ export class Game {
       crunch(14);
       this.shake = Math.max(this.shake, 0.35);
       this.particles.emit(at, 18, 0x2a2730, 7, 6, 0.3);
-      this.moments.panel('crash', 0.5);
+      this.moments.panel('crash', 0.5, false); // the art without the freeze: rams are frequent
       this.popup('BULLDOZED!', 'big');
       this.tip('smash', 1, 'RAM');
     }
@@ -643,11 +646,11 @@ export class Game {
       const marker = new THREE.Group();
       marker.add(groundRing(c.road.x, c.road.z, 5, 6.2, color, 0.85));
       marker.add(beam(c.road, 6, 14, color, 0.16));
-      const label = makeLabel(type.label, { bg: type.vip ? '#3a2a00e0' : '#000000c0', fg: type.vip ? '#ffd23a' : '#ffffff', height: 1 });
-      label.position.copy(c.walk).add(new THREE.Vector3(0, 3.4, 0));
+      const want = type.wants[Math.floor(this.rand() * type.wants.length)];
+      const label = this.fareLabel(type, want, c, dest);
       marker.add(label);
       this.scene.add(person.root, marker);
-      this.waiting.push({ type, dest, curb: c, person, marker, phase: this.rand() * 6 });
+      this.waiting.push({ type, dest, curb: c, person, marker, label, want, phase: this.rand() * 6 });
       return;
     }
   }
@@ -677,6 +680,32 @@ export class Game {
   }
 
   // Swap waiting passengers between sprites and 3D models (look panel toggle).
+  private get premium() { return CABS[this.cabIndex].id === 'wayfarer'; } // Waymo's perk: sees every fare, pays 1.3×
+
+  // The tag over a waiting passenger. In the Wayfarer it also shows what they want and roughly what they'll pay.
+  private fareLabel(type: PassengerType, want: WantId, c: Curb, dest: Landmark) {
+    let text = type.label;
+    if (this.premium) {
+      const pay = (4 + blocks(c.road, dest.curb.road) * 0.05) * type.fareMul * SURGE[this.surge][3] * 1.3;
+      text = `${type.label} · ${WANTS[want].icon} ${WANTS[want].title} · $${Math.round(pay)}`;
+    }
+    const label = makeLabel(text, { bg: type.vip ? '#3a2a00e0' : '#000000c0', fg: type.vip ? '#ffd23a' : '#ffffff', height: 1 });
+    label.position.copy(c.walk).add(new THREE.Vector3(0, 3.4, 0));
+    return label;
+  }
+
+  // Redraw every waiting fare's tag (after switching cab, or as the surge changes).
+  private relabelFares() {
+    for (const w of this.waiting) {
+      w.marker.remove(w.label);
+      const old = (w.label as THREE.Sprite).material; // sprites share one geometry: free only the texture and material
+      old.map?.dispose();
+      old.dispose();
+      w.label = this.fareLabel(w.type, w.want, w.curb, w.dest);
+      w.marker.add(w.label);
+    }
+  }
+
   refreshPassengers() {
     for (const w of this.waiting) {
       this.scene.remove(w.person.root);
@@ -702,8 +731,7 @@ export class Game {
     const d = blocks(w.curb.road, w.dest.curb.road);
     const [give, limit, hard] = SURGE[this.surge];
     const total = (d / 19 + 6) * w.type.timeMul * limit;
-    const pool = w.type.wants;
-    const want = new Want(pool[Math.floor(this.rand() * pool.length)], w.type.id, total, hard);
+    const want = new Want(w.want, w.type.id, total, hard);
     this.ride = {
       type: w.type, dest: w.dest, base: 4 + d * 0.05, total, left: total, startDist: d,
       tips: 0, equity: 0, fareMul: w.type.fareMul, filmed: false, firedDone: false, firedT: 0,
@@ -818,7 +846,7 @@ export class Game {
   private dropoff(r: Ride) {
     const ratio = r.left / r.total;
     const [grade, mul] = ratio > 0.45 ? ['SPEEDY!', 1.3] as const : ratio > 0.15 ? ['NICE', 1] as const : ['SLOW...', 0.8] as const;
-    const fare = Math.round(r.base * r.fareMul * mul * SURGE[this.surge][3]);
+    const fare = Math.round(r.base * r.fareMul * mul * SURGE[this.surge][3] * (this.premium ? 1.3 : 1));
     this.cash += fare;
     this.popup(`${grade}  +${Math.ceil(r.left)}s SAVED`, 'big');
     this.popup(`FARE ${money(fare)}`, 'good');
@@ -842,6 +870,7 @@ export class Game {
     const surgeBefore = this.surge;
     this.fares++;
     if (this.surge > surgeBefore) {
+      this.relabelFares(); // prices went up
       this.popup(`SURGE PRICING ${SURGE[this.surge][3]}×`, 'big bad');
       sfx.armed();
     }

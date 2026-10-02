@@ -3,13 +3,13 @@ import { glyph, key, keycap, phrase, type Act } from './prompts';
 
 // Title screen and cab picker overlays (the 3D taxi rank sits behind them).
 
-interface CabCard { price: string; eta: string; stats: [string, number, string][] } // [label, cells 0..6, value]
+interface CabCard { price: string; eta: string; stats: [string, number, string][]; perk?: string } // stats: [label, cells 0..6, value]
 const CARDS: Record<string, CabCard> = {
   cab: { price: '$14.20', eta: '2 min', stats: [['LIDAR COUNT', 3, '1 puck'], ['APOLOGY RATE', 2, '3 / min'], ['TOP SPEED', 4, 'brisk']] },
-  wayfarer: { price: '$31.80', eta: '4 min', stats: [['LIDAR COUNT', 6, '29'], ['APOLOGY RATE', 6, '12 / min'], ['TOP SPEED', 3, 'polite']] },
-  cybercab: { price: '$9.99', eta: 'ETA: TBC', stats: [['LIDAR COUNT', 0, 'cameras only'], ['APOLOGY RATE', 1, 'never'], ['TOP SPEED', 6, 'next year']] },
+  wayfarer: { perk: 'SEES WHAT EVERY FARE WANTS · PREMIUM 1.3× FARES', price: '$31.80', eta: '4 min', stats: [['LIDAR COUNT', 6, '29'], ['APOLOGY RATE', 6, '12 / min'], ['TOP SPEED', 3, 'polite']] },
+  cybercab: { perk: 'FASTEST CAB IN THE CITY', price: '$9.99', eta: 'ETA: TBC', stats: [['LIDAR COUNT', 0, 'cameras only'], ['APOLOGY RATE', 1, 'never'], ['TOP SPEED', 6, 'next year']] },
   zoox: { price: '$22.00', eta: '3 min, either way', stats: [['LIDAR COUNT', 4, '4 corners'], ['APOLOGY RATE', 3, 'both ends'], ['TOP SPEED', 3, 'toasty']] },
-  apollo: { price: '$4.80', eta: '1 min', stats: [['LIDAR COUNT', 5, 'a crown'], ['APOLOGY RATE', 0, 'n/a'], ['TOP SPEED', 4, 'relentless']] },
+  apollo: { perk: 'BULLDOZER: TRAFFIC BOUNCES OFF IT', price: '$4.80', eta: '1 min', stats: [['LIDAR COUNT', 5, 'a crown'], ['APOLOGY RATE', 0, 'n/a'], ['TOP SPEED', 4, 'relentless']] },
 };
 
 const btn = (act: Act, text: string) => `<span class="prompt">${key(act)}${text}</span>`;
@@ -59,6 +59,7 @@ export function pickerHTML(selected: number, thumbs: Record<string, string>) {
         <div class="cab-info">
           <div class="cab-line"><b>${c.name}</b><span class="price">${card.price}</span><span class="eta">${card.eta}</span></div>
           ${sel ? `<div class="cab-tagline">${c.tagline}</div>` : ''}
+          ${sel && card.perk ? `<div class="cab-perk">★ ${card.perk}</div>` : ''}
         </div>
       </div>`;
   }).join('');

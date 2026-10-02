@@ -70,6 +70,7 @@ const LANE = 3;
 const PARTS = [-1.4, 0, 1.4];
 const CARRIER_PARTS = [2.4, 3.6]; // only the cab is solid; the ramp is for driving on
 const PART_R = 1.1;
+const MID = 0.85; // half a car's height: a rammed car tumbles about this point
 
 export class Traffic {
   cars: TCar[] = [];
@@ -199,7 +200,7 @@ export class Traffic {
           const kick = player.speed * 0.9 + 6;
           const r = () => (Math.random() - 0.5) * 2;
           c.fly = { vx: -nx * kick + player.vel.x * 0.3, vy: 6 + player.speed * 0.2, vz: -nz * kick + player.vel.y * 0.3,
-            y: groundAt(c.x, c.z, false), rx: 0, ry: Math.atan2(fx, fz), rz: 0, sx: r() * 6, sy: r() * 5, sz: r() * 6, t: 3.5 };
+            y: groundAt(c.x, c.z, false) + MID, rx: 0, ry: Math.atan2(fx, fz), rz: 0, sx: r() * 6, sy: r() * 5, sz: r() * 6, t: 3.5 };
           c.speed = 0;
           player.vel.multiplyScalar(0.92);
           ev.rams.push(new THREE.Vector3(c.x, c.fly.y + 1, c.z));
@@ -232,7 +233,8 @@ export class Traffic {
     f.vy -= 30 * dt;
     c.x += f.vx * dt; c.z += f.vz * dt; f.y += f.vy * dt;
     f.rx += f.sx * dt; f.ry += f.sy * dt; f.rz += f.sz * dt;
-    const ground = groundAt(c.x, c.z, false);
+    // f.y is the car's middle (it spins about that), so it never dips into the road.
+    const ground = groundAt(c.x, c.z, false) + MID;
     if (f.y < ground) {
       f.y = ground;
       f.vy = Math.abs(f.vy) * 0.35;
@@ -242,6 +244,7 @@ export class Traffic {
     f.t -= dt;
     if (f.t > 0) return;
     c.fly = null;
+    c.model.body.position.y = 0;
     const along = c.axis === 'z' ? player.pos.z : player.pos.x;
     c.s = along + (along > 0 ? -1 : 1) * (HALF * 0.8); // well away from the cab
     c.speed = c.cruise;
@@ -252,9 +255,11 @@ export class Traffic {
   sync(dt: number) {
     for (const c of this.cars) {
       if (c.fly) {
+        // Spin about the car's middle: the root sits there, the body hangs half a car below it.
         c.model.root.position.set(c.x, c.fly.y, c.z);
         c.model.root.rotation.set(c.fly.rx, c.fly.ry, c.fly.rz, 'YXZ');
         c.model.body.rotation.x = 0;
+        c.model.body.position.y = -MID;
         continue;
       }
       const [fx, fz] = this.heading(c);

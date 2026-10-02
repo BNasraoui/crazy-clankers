@@ -483,3 +483,7 @@ html:not([data-input="pad"]) .k-pad, html:not([data-input="kb"]) .k-kb, html:not
 @keyframes spin { to { transform: rotate(360deg); } }
 .title-screen:not(.boot) .press-start { animation: start-in 0.35s cubic-bezier(.2, 1.6, .4, 1), nudge 1.2s ease-in-out 0.35s infinite; }
 @keyframes start-in { from { transform: translateX(-50%) rotate(-1deg) scale(0.7); opacity: 0; } }
+
+/* The selected cab's perk, under its tagline in the picker */
+.cab-perk { display: inline-block; margin-top: 4px; padding: 1px 8px; font: 11px var(--num); letter-spacing: 0.03em; color: var(--ink);
+  background: var(--yellow); border: 2px solid var(--ink); border-radius: 4px; }

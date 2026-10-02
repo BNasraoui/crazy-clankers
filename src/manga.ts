@@ -44,12 +44,14 @@ export class Moments {
   }
 
   // The freeze plus the panel; rate-limited so a pile-up doesn't strobe.
-  panel(kind: Moment, strength = 1) {
+  panel(kind: Moment, strength = 1, freeze = true) {
     const now = performance.now() / 1000;
     if (now - this.lastPanel < 1.2) return;
     this.lastPanel = now;
-    this.stop = 0.09 + 0.06 * Math.min(1, strength);
-    this.slow = 0;
+    if (freeze) {
+      this.stop = 0.09 + 0.06 * Math.min(1, strength);
+      this.slow = 0;
+    }
     const words = WORDS[kind];
     const [jp, en] = words[Math.floor(Math.random() * words.length)];
     const tilt = (Math.random() * 14 - 7).toFixed(1);
