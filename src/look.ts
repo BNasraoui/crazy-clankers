@@ -249,7 +249,7 @@ export class Look {
     panel.id = 'lookpanel';
     panel.hidden = true;
     panel.innerHTML = `
-      <b>LOOK</b>
+      <div class="lk-head"><b>LOOK</b><button type="button" id="lk-close" aria-label="Close settings">✕</button></div>
       <label>Resolution <select id="lk-res">
         ${[240, 360, 480, 720, 4000].map((v) => `<option value="${v}">${v === 4000 ? 'native' : v + 'p'}</option>`).join('')}
       </select></label>
@@ -317,6 +317,7 @@ export class Look {
     });
     addEventListener('keydown', (e) => { if (e.code === 'Backquote') panel.hidden = !panel.hidden; });
     this.togglePanel = () => { panel.hidden = !panel.hidden; };
+    panel.querySelector<HTMLButtonElement>('#lk-close')!.onclick = () => { panel.hidden = true; }; // touch has no B or Esc
   }
 
   togglePanel = () => {};

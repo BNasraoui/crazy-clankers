@@ -586,6 +586,7 @@ html.touch body[data-state="play"] #touch { display: block; }
   /* The cab list gives way (and scrolls) so the drive button is always on screen. */
   .picker-panel > * { flex: none; }
   .picker-panel .cab-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; touch-action: pan-y; padding: 2px 8px 6px 2px; }
+  .picker-panel .stats { display: none; } /* the joke stat bars give their room to the four cabs */
   #hud .note, #rating .note { display: none; }
   #lookpanel { top: 8px; right: 8px; max-height: calc(100% - 16px); overflow-y: auto; touch-action: pan-y; }
 }
@@ -608,3 +609,8 @@ html.touch .radio-menu-button { min-height: 48px; padding: 8px 18px; font-size: 
 #touch .tb { font-size: calc(17px * var(--tbs, 1)); }
 #touch .gas { font-size: calc(22px * var(--tbs, 1)); }
 #touch .brake { font-size: calc(14px * var(--tbs, 1)); }
+
+/* Settings panel: a close button (phones have no B or Esc) */
+#lookpanel .lk-head { display: flex; align-items: center; justify-content: space-between; }
+#lk-close { width: 34px; height: 34px; padding: 0; font: 800 16px var(--body); color: var(--ink); background: var(--paper);
+  border: 2px solid var(--ink); border-radius: 50%; box-shadow: 2px 2px 0 var(--ink); cursor: pointer; pointer-events: auto; touch-action: manipulation; }

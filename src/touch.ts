@@ -186,7 +186,7 @@ addEventListener('keydown', (e) => { if (!(e.target as Element).closest?.('input
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 layer.addEventListener('contextmenu', (e) => e.preventDefault());
 document.addEventListener('touchmove', (e) => {
-  if (!(e.target as Element).closest?.('#radio-screen, #lookpanel')) e.preventDefault();
+  if (!(e.target as Element).closest?.('#radio-screen, #lookpanel, .cab-list')) e.preventDefault(); // these scroll
 }, { passive: false });
 
 // Turning the phone upright mid-shift pauses it (the rotate card covers the screen).
