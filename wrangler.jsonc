@@ -2,6 +2,13 @@
 {
   "name": "crazy-clankers",
   "compatibility_date": "2026-10-01",
+  "routes": [
+    { "pattern": "crazyclankers.com", "custom_domain": true },
+    { "pattern": "www.crazyclankers.com", "custom_domain": true }
+  ],
+  // Keep the workers.dev address alongside the custom domain.
+  "workers_dev": true,
+  "preview_urls": true,
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
