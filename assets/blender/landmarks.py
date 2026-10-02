@@ -28,6 +28,19 @@ Blocks on a slope get a plinth: the models reach a few metres below their origin
   building with its arched door, and the round hilltop terrace. 33 m.
 - golden_gate: two towers with stepped portal braces, the deck with its truss, the main
   cables and suspenders; origin at the water line midway between the towers.
+- city_hall: the Beaux-Arts block on its podium, giant columns, the pedimented portico
+  and front steps facing east onto Civic Center Plaza, and the gilded ribbed dome on its
+  colonnaded drum (node `dome`) with a `light_lantern` lantern. 52 m.
+- dragon_gate: Chinatown's gate, standing across a street: stone pillars, red and gilt
+  lintels, the blue name board, three green-tiled roofs with swept-up corners, dragons
+  and a pearl on the central ridge, carp on the side ridges, `light_lantern` lanterns,
+  guardian lions. Origin on the street centreline; the pillars reach 3 m down.
+- palace_of_fine_arts: the domed octagonal rotunda (its arches wide enough to drive
+  through), the curved colonnade wings with their planter boxes, and the lagoon's
+  reeds, swans and `water` sheet half a metre below the origin (the game carves the bed).
+- alcatraz: the island on its cliffs, origin at the water line; the cellhouse, the
+  lighthouse (`light_beacon`), the water tower, the warden's house ruin, a guard tower,
+  and the causeway ramp from the sea floor up to the landing (src/features.ts drives it).
 """
 import json
 import math
@@ -1071,16 +1084,15 @@ def build_city_hall():
             for x in (9.2, 17.8):
                 b.tube("trunk", V(x, y, 0.2), V(x, y, 2.4), 0.2, 0.16, sides=6)
                 b.box("leaf", (2.4, 2.4, 1.8), V(x, y, 3.3), bevel=0.35)
-    for y in (-2.2, 2.2):
-        b.tube("rail", V(17.5, y, 0.2), V(17.5, y, 13.0), 0.14, 0.08, sides=6)
-        b.sphere("gold", V(17.5, y, 13.1), (0.2, 0.2, 0.2), u=6, v=4)
-    b.box("flag", (0.06, 2.6, 1.6), V(17.5, -2.2 + 1.35, 12.0))
-    b.box("flag", (0.06, 2.6, 1.6), V(17.5, 2.2 + 1.35, 12.0))
+    for y in (-4.0, 4.0):
+        b.tube("rail", V(18.6, y, 0.2), V(18.6, y, 12.0), 0.12, 0.07, sides=6)
+        b.sphere("gold", V(18.6, y, 12.1), (0.18, 0.18, 0.18), u=6, v=4)
+        b.box("flag", (0.05, 1.5, 0.95), V(18.6, y + 0.8, 11.3))
     plaza = part(b, "plaza", mats, root)
     return root, [hall, dome, plaza], [
         ("3/4 east", -125, 9, V(0, 0, 24), 58, 1.0),
         ("east front", -90, 4, V(2, 0, 22), 54, 0.95),
-        ("dome", -110, 6, V(dx, dy, 40), 20, 0.85),
+        ("dome", -110, 6, V(dx, dy, 41), 23, 0.85),
         ("portico", -120, 10, V(4, 0, 9), 22, 1.25),
     ]
 
@@ -1261,10 +1273,10 @@ def build_dragon_gate():
         dg_lion(b, sx * (DG_OUTER + 0.7), -1.9, -1)
     lions = part(b, "lions", mats, root)
     return root, [gate, lions], [
-        ("3/4 south", -25, 8, V(0, 0, 5.5), 15, 1.6),
-        ("south", 0, 3, V(0, 0, 5.5), 14, 1.65),
-        ("ridge", -30, 12, V(4, 0, 9.5), 6, 1.4),
-        ("side", -70, 6, V(0, 0, 5.0), 13, 1.1),
+        ("3/4 south", -25, 8, V(0, 0, 6.2), 17, 1.6),
+        ("south", 0, 3, V(0, 0, 6.2), 16, 1.6),
+        ("ridge", -30, 12, V(5, 0, 10.5), 7, 1.4),
+        ("side", -70, 6, V(0, 0, 6.0), 15, 1.1),
     ]
 
 
@@ -1273,7 +1285,7 @@ def build_dragon_gate():
 PF_PAL = {"stone": 0xEAD2B2, "stone_dark": 0xD2B08B, "trim": 0xF5E6CF, "shade": 0x6C5A52,
           "dome": 0xD4875A, "dome_rib": 0xAE6A44, "frieze": 0xC99C78, "lawn": 0x86B24C,
           "reed": 0x6E9A4A, "leaf": 0x4F7F43, "trunk": 0x7A5440, "swan": 0xF7F5EE, "beak": 0xE08A2E,
-          "rail": 0x3C474E, "light_lamp": 0xFFF0C0, "ink": INK}
+          "rail": 0x3C474E, "water": 0x3F93BA, "light_lamp": 0xFFF0C0, "ink": INK}
 PF_ROT = (-7.0, 0.0)      # the rotunda's centre
 PF_R = 8.0                # its piers' radius: wide enough to drive a cab through the arches
 PF_ARC = (6.0, 0.0, 21.0)  # the colonnade: centre and radius of its arc
@@ -1403,8 +1415,16 @@ def build_palace_of_fine_arts():
         if math.cos(a) > 0.55:      # keep the near (street) bank open, so a cab can drive in
             continue
         p = V(lx + (lrx - 0.4) * math.cos(a), ly + (lry - 0.4) * math.sin(a), 0)
-        for j, (dx, dy, h) in enumerate(((0, 0, 1.4), (0.35, 0.2, 1.0), (-0.3, 0.25, 1.2))):
-            b.tube("reed", p + V(dx, dy, -1.0), p + V(dx * 1.4, dy * 1.4, h - 0.6), 0.14, 0.0, sides=4)
+        for j, (dx, dy, h) in enumerate(((0, 0, 2.0), (0.45, 0.25, 1.5), (-0.4, 0.3, 1.7))):
+            b.tube("reed", p + V(dx, dy, -1.0), p + V(dx * 1.5, dy * 1.5, h - 0.5), 0.2, 0.0, sides=4)
+    # The water: a flat sheet at the lagoon's level (the game carves the bed beneath it).
+    wpts = [(lx + lrx * math.cos(2 * math.pi * k / 40), ly + lry * math.sin(2 * math.pi * k / 40)) for k in range(40)]
+    b.prism("water", wpts, 0.04, Matrix.Translation((0, 0, PF_WATER)))
+    for k in range(40):
+        a0, a1 = 2 * math.pi * k / 40, 2 * math.pi * (k + 1) / 40
+        p0 = V(lx + (lrx + 0.05) * math.cos(a0), ly + (lry + 0.05) * math.sin(a0), PF_WATER + 0.02)
+        p1 = V(lx + (lrx + 0.05) * math.cos(a1), ly + (lry + 0.05) * math.sin(a1), PF_WATER + 0.02)
+        S.bar(b, "ink", p0, p1, V(0, 0, 1), w=0.14, d=0.03, sink=0.03)
     for sx, sy, yaw in ((lx - 2.0, ly + 3.0, 0.6), (lx + 1.0, ly - 4.0, 2.4)):
         rot = Matrix.Rotation(yaw, 4, "Z")
         p = V(sx, sy, PF_WATER)
@@ -1424,7 +1444,7 @@ def build_palace_of_fine_arts():
         ("3/4 lagoon", -125, 12, V(-1, 0, 11), 34, 1.25),
         ("from the lagoon", -90, 5, V(-1, 0, 11), 30, 1.35),
         ("rotunda", -150, 8, V(rx, ry, 13), 22, 0.95),
-        ("colonnade", -60, 10, V(-8, 12, 7), 18, 1.25),
+        ("colonnade", -20, 9, V(-4, -14, 7), 19, 1.25),
     ]
 
 
@@ -1460,7 +1480,7 @@ def build_alcatraz():
         ring = []
         for j in range(n):
             a = 2 * math.pi * j / n
-            jitter = 0.0 if i == len(AZ_CLIFF) - 1 else (az_noise(i, j) - 0.5) * 0.9
+            jitter = 0.0 if i == len(AZ_CLIFF) - 1 else (az_noise(i, j) - 0.5) * (0.9 + 0.3 * (len(AZ_CLIFF) - i))
             ring.append(V((AZ_RX + o + jitter) * math.cos(a), (AZ_RY + o + jitter) * math.sin(a), z))
         rings.append([b.bm.verts.new(p) for p in ring])
     roles = ("rock", "rock_dark", "rock_light")
@@ -1471,6 +1491,13 @@ def build_alcatraz():
             k = int(az_noise(j // 2, i + 7) * 3) if i < len(rings) - 2 else 0
             f.material_index = b.materials.index(roles[k])
     b.bm.faces.new(list(reversed(rings[0]))).material_index = b.materials.index("rock_dark")
+    for k in range(14):
+        a = 2 * math.pi * (k + az_noise(k, 5)) / 14
+        if abs(a) < 0.3 or abs(a - 2 * math.pi) < 0.3:   # the ramp's foot
+            continue
+        r = 1.6 + 1.6 * az_noise(k, 11)
+        p = V((AZ_RX + 6.0) * math.cos(a), (AZ_RY + 6.0) * math.sin(a), AZ_FLOOR + r * 0.4)
+        b.sphere(roles[k % 3], p, (r, r * 1.2, r * 0.8), u=6, v=4, rot=Matrix.Rotation(a, 4, "Z"))
     b.bm.faces.new(rings[-1]).material_index = b.materials.index("dirt")
     top = [p.co.copy() for p in rings[-1]]
     for k in range(n):
@@ -1627,7 +1654,7 @@ def build_alcatraz():
         d = p1 - p0
         b.box("concrete_dark", (d.length + 0.4, 0.4, 5.0), (p0 + p1) / 2 + V(0, 0, 2.5), rot=Matrix.Rotation(math.atan2(d.y, d.x), 4, "Z"))
         nrm = V(d.y, -d.x, 0).normalized()
-        fr = wall_frame((p0 + p1) / 2 + nrm * 0.2, d, nrm)
+        fr = wall_frame((p0 + p1) / 2 + nrm * 0.2 - V(0, 0, z0), d, nrm)
         for u in (-1.5, 1.5):
             opening(b, "window", fr @ Matrix.Translation((u, 0, 0)), [(-0.5, z0 + 2.4), (0.5, z0 + 2.4), (0.5, z0 + 4.0), (-0.5, z0 + 4.0)], proud=0.03)
     b.box("rust", (1.0, 1.0, 2.2), V(hx_ + 2.0, hy_ + 1.5, z0 + 5.6))
@@ -1673,7 +1700,7 @@ LANDMARKS = {
 }
 
 
-def render_sheet(root, name, shots, height=900):
+def render_sheet(root, name, shots, height=900, ground=0.0):
     """One tile per shot (label, turn in degrees, camera elevation in degrees, target in
     model space, metres of view height, aspect); tiles side by side, toon-shaded with
     inverted-hull outlines scaled to each shot."""
@@ -1686,7 +1713,7 @@ def render_sheet(root, name, shots, height=900):
     ground_mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (
         *[C.srgb_to_linear(c) for c in C.BG], 1)
     C.toonify(ground_mat, shadow_mul=(0.82, 0.83, 0.9))
-    bpy.ops.mesh.primitive_plane_add(size=600)
+    bpy.ops.mesh.primitive_plane_add(size=600, location=(0, 0, ground))
     bpy.context.active_object.data.materials.append(ground_mat)
     sun_data = bpy.data.lights.new("sun", "SUN")
     sun_data.energy = 3.0
@@ -1761,7 +1788,8 @@ def build(name):
     assert tris <= BUDGET, f"{name} has {tris} triangles, over the budget of {BUDGET}"
     (C.MODELS_DIR / DIR).mkdir(parents=True, exist_ok=True)
     C.export_glb(f"{DIR}/{name}")
-    render_sheet(root, f"landmark-{name}", shots)
+    # The lagoon lies below the Palace's origin: drop the sheet's ground to show it.
+    render_sheet(root, f"landmark-{name}", shots, ground=PF_WATER - 0.1 if name == "palace_of_fine_arts" else 0.0)
 
 
 def check():
@@ -1798,7 +1826,13 @@ def check():
     assert "crown" in out["salesfarce_tower"]["nodes"], out["salesfarce_tower"]
     assert "light_crown" in out["salesfarce_tower"]["materials"]
     assert "light_clock" in out["ferry_building"]["materials"]
+    fits("city_hall", 20, 20, (50, 56))
+    fits("dragon_gate", 11.5, 2.8, (12, 13.5))
+    fits("palace_of_fine_arts", 21.5, 21.5, (27, 30))
+    fits("alcatraz", AZ_RAMP[0], AZ_RY + 8, (AZ_TOP + 18, AZ_TOP + 22))
     assert {"towers", "deck", "cables"} <= set(out["golden_gate"]["nodes"])
+    assert "dome" in out["city_hall"]["nodes"] and "light_lantern" in out["city_hall"]["materials"]
+    assert "water" in out["palace_of_fine_arts"]["materials"]
     (REVIEWS / "landmarks.json").write_text(json.dumps(out, indent=2) + "\n")
     print(json.dumps(out, indent=2))
 

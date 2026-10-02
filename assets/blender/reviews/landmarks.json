@@ -166,5 +166,156 @@
       "orange_dark",
       "road"
     ]
+  },
+  "city_hall": {
+    "triangles": 13152,
+    "budget": 20000,
+    "min": [
+      -20.0,
+      -20.0,
+      -8.0
+    ],
+    "max": [
+      20.0,
+      20.0,
+      52.22
+    ],
+    "nodes": [
+      "city_hall",
+      "dome",
+      "hall",
+      "plaza"
+    ],
+    "materials": [
+      "door",
+      "flag",
+      "gold",
+      "gold_dark",
+      "granite",
+      "granite_dark",
+      "ink",
+      "lawn",
+      "leaf",
+      "light_lamp",
+      "light_lantern",
+      "plaza",
+      "rail",
+      "roof",
+      "trim",
+      "trunk",
+      "window"
+    ]
+  },
+  "dragon_gate": {
+    "triangles": 7066,
+    "budget": 20000,
+    "min": [
+      -11.2,
+      -2.95,
+      -3.0
+    ],
+    "max": [
+      11.2,
+      2.7,
+      13.03
+    ],
+    "nodes": [
+      "dragon_gate",
+      "gate",
+      "lions"
+    ],
+    "materials": [
+      "beam",
+      "beam_dark",
+      "blue",
+      "gold",
+      "ink",
+      "jade",
+      "light_lantern",
+      "lion",
+      "stone",
+      "stone_dark",
+      "tile",
+      "tile_dark"
+    ]
+  },
+  "palace_of_fine_arts": {
+    "triangles": 12546,
+    "budget": 20000,
+    "min": [
+      -20.78,
+      -20.09,
+      -2.0
+    ],
+    "max": [
+      18.12,
+      19.9,
+      27.8
+    ],
+    "nodes": [
+      "colonnade",
+      "grounds",
+      "palace_of_fine_arts",
+      "rotunda"
+    ],
+    "materials": [
+      "beak",
+      "dome",
+      "dome_rib",
+      "frieze",
+      "ink",
+      "leaf",
+      "light_lamp",
+      "rail",
+      "reed",
+      "shade",
+      "stone",
+      "stone_dark",
+      "swan",
+      "trim",
+      "trunk",
+      "water"
+    ]
+  },
+  "alcatraz": {
+    "triangles": 7084,
+    "budget": 20000,
+    "min": [
+      -25.07,
+      -43.71,
+      -13.27
+    ],
+    "max": [
+      93.24,
+      44.19,
+      26.3
+    ],
+    "nodes": [
+      "alcatraz",
+      "buildings",
+      "cellhouse",
+      "island"
+    ],
+    "materials": [
+      "concrete",
+      "concrete_dark",
+      "dirt",
+      "ink",
+      "light_beacon",
+      "light_lamp",
+      "road",
+      "rock",
+      "rock_dark",
+      "rock_light",
+      "roof",
+      "rust",
+      "scrub",
+      "scrub_dark",
+      "sign",
+      "steel",
+      "stripe",
+      "tank",
+      "window"
+    ]
   }
 }
