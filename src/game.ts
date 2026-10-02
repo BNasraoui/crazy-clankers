@@ -13,7 +13,7 @@ import { sfx, setEngine, unlockAudio } from './audio';
 import { bump, crunch, splash as splashLayers } from './sfx';
 import { Tyres } from './skids';
 import { Voices } from './voices';
-import { BLOCKS_SIDES, CELL, HALF, WATER, buildWorld, curb, landmarks, N, type Curb, type Landmark } from './world';
+import { BLOCKS_SIDES, CELL, HALF, WATER, buildWorld, curb, landmarks, N, waterAt, type Curb, type Landmark } from './world';
 import { buildFeatures, groundAt } from './features';
 import { Moments } from './manga';
 import { Want, WANTS, type Feed, type WantId } from './wants';
@@ -438,7 +438,7 @@ export class Game {
     if (splash) {
       sfx.splash();
       splashLayers();
-      this.particles.emit(this.car.pos.clone().setY(WATER), 50, 0xe6f6ff, 9, 12, 0.45);
+      this.particles.emit(this.car.pos.clone().setY(waterAt(this.car.pos.x, this.car.pos.z)), 50, 0xe6f6ff, 9, 12, 0.45);
       this.popup('SEABED MODE', 'big');
       this.quips.say('cab', 'underwater', { force: true });
     }
