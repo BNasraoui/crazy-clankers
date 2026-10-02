@@ -1,0 +1,19 @@
+# Vite's bundles have content hashes in their names: cache them for good.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Art keeps its name between builds: a day in the browser, then quietly revalidated.
+/models/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/facades/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/sprites/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/sky/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/keyart/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/portraits/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/sounds/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
