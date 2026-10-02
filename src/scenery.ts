@@ -74,22 +74,47 @@ export function partsOf(template: THREE.Object3D): Part[] {
   return parts;
 }
 
-// One instanced mesh per part, placed at each of the given transforms.
+// One instanced mesh per part, placed at each of the given transforms. Heavy models (the trees) are
+// split into CHUNK-sized squares with their own instanced meshes, so the camera and the sun's shadow
+// only draw the squares they can see: one mesh spanning the city is drawn whole, every frame, twice.
+// Light ones (lamps, shelters) stay whole, since each square costs a draw call per part.
+// slots[i] says where the i-th transform ended up, for things that move one (toppling trees).
+const CHUNK = 160;
+const HEAVY = 100_000; // triangles, all copies together
+const REACH = 12; // a toppled tree or lamp lies this far outside where it stood
+
+export interface Slot { meshes: THREE.InstancedMesh[]; index: number }
+
 export function instance(template: THREE.Object3D, matrices: THREE.Matrix4[], shadows = true) {
   const group = new THREE.Group();
   const parts = partsOf(template);
-  const meshes = parts.map((p) => {
-    const inst = new THREE.InstancedMesh(p.geometry, p.material, Math.max(1, matrices.length));
-    const m = new THREE.Matrix4();
-    matrices.forEach((mm, i) => inst.setMatrixAt(i, m.multiplyMatrices(mm, p.local)));
-    inst.count = matrices.length;
-    inst.castShadow = shadows;
-    inst.receiveShadow = true;
-    inst.frustumCulled = false;
-    group.add(inst);
-    return inst;
+  const tris = parts.reduce((n, p) => n + (p.geometry.index?.count ?? p.geometry.attributes.position.count) / 3, 0);
+  const size = tris * matrices.length > HEAVY ? CHUNK : Infinity;
+  const cells = new Map<string, number[]>();
+  const at = new THREE.Vector3();
+  matrices.forEach((mm, i) => {
+    at.setFromMatrixPosition(mm);
+    const key = size === Infinity ? 'all' : `${Math.floor(at.x / size)},${Math.floor(at.z / size)}`;
+    cells.set(key, [...(cells.get(key) ?? []), i]);
   });
-  return { group, meshes, locals: parts.map((p) => p.local) };
+  const slots: Slot[] = [];
+  const meshes: THREE.InstancedMesh[] = [];
+  const m = new THREE.Matrix4();
+  for (const members of cells.values()) {
+    const chunk = parts.map((p) => {
+      const inst = new THREE.InstancedMesh(p.geometry, p.material, members.length);
+      members.forEach((i, k) => inst.setMatrixAt(k, m.multiplyMatrices(matrices[i], p.local)));
+      inst.castShadow = shadows;
+      inst.receiveShadow = true;
+      inst.computeBoundingSphere();
+      inst.boundingSphere!.radius += REACH;
+      group.add(inst);
+      return inst;
+    });
+    meshes.push(...chunk);
+    members.forEach((i, k) => (slots[i] = { meshes: chunk, index: k }));
+  }
+  return { group, meshes, slots, locals: parts.map((p) => p.local) };
 }
 
 // Points where the poles' wires attach, relative to the pole's base.

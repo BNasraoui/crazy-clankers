@@ -898,8 +898,8 @@ function makeTrees(spots: TreeSpot[]) {
     if (template) {
       const k = SPECIES_SCALE[species];
       const mats = list.map((t) => t.m.clone().multiply(new THREE.Matrix4().makeScale(k, k, k)));
-      const { group, meshes, locals } = instance(template, mats);
-      list.forEach((t, i) => treeRefs.set(t.c, { circle: t.c, base: mats[i], meshes, locals, index: i, kind: 'tree' }));
+      const { group, slots, locals } = instance(template, mats);
+      list.forEach((t, i) => treeRefs.set(t.c, { circle: t.c, base: mats[i], ...slots[i], locals, kind: 'tree' }));
       g.add(group);
       continue;
     }
@@ -1018,8 +1018,8 @@ function buildStreetFurniture(scene: THREE.Scene, streetTrees: TreeSpot[]) {
 
   const register = (template: THREE.Object3D | undefined, list: { m: THREE.Matrix4; c: Circle | null }[], kind: TreeRef['kind']) => {
     if (!template || !list.length) return;
-    const { group, meshes, locals } = instance(template, list.map((l) => l.m));
-    list.forEach((l, i) => { if (l.c) treeRefs.set(l.c, { circle: l.c, base: l.m, meshes, locals, index: i, kind }); });
+    const { group, slots, locals } = instance(template, list.map((l) => l.m));
+    list.forEach((l, i) => { if (l.c) treeRefs.set(l.c, { circle: l.c, base: l.m, ...slots[i], locals, kind }); });
     scene.add(group);
   };
   register(kit.street_lamp, lamps, 'lamp');
