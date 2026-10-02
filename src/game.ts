@@ -3,7 +3,7 @@ import { Radio } from './radio';
 import { Car, MAX_SPEED, handlingOf } from './car';
 import { readInput, padName, padDebug, type Input } from './input';
 import { CABS, EXTRA_CARS, makeCar, makePerson, makeLabel, personFrom, type PersonModel } from './models';
-import { Look, SKY, makeSky } from './look';
+import { Look, SKY, SMALL_SCREEN, makeSky } from './look';
 import { paintSky, updateSky } from './sky';
 import { CHARACTER_LAYER, makeCharacter, sunDir } from './anime';
 import { pickPassenger, type PassengerType } from './passengers';
@@ -23,8 +23,9 @@ import { SpritePerson, type SpriteSet } from './spritepeople';
 import { Trees } from './trees';
 import { CableCars } from './cablecar';
 import { BAY, Rank, snapshotCabs } from './rank';
-import { btn, burst, howToHTML, pickerHTML, titleHTML } from './menus';
+import { btn, burst, howToHTML, pickerHTML, tapButton, titleHTML } from './menus';
 import { key } from './prompts';
+import { buzz } from './touch';
 
 const STEP = 1 / 120;
 const START_TIME = 90; // with SURGE below, aimed at a 3-5 minute shift
@@ -153,7 +154,7 @@ export class Game {
     this.sun.layers.enable(CHARACTER_LAYER);
     this.sun.shadow.camera.layers.enable(CHARACTER_LAYER);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.mapSize.setScalar(SMALL_SCREEN ? 1024 : 2048);
     const sc = this.sun.shadow.camera;
     sc.left = sc.bottom = -70;
     sc.right = sc.top = 70;
@@ -329,8 +330,8 @@ export class Game {
       else if (inp.back) this.look.togglePanel();
     } else {
       const move = inp.navY || inp.navX;
-      if (move) {
-        this.chooseCab(this.cabIndex + move);
+      if (move || (inp.select >= 0 && inp.select !== this.cabIndex)) {
+        this.chooseCab(move ? this.cabIndex + move : inp.select);
         sfx.tip();
       }
       if (inp.confirm) this.start();
@@ -353,13 +354,16 @@ export class Game {
 
   private setState(s: Game['state']) {
     this.state = s;
+    document.body.dataset.state = s;
     $('#hud').classList.toggle('hidden', s === 'title' || s === 'picker');
     const ov = $('#overlay');
     ov.className = '';
     if (s === 'play') ov.innerHTML = '';
     if (s === 'paused') {
       ov.className = 'dim';
-      ov.innerHTML = `<h2>PAUSED</h2><div class="press">${btn('confirm', 'RESUME')}</div><div class="pad">${btn('restart', 'Restart')}${btn('menu', 'Main menu')}</div><button class="radio-menu-button" data-radio-open>${key('radio')} Radio</button>`;
+      ov.innerHTML = `<h2>PAUSED</h2><div class="press pad-only">${btn('confirm', 'RESUME')}</div><div class="pad pad-only">${btn('restart', 'Restart')}${btn('menu', 'Main menu')}</div>
+        <div class="tap-row touch-only">${tapButton('confirm', 'RESUME', 'go')}${tapButton('restart', 'RESTART')}${tapButton('back', 'MAIN MENU')}</div>
+        <button class="radio-menu-button" data-radio-open>${key('radio')} Radio</button>`;
     }
   }
 
@@ -529,6 +533,7 @@ export class Game {
   private onCrash(impact: number) {
     sfx.crash(impact);
     crunch(impact);
+    buzz(impact);
     this.shake = Math.min(1, impact / 20);
     this.combo = 0;
     this.safetyHit(THREE.MathUtils.clamp(impact * 0.9, 4, 22));
@@ -899,6 +904,7 @@ export class Game {
   private gameOver(reason: string) {
     if (this.state !== 'play') return;
     this.state = 'over';
+    document.body.dataset.state = 'over';
     try { localStorage.setItem('clankers.rating', this.rating.toFixed(2)); } catch { /* storage unavailable */ }
     let equityLine = '';
     if (this.equity > 0) {
@@ -923,7 +929,8 @@ export class Game {
         ${starLine}${airLine}${equityLine}${promiseLine}
         <div class="total">${money(this.cash)}</div>
       </div>
-      <div class="press">${btn('confirm', 'DRIVE AGAIN')}</div><div class="pad">${btn('back', 'Change cab')}</div>`;
+      <div class="press pad-only">${btn('confirm', 'DRIVE AGAIN')}</div><div class="pad pad-only">${btn('back', 'Change cab')}</div>
+      <div class="tap-row touch-only">${tapButton('confirm', 'DRIVE AGAIN', 'go')}${tapButton('back', 'CHANGE CAB')}</div>`;
     sfx.bad();
   }
 

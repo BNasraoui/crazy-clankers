@@ -51,7 +51,9 @@ export function makeSky() {
 }
 
 export interface LookSettings { height: number; grain: number; outline: boolean; speedLines: boolean; people: number; camBack: number; camUp: number; fov: number; paxSprites: boolean }
-const DEFAULTS: LookSettings = { height: 720, grain: 0, outline: true, speedLines: true, people: 1.2, camBack: 6.5, camUp: 3, fov: 60, paxSprites: true };
+// Phones (a coarse pointer or a short screen) start at 480p; the look panel can still change it.
+export const SMALL_SCREEN = matchMedia('(pointer: coarse)').matches || Math.min(screen.width, screen.height) <= 500;
+const DEFAULTS: LookSettings = { height: SMALL_SCREEN ? 480 : 720, grain: 0, outline: true, speedLines: true, people: 1.2, camBack: 6.5, camUp: 3, fov: 60, paxSprites: true };
 const STORE = 'clankers.look.v5'; // bump when defaults change, so old saved tweaks don't hide them
 
 function loadSettings(): LookSettings {

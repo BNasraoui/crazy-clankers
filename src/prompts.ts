@@ -2,6 +2,8 @@
 // buttons, keyboard keycaps, or plain words on a touchscreen. The page carries
 // data-input="pad" | "kb" | "touch" and CSS shows the matching label.
 
+import { setTouchMode } from './touch';
+
 export type Device = 'pad' | 'kb' | 'touch';
 export type Act = 'confirm' | 'back' | 'alt' | 'choose' | 'restart' | 'menu' | 'radio';
 
@@ -13,6 +15,7 @@ export function useDevice(d: Device) {
   if (d === device) return;
   device = d;
   document.documentElement.dataset.input = d;
+  setTouchMode(d === 'touch'); // the touch controls and tap buttons follow the same device
 }
 
 addEventListener('keydown', () => useDevice('kb'), true);
