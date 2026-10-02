@@ -8,8 +8,11 @@ import { pool, retry } from './scenery';
 export interface FacadeImage { id: string; kind: 'house' | 'tile' | 'towerbase' | 'drop'; wall: string; base: string }
 export let facadeSets: Record<string, FacadeImage[]> = {};
 const textures = new Map<string, THREE.Texture>();
+const waiting = new Map<string, ((tex: THREE.Texture) => void)[]>(); // materials waiting for a drawing
+const wallOf = new Map<string, string>();
 
-// Loads the manifest and every drawing up front, so no wall waits on (or loses) its texture.
+// Only the (small) manifest is awaited, so the title doesn't wait on 3 MB of drawings. Each
+// building starts in its own wall colour and its drawing paints in as it arrives (see build()).
 export async function loadFacades() {
   try {
     facadeSets = await retry(async () => (await fetch('/facades/manifest.json')).json());
@@ -17,22 +20,34 @@ export async function loadFacades() {
     console.warn('No facade manifest:', err);
     return;
   }
+  for (const f of Object.values(facadeSets).flat()) wallOf.set(f.id, f.wall);
+}
+
+// The drawings themselves, started once the game is up so they don't hold up the files it needs first.
+export function paintFacades() {
+  const all = Object.values(facadeSets).flat();
+  const repeats = new Set(all.filter((f) => f.kind !== 'house').map((f) => f.id));
   const loader = new THREE.TextureLoader();
-  const repeats = new Set(Object.values(facadeSets).flat().filter((f) => f.kind !== 'house').map((f) => f.id));
-  const ids = [...new Set(Object.values(facadeSets).flat().map((f) => f.id))];
-  await pool(ids, 4, async (id) => {
+  void pool([...new Set(all.map((f) => f.id))], 4, async (id) => {
     try {
       const tex = await retry(() => loader.loadAsync(`/facades/${id}.avif`));
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = 8;
       if (repeats.has(id)) tex.wrapS = tex.wrapT = THREE.RepeatWrapping; // tiles and lobbies repeat
       textures.set(id, tex);
+      for (const done of waiting.get(id) ?? []) done(tex);
+      waiting.delete(id);
     } catch (err) {
-      console.warn(`No facade ${id}:`, err);
+      console.warn(`No facade ${id}:`, err); // that wall keeps its plain colour
     }
   });
-  // Drop drawings that never arrived; their lots fall back to plain houses.
-  for (const d of Object.keys(facadeSets)) facadeSets[d] = facadeSets[d].filter((f) => textures.has(f.id));
+}
+
+// Calls back with the drawing now if it has arrived, or as soon as it does.
+function whenDrawn(id: string, done: (tex: THREE.Texture) => void) {
+  const tex = textures.get(id);
+  if (tex) done(tex);
+  else waiting.set(id, [...(waiting.get(id) ?? []), done]);
 }
 
 export const houseSet = (district: string) => (facadeSets[district] ?? []).filter((f) => f.kind === 'house');
@@ -81,7 +96,12 @@ export class FacadeBuilder {
       geo.computeVertexNormals();
       let mat: THREE.Material;
       if (key.startsWith('#')) mat = toon({ color: new THREE.Color(key) });
-      else mat = toon({ map: textures.get(key) });
+      else {
+        // The wall colour until the drawing arrives, then the drawing.
+        const m = toon({ color: new THREE.Color(wallOf.get(key) ?? '#cfc6b4') });
+        whenDrawn(key, (tex) => { m.map = tex; m.color.set(0xffffff); m.needsUpdate = true; });
+        mat = m;
+      }
       const mesh = new THREE.Mesh(geo, mat);
       mesh.receiveShadow = true;
       g.add(mesh);

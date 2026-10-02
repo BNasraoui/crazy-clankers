@@ -4,7 +4,7 @@ import { Game } from './game';
 import { treeRefs } from './world';
 import { loadCars, loadPeople } from './models';
 import { loadStreetKit } from './scenery';
-import { loadFacades } from './facades';
+import { loadFacades, paintFacades } from './facades';
 import { loadSky } from './sky';
 import { Pedestrians } from './pedestrians';
 import { loadPassengerSprites } from './spritepeople';
@@ -17,6 +17,7 @@ renderer.shadowMap.type = THREE.PCFShadowMap;
 const [, people] = await Promise.all([loadCars(), loadPeople(), loadStreetKit(), loadFacades(), loadSky()]);
 const game = new Game(renderer, people);
 document.body.classList.add('ready'); // the boot screen's title is now the real one
+paintFacades(); // the building drawings stream in behind the title
 loadPassengerSprites().then((s) => { game.paxSprites = s; game.refreshPassengers(); }).catch((err) => console.warn('No passenger sprites:', err));
 Pedestrians.load(game.scene).then((p) => { game.peds = p; }).catch((err) => console.warn('No pedestrians:', err));
 const fit = () => {
