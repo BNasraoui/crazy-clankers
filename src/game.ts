@@ -29,7 +29,7 @@ import { key } from './prompts';
 const STEP = 1 / 120;
 const START_TIME = 75;
 const START = BAY; // every shift starts by pulling out of the robotaxi rank
-const WAITING_COUNT = 26;
+const WAITING_COUNT = 40;
 
 interface Waiting {
   type: PassengerType;
@@ -591,7 +591,7 @@ export class Game {
 
   private spawnWaiting() {
     // Keep about half the fares within a short drive of the cab, so one is usually in view.
-    const near = this.waiting.filter((w) => flat(w.curb.road, this.car.pos) < 220).length < WAITING_COUNT / 2;
+    const near = this.waiting.filter((w) => flat(w.curb.road, this.car.pos) < 220).length < WAITING_COUNT * 0.6;
     for (let tries = 0; tries < 50; tries++) {
       let bi = Math.floor(this.rand() * N), bj = Math.floor(this.rand() * N);
       if (near) {
@@ -602,7 +602,7 @@ export class Game {
       const side = BLOCKS_SIDES[Math.floor(this.rand() * 4)];
       const c = curb(bi, bj, side, this.rand());
       if (flat(c.road, this.car.pos) < 40) continue;
-      if (this.waiting.some((w) => flat(w.curb.road, c.road) < 22)) continue;
+      if (this.waiting.some((w) => flat(w.curb.road, c.road) < 18)) continue;
       if (landmarks.some((l) => flat(l.curb.road, c.road) < 12)) continue;
       const type = pickPassenger(this.rand);
       const far = landmarks.filter((l) => blocks(l.curb.road, c.road) > 160);
@@ -685,6 +685,9 @@ export class Game {
       rerouted: false, incidents: 0, slowT: 0, idleT: 7, timeLowSaid: false, want,
     };
     this.showWantCard(this.ride);
+    // The fare's whole time limit goes on the shift clock: deliver fast and you keep the change.
+    this.time += total;
+    this.popup(`+${Math.round(total)}s`, 'big good');
     this.setDest(w.dest);
     sfx.pickup();
     this.popup(w.type.label.replace('★ ', ''), 'big');
@@ -789,10 +792,10 @@ export class Game {
 
   private dropoff(r: Ride) {
     const ratio = r.left / r.total;
-    const [grade, bonus, mul] = ratio > 0.45 ? ['SPEEDY!', 10, 1.3] as const : ratio > 0.15 ? ['NICE', 5, 1] as const : ['SLOW...', 2, 0.8] as const;
+    const [grade, mul] = ratio > 0.45 ? ['SPEEDY!', 1.3] as const : ratio > 0.15 ? ['NICE', 1] as const : ['SLOW...', 0.8] as const;
     const fare = Math.round(r.base * r.fareMul * mul);
     this.cash += fare;
-    this.popup(`${grade}  +${bonus}s`, 'big');
+    this.popup(`${grade}  +${Math.ceil(r.left)}s SAVED`, 'big');
     this.popup(`FARE ${money(fare)}`, 'good');
     // The passenger rates the ride on what they wanted: the stars set the tip and move the driver rating.
     if (r.want.id === 'ontime') r.want.tick(0, 0, ratio, false, false);
@@ -811,7 +814,6 @@ export class Game {
       line = tip ? `${tip * 10} SHARES VESTING` : 'NO SHARES';
     } else this.cash += tip;
     this.stamp(stars, `${r.want.def.title} ${r.want.shown} · ${line}`);
-    this.time += bonus;
     this.fares++;
     sfx.cash();
     this.quips.say(r.type.id, 'dropoff', { force: true });
