@@ -71,6 +71,7 @@ test('login: only a genuine Shoo token for this site gets a session', async () =
   bad.push(t.slice(0, -4) + (t.endsWith('AAAA') ? 'BBBB' : 'AAAA')); // tampered signature
   const [h, , s] = t.split('.');
   bad.push(`${h}.${b64(JSON.stringify({ iss: 'https://shoo.dev', aud: `origin:${ORIGIN}`, exp: now + 600, pairwise_sub: 'someone-else' }))}.${s}`); // swapped claims
+  bad.push('a.b.c', 'not-a-token', '..');
   for (const token of bad) assert.equal((await call('POST', '/api/login', { token })).status, 401);
   assert.equal((await call('GET', '/api/me', undefined, 'forged.session')).status, 401);
   assert.equal((await call('GET', '/api/me')).status, 401);

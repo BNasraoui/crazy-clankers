@@ -174,7 +174,7 @@ async function login(request: Request, env: Env) {
   let body: { token?: unknown; progress?: unknown };
   try { body = await request.json(); } catch { return fail('bad json'); }
   if (typeof body.token !== 'string' || body.token.length > 4096) return fail('bad token');
-  const player = await shooPlayer(body.token, new URL(request.url).origin);
+  const player = await shooPlayer(body.token, new URL(request.url).origin).catch(() => null); // garbled tokens are just bad
   if (!player) return fail('bad token', 401);
   // This device's progress joins the account's: the larger of each, so logging in twice never counts a shift twice.
   const progress = await loadProgress(env, player);
