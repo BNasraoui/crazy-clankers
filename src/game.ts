@@ -27,17 +27,17 @@ import { btn, burst, howToHTML, pickerHTML, titleHTML } from './menus';
 import { key } from './prompts';
 
 const STEP = 1 / 120;
-const START_TIME = 75;
+const START_TIME = 90; // with SURGE below, aimed at a 3-5 minute shift
 const START = BAY; // every shift starts by pulling out of the robotaxi rank
 const WAITING_COUNT = 40;
 // Surge pricing is the difficulty: every 5 deliveries it climbs a level, up to 4.
 // [time added at pickup (share of the fare's limit), fare limit, want targets, fare pay]
 const SURGE: [number, number, number, number][] = [
-  [0.7, 1, 1, 1],
-  [0.6, 0.92, 1.1, 1.25],
-  [0.5, 0.85, 1.2, 1.5],
-  [0.42, 0.78, 1.3, 1.75],
-  [0.35, 0.72, 1.4, 2],
+  [0.5, 1, 1, 1],
+  [0.42, 0.92, 1.1, 1.25],
+  [0.35, 0.85, 1.2, 1.5],
+  [0.28, 0.78, 1.3, 1.75],
+  [0.22, 0.72, 1.4, 2],
 ];
 
 interface Waiting {
@@ -86,6 +86,7 @@ export class Game {
   state: 'title' | 'picker' | 'play' | 'paused' | 'over' = 'title';
 
   time = START_TIME;
+  private shiftTime = 0; // how long this shift has lasted
   cash = 0;
   equity = 0;
   promised = 0;
@@ -221,6 +222,7 @@ export class Game {
 
   private reset() {
     this.time = START_TIME;
+    this.shiftTime = 0;
     this.cash = this.equity = this.promised = this.fares = this.combo = 0;
     this.starsGiven = [];
     this.safety = 100;
@@ -501,6 +503,7 @@ export class Game {
     this.updateWaiting(dt);
     this.updateRide(dt);
     this.time -= dt;
+    this.shiftTime += dt;
     if (this.time <= 0) { this.time = 0; this.gameOver('TIME UP'); }
     this.driveCamera(dt);
     this.updateArrow();
@@ -876,7 +879,7 @@ export class Game {
       <h2>${reason}</h2>
       <div class="stats">
         <div>${sub}</div>
-        <div>Fares delivered: <b>${this.fares}</b> · Final rating: <b>${this.rating.toFixed(2)} ★</b></div>
+        <div>Shift: <b>${Math.floor(this.shiftTime / 60)}:${String(Math.floor(this.shiftTime % 60)).padStart(2, '0')}</b> · Fares delivered: <b>${this.fares}</b> · Final rating: <b>${this.rating.toFixed(2)} ★</b></div>
         ${starLine}${airLine}${equityLine}${promiseLine}
         <div class="total">${money(this.cash)}</div>
       </div>
