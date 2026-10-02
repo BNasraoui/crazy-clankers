@@ -184,7 +184,7 @@ export function buildFeatures(scene: THREE.Scene) {
 // same speed, flies about 80 m (21 m up at the top) and lands in the lane, heading for the tyre
 // wall in front of the water tower (world.ts). tests/ui/alcatraz.spec.ts flies every cab off it.
 export const ALCATRAZ_JUMP = (() => {
-  const start = { x: 192, z: -HALF - 2 };
+  const start = { x: 192, z: -HALF - 6 }; // on the promenade, clear of the crosswalk
   const target = { x: ALCATRAZ.x + 11, z: ALCATRAZ.z + 8 }; // where it lands: the lane, south of the drop-off
   const yaw = Math.atan2(target.x - start.x, target.z - start.z);
   return { start, target, yaw, length: 34, kicker: 14, rise: 5, speed: 40 };
@@ -192,7 +192,7 @@ export const ALCATRAZ_JUMP = (() => {
 
 function addAlcatrazJump(scene: THREE.Scene) {
   const j = ALCATRAZ_JUMP;
-  const deck = heightAt(j.start.x, -HALF);
+  const deck = heightAt(j.start.x, -HALF) + 0.04; // just above the promenade, not fighting it
   const flat = 1 - j.kicker / j.length;
   const r: Ramp = {
     x: j.start.x, z: j.start.z, yaw: j.yaw, length: j.length, width: 20, abs: deck, thickness: 1.2, // wide enough to catch the whole street
