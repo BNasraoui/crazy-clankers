@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Input } from './input';
 import { collide, waterAt } from './world';
-import { groundAt } from './features';
+import { boostAt, groundAt } from './features';
 import type { CarModel } from './models';
 
 export const MAX_SPEED = 42;
@@ -155,6 +155,13 @@ export class Car {
     } else {
       this.yaw -= inp.steer * 0.8 * dt;
       if (wet) vs *= Math.exp(-1.5 * dt);
+    }
+    // A boost strip: exactly its speed, and pulled onto its line, so the jump it feeds always lands.
+    const on = this.grounded ? boostAt(this.pos.x, this.pos.z) : null;
+    if (on && vf > 2 && Math.cos(this.yaw - on.boost.yaw) > 0.7) {
+      vf = on.boost.speed;
+      vs = -on.right * 6; // slide back to the centre line
+      this.yaw += Math.atan2(Math.sin(on.boost.yaw - this.yaw), Math.cos(on.boost.yaw - this.yaw)) * Math.min(1, 8 * dt);
     }
     this.forward = vf;
     this.lateral = vs;

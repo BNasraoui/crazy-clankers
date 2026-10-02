@@ -19,6 +19,22 @@ export interface Ramp {
 }
 
 export const ramps: Ramp[] = [];
+
+// Boost strips: drive along one and the cab goes exactly `speed`, whatever it is, so a jump
+// built for that speed always lands (the Alcatraz pier). It also holds the cab to the line.
+export interface Boost { x: number; z: number; yaw: number; length: number; width: number; speed: number }
+export const boosts: Boost[] = [];
+
+// The strip under (x, z), and how far right of its centre line that is.
+export function boostAt(x: number, z: number): { boost: Boost; right: number } | null {
+  for (const b of boosts) {
+    const dx = x - b.x, dz = z - b.z;
+    const s = Math.sin(b.yaw), c = Math.cos(b.yaw);
+    const a = dx * s + dz * c, l = dx * c - dz * s;
+    if (a >= 0 && a <= b.length && Math.abs(l) <= b.width / 2) return { boost: b, right: -l };
+  }
+  return null;
+}
 // Ramps that move (car-carrier trucks). Traffic ignores these for its own height.
 export const movingRamps: Ramp[] = [];
 
@@ -144,6 +160,8 @@ export function buildFeatures(scene: THREE.Scene) {
     addPilings(scene, r);
   }
 
+  addAlcatrazJump(scene);
+
   // Alcatraz's causeway: from the sea floor east of the island up to the landing, 76 m at
   // about 14 degrees. The island's model draws it, so it is only registered here.
   ramps.push({
@@ -152,12 +170,50 @@ export function buildFeatures(scene: THREE.Scene) {
   });
 
   // Boat ramps: the only way back out of the bay.
-  for (const [x, z, yaw] of [[HALF + 60, -64, WEST], [192, -HALF - 60, SOUTH]] as const) {
+  for (const [x, z, yaw] of [[HALF + 60, -64, WEST], [256, -HALF - 60, SOUTH]] as const) {
     const shore = heightAt(Math.min(x, HALF), Math.max(z, -HALF));
     addRamp(scene, {
       x, z, yaw, length: 54, width: 12, abs: SEA_FLOOR, thickness: 1,
       height: (t) => t * (shore - SEA_FLOOR),
     }, 0xa9a69c);
+  }
+}
+
+// The Alcatraz Express: a pier off the end of the street at x = 192, angled at the clear lane
+// along the island's east side, with a boost strip and a kicker. Every cab leaves the lip at the
+// same speed, flies about 80 m (21 m up at the top) and lands in the lane, heading for the tyre
+// wall in front of the water tower (world.ts). The flight is checked in tests/api/alcatraz.test.mts.
+export const ALCATRAZ_JUMP = (() => {
+  const start = { x: 192, z: -HALF - 2 };
+  const target = { x: ALCATRAZ.x + 11, z: ALCATRAZ.z + 8 }; // where it lands: the lane, south of the drop-off
+  const yaw = Math.atan2(target.x - start.x, target.z - start.z);
+  return { start, target, yaw, length: 34, kicker: 14, rise: 5, speed: 40 };
+})();
+
+function addAlcatrazJump(scene: THREE.Scene) {
+  const j = ALCATRAZ_JUMP;
+  const deck = heightAt(j.start.x, -HALF);
+  const flat = 1 - j.kicker / j.length;
+  const r: Ramp = {
+    x: j.start.x, z: j.start.z, yaw: j.yaw, length: j.length, width: 20, abs: deck, thickness: 1.2, // wide enough to catch the whole street
+    height: (t) => (t < flat ? 0 : j.rise * ((t - flat) / (1 - flat)) ** 2), // curls up to about 35 degrees at the lip
+  };
+  addRamp(scene, r, 0x9a7650);
+  addPilings(scene, r);
+  // The boost: all but the first few metres, the full width, up the kicker to the lip; it
+  // gathers a cab from anywhere on the pier onto the line. Painted with chevrons.
+  const from = 3;
+  const sx = Math.sin(j.yaw), cz = Math.cos(j.yaw);
+  boosts.push({ x: j.start.x + sx * from, z: j.start.z + cz * from, yaw: j.yaw, length: j.length - from, width: 20, speed: j.speed });
+  const chevron = new THREE.Shape([new THREE.Vector2(-3, 0), new THREE.Vector2(0, 2.2), new THREE.Vector2(3, 0), new THREE.Vector2(3, -1.4), new THREE.Vector2(0, 0.8), new THREE.Vector2(-3, -1.4)]);
+  const geo = new THREE.ShapeGeometry(chevron).rotateX(-Math.PI / 2);
+  const paint = new THREE.MeshBasicMaterial({ color: 0x2fd6bf });
+  for (let a = from + 2; a < j.length - 1; a += 3.2) {
+    const x = j.start.x + sx * a, z = j.start.z + cz * a;
+    const m = new THREE.Mesh(geo, paint);
+    m.position.set(x, groundAt(x, z) + 0.06, z);
+    m.rotation.y = j.yaw + Math.PI; // the arrow's tip points along the pier
+    scene.add(m);
   }
 }
 

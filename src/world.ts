@@ -1172,6 +1172,18 @@ function addLandmarks(scene: THREE.Scene) {
     solid(-9, -25, 3.8);
     solid(8, -24, 1.8);
     for (const my of [5.8, 10.2]) solid(13, my, 0.3);
+    // The tyre wall across the east lane, in front of the water tower: where an Alcatraz
+    // Express jump (features.ts) ends if you don't brake.
+    const tyre = new THREE.CylinderGeometry(1.05, 1.05, 0.85, 14);
+    const tyres = new THREE.InstancedMesh(tyre, toon({ color: 0x2b2a30 }), 8 * 3);
+    const m = new THREE.Matrix4();
+    let k = 0;
+    for (let mx = 2.5; mx <= 16.5; mx += 2) {
+      solid(mx, 20.5, 1.1);
+      for (let level = 0; level < 3; level++) tyres.setMatrixAt(k++, m.makeTranslation(ALCATRAZ.x + mx, ALCATRAZ.top + 0.43 + level * 0.85, ALCATRAZ.z - 20.5));
+    }
+    tyres.castShadow = tyres.receiveShadow = true;
+    scene.add(tyres);
   }
 }
 
