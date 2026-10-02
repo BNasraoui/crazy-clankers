@@ -6,10 +6,10 @@ import { glyph, key, keycap, phrase, type Act } from './prompts';
 interface CabCard { price: string; eta: string; stats: [string, number, string][]; perk?: string } // stats: [label, cells 0..6, value]
 const CARDS: Record<string, CabCard> = {
   cab: { price: '$14.20', eta: '2 min', stats: [['LIDAR COUNT', 3, '1 puck'], ['APOLOGY RATE', 2, '3 / min'], ['TOP SPEED', 4, 'brisk']] },
-  wayfarer: { perk: 'SEES WHAT EVERY FARE WANTS · PREMIUM 1.3× FARES', price: '$31.80', eta: '4 min', stats: [['LIDAR COUNT', 6, '29'], ['APOLOGY RATE', 6, '12 / min'], ['TOP SPEED', 3, 'polite']] },
-  cybercab: { perk: 'FASTEST CAB IN THE CITY', price: '$9.99', eta: 'ETA: TBC', stats: [['LIDAR COUNT', 0, 'cameras only'], ['APOLOGY RATE', 1, 'never'], ['TOP SPEED', 6, 'next year']] },
-  zoox: { perk: 'CARPOOL: UP TO 3 FARES AT ONCE', price: '$22.00', eta: '3 min, either way', stats: [['LIDAR COUNT', 4, '4 corners'], ['APOLOGY RATE', 3, 'both ends'], ['TOP SPEED', 3, 'toasty']] },
-  apollo: { perk: 'BULLDOZER: TRAFFIC BOUNCES OFF IT', price: '$4.80', eta: '1 min', stats: [['LIDAR COUNT', 5, 'a crown'], ['APOLOGY RATE', 0, 'n/a'], ['TOP SPEED', 4, 'relentless']] },
+  wayfarer: { perk: 'SEES WHAT FARES WANT · 1.3× PAY', price: '$31.80', eta: '4 min', stats: [['LIDAR COUNT', 6, '29'], ['APOLOGY RATE', 6, '12 / min'], ['TOP SPEED', 3, 'polite']] },
+  cybercab: { perk: 'FASTEST CAB IN TOWN', price: '$9.99', eta: 'ETA: TBC', stats: [['LIDAR COUNT', 0, 'cameras only'], ['APOLOGY RATE', 1, 'never'], ['TOP SPEED', 6, 'next year']] },
+  zoox: { perk: 'CARPOOL: 3 FARES AT ONCE', price: '$22.00', eta: '3 min, either way', stats: [['LIDAR COUNT', 4, '4 corners'], ['APOLOGY RATE', 3, 'both ends'], ['TOP SPEED', 3, 'toasty']] },
+  apollo: { perk: 'BULLDOZER: TRAFFIC BOUNCES OFF', price: '$4.80', eta: '1 min', stats: [['LIDAR COUNT', 5, 'a crown'], ['APOLOGY RATE', 0, 'n/a'], ['TOP SPEED', 4, 'relentless']] },
 };
 
 const btn = (act: Act, text: string) => `<span class="prompt">${key(act)}${text}</span>`;
@@ -98,4 +98,25 @@ export function burst() {
   el.className = 'burst';
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 700);
+}
+
+// Fit the picker panel to the screen: measure how tall its content really is, and if that's
+// more than the room available, scale the whole panel down just enough (any screen, any perk
+// text, any language). Phones held sideways (max-height: 500px) have their own layout.
+export function fitPicker() {
+  const panel = document.querySelector<HTMLElement>('.picker-panel');
+  if (!panel) return;
+  panel.style.removeProperty('--pfit');
+  panel.style.removeProperty('height');
+  panel.style.removeProperty('bottom');
+  if (matchMedia('(max-height: 500px)').matches) return;
+  panel.classList.add('measure');
+  const need = panel.scrollHeight + 16; // plus a little for margins the measure misses
+  panel.classList.remove('measure');
+  const room = innerHeight * 0.86; // top 4%, bottom 10%
+  if (need <= room) return;
+  const fit = Math.max(0.55, room / need);
+  panel.style.setProperty('--pfit', fit.toFixed(3));
+  panel.style.height = `${room / fit}px`;
+  panel.style.bottom = 'auto';
 }

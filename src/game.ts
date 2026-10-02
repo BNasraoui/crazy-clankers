@@ -23,7 +23,7 @@ import { SpritePerson, type SpriteSet } from './spritepeople';
 import { Trees } from './trees';
 import { CableCars } from './cablecar';
 import { BAY, Rank, snapshotCabs } from './rank';
-import { btn, burst, howToHTML, pickerHTML, tapButton, titleHTML } from './menus';
+import { btn, burst, fitPicker, howToHTML, pickerHTML, tapButton, titleHTML } from './menus';
 import { key } from './prompts';
 import { buzz } from './touch';
 
@@ -224,6 +224,7 @@ export class Game {
   }
 
   resize(w: number, h: number) {
+    fitPicker();
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.look.setSize(w, h);
@@ -396,6 +397,7 @@ export class Game {
   private renderCabPicker() {
     if (this.state !== 'picker') return;
     $('#overlay').innerHTML = pickerHTML(this.cabIndex, this.thumbs);
+    fitPicker();
   }
 
   private showTitle() {
