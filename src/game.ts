@@ -244,6 +244,8 @@ export class Game {
     this.reset();
     this.showTitle();
     addEventListener('keydown', (e) => this.signKey(e), true);
+    // The picker sizes itself to its text, so measure again when a font (or a Chinese glyph set) arrives.
+    document.fonts?.addEventListener('loadingdone', () => { if (this.state === 'picker') fitPicker(); });
     onLang(() => this.relanguage());
     this.labelFont();
     // The EN / 中文 switch on the title screen: click it, or press L.

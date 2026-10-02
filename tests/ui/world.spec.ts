@@ -31,7 +31,10 @@ test.describe('world', () => {
       await page.waitForFunction(() => (window as unknown as { still?: unknown }).still, null, { timeout: 170_000 });
       await page.addStyleTag({ content: '#overlay, #hud, #radio-dashboard, #radio-collapsed, #radio-toast, #touch, #quip, #popups { visibility: hidden !important; }' });
       await page.evaluate(([eye, target]) => {
-        const w = window as unknown as { game: { car: { pos: { x: number; y: number; z: number } } }; still: (e: V, t: V) => void };
+        type Fare = { person: { root: { visible: boolean } }; marker: { visible: boolean } };
+        const w = window as unknown as { game: { car: { pos: { x: number; y: number; z: number } }; waiting: Fare[] }; still: (e: V, t: V) => void };
+        // Waiting fares depend on how the boot went; these views are about the city.
+        for (const f of w.game.waiting) f.person.root.visible = f.marker.visible = false;
         const c = w.game.car.pos;
         w.still([c.x + eye[0], c.y + eye[1], c.z + eye[2]], [c.x + target[0], c.y + target[1], c.z + target[2]]);
       }, [eye, target] as [V, V]);
