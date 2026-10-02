@@ -7,12 +7,12 @@ export interface Station { name: string; source: string; genre?: string; credit?
 // audio element, so they need nothing on screen. Credit goes to each broadcaster.
 export const DEFAULT_STATIONS: Station[] = [
   // Game soundtracks: YouTube playlists whose tracks all allow embedding (checked 2026-10-02).
+  { name: 'SSX Tricky', genre: 'Game soundtrack', credit: 'YouTube playlist', source: 'PL8E46108211380524' },
   { name: 'Crazy Taxi', genre: 'Game soundtrack', credit: 'YouTube playlist', source: 'PL1769A4saL4KY16HsbBRuie0aK2gc1Ukz' },
   { name: 'Jet Set Radio', genre: 'Game soundtrack', credit: 'YouTube playlist', source: 'PLE3VL-5NEtZiefRHaaTUGnU7JhOkbd3mT' },
   { name: 'Jet Set Radio Future', genre: 'Game soundtrack', credit: 'YouTube playlist', source: 'PL0541582D4B7CA841' },
   { name: "Tony Hawk's Pro Skater 1-4", genre: 'Game soundtrack', credit: 'YouTube playlist', source: 'PLB3FnBA-48BED8VsTro4T0-emKTPWI7iK' },
   { name: 'Aggressive Inline', genre: 'Game soundtrack', credit: 'YouTube playlist', source: 'PL1NMu3P_ZJ911aICRc2YuwJrl0wNms37e' },
-  { name: 'SSX Tricky', genre: 'Game soundtrack', credit: 'YouTube playlist', source: 'PL8E46108211380524' },
   // Internet radio.
   { name: "Punk's Not Dead", genre: 'Punk', credit: 'Polygon.FM', source: 'https://eu6.fastcast4u.com/proxy/pnd?mp=/stream' },
   { name: 'Alt Rock', genre: 'Alternative', credit: 'Best Of Rock.FM', source: 'https://bestofrockfm.stream.vip/altrock/mp3-256/bestofrock.fm/' },
@@ -27,6 +27,7 @@ export const DEFAULT_STATIONS: Station[] = [
   { name: 'Lo-fi', genre: 'Lo-fi', credit: 'REYFM', source: 'https://listen.reyfm.de/lofi_320kbps.mp3' },
 ];
 const STORAGE_KEY = 'clankers.radio.v2';
+const FIRST_STATION = 'PL8E46108211380524'; // the radio starts on SSX Tricky, wherever it sits in a saved list
 const OLD_STORAGE_KEY = 'clankers.radio.v1';
 const OLD_DEFAULTS = ['K4DyBUG242c', 'Dr8xAycPpYw']; // the first build's placeholder stations
 
@@ -268,7 +269,7 @@ export class Radio {
   private autostart() {
     if (this.interacted || !this.stations.length) return;
     this.autostarting = true;
-    this.tune(0);
+    this.tune(this.firstStation());
     this.audio.addEventListener('playing', () => { this.autostarting = false; }, { once: true });
   }
 
@@ -280,9 +281,11 @@ export class Radio {
     this.interacted = false;
   }
 
+  private firstStation() { return Math.max(0, this.stations.findIndex((s) => s.source === FIRST_STATION)); }
+
   private gesture() {
     this.interacted = true;
-    if (this.stations.length) this.tune(0);
+    if (this.stations.length) this.tune(this.firstStation());
   }
 
   private isStream() { const s = this.stations[this.selected]; return !!s && !!streamSource(s.source); }
