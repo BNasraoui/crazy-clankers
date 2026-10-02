@@ -11,7 +11,6 @@ import { loadPassengerSprites } from './spritepeople';
 
 const canvas = document.getElementById('view') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 
@@ -21,6 +20,8 @@ document.body.classList.add('ready'); // the boot screen's title is now the real
 loadPassengerSprites().then((s) => { game.paxSprites = s; game.refreshPassengers(); }).catch((err) => console.warn('No passenger sprites:', err));
 Pedestrians.load(game.scene).then((p) => { game.peds = p; }).catch((err) => console.warn('No pedestrians:', err));
 const fit = () => {
+  // Up to ~1080 real pixels tall: sharp on high-density phones, the same 1.5 cap as before on desktops.
+  renderer.setPixelRatio(Math.min(devicePixelRatio, Math.max(1.5, 1080 / innerHeight)));
   renderer.setSize(innerWidth, innerHeight, false);
   game.resize(innerWidth, innerHeight);
 };

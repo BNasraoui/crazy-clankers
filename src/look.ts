@@ -201,10 +201,11 @@ export class Look {
   setSize(w: number, h: number) {
     this.w = w;
     this.h = h;
-    const lh = Math.min(h, this.settings.height);
+    // The world's resolution is in real pixels: a phone is ~300 CSS px tall but ~900 real ones.
+    const pr = this.renderer.getPixelRatio();
+    const lh = Math.round(Math.min(h * pr, this.settings.height));
     const lw = Math.round((lh * w) / h);
     this.target.setSize(lw, lh);
-    const pr = this.renderer.getPixelRatio();
     this.chars.setSize(Math.round(w * pr), Math.round(h * pr));
     this.quad.material.uniforms.uFull.value.set(Math.round(w * pr), Math.round(h * pr));
     setOutlineResolution(Math.round(w * pr), Math.round(h * pr));
