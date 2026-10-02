@@ -9,6 +9,8 @@
   // Keep the workers.dev address alongside the custom domain.
   "workers_dev": true,
   "preview_urls": true,
+  // Workers Builds' preview deploys (`npx wrangler preview`) need this block, even empty.
+  "previews": {},
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
