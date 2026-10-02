@@ -1,16 +1,19 @@
 // Logging in, which is optional: Google through Shoo (https://shoo.dev), so a player's XP follows
-// them between devices. The page leaves for Google and comes back, so the game only offers it on
-// the results screen, once the shift is already saved. The server (worker/index.ts) checks Shoo's
-// token once and gives us its own session, which is all we keep.
+// them between devices. Google opens in a popup and the game stays put: Google sends the popup
+// back to /auth (public/auth.html), which hands the code over and closes. If the popup is blocked
+// (or there was no click to open it from, like a pad button), the whole page goes instead and
+// comes back to the title. The server (worker/index.ts) checks Shoo's token once and gives us
+// its own session, which is all we keep.
 
 import { createShooAuth } from '@shoojs/auth';
 import { allProgress, replaceProgress, type CabProgress } from './progress';
 
 const SESSION = 'clankers.session';
 const PENDING = 'clankers.pending'; // shifts that haven't reached the server yet
-const CALLBACK = '/auth/callback';
+const SHOO = 'https://shoo.dev';
+const REDIRECT = `${location.origin}/auth`;
 
-const auth = createShooAuth({ shooBaseUrl: 'https://shoo.dev', callbackPath: CALLBACK, fallbackPath: '/' });
+const auth = createShooAuth({ shooBaseUrl: SHOO, redirectUri: REDIRECT, fallbackPath: '/' });
 
 interface Shift { cab: string; xp: number; cents: number }
 type Progress = Record<string, CabProgress>;
@@ -23,8 +26,47 @@ const pending = (): Shift[] => { try { return JSON.parse(read(PENDING) ?? '[]');
 
 export const loggedIn = () => !!read(SESSION);
 
-export function logIn() {
-  return auth.startSignIn({ returnTo: '/' }); // leaves the page
+// Must run straight from a click or tap: browsers only allow popups then.
+// Resolves 'in' or 'failed' (a popup that's closed without logging in just never resolves).
+export function logIn(): Promise<'in' | 'failed'> {
+  try { sessionStorage.removeItem('clankers.loginMode'); } catch { /* fine */ }
+  const popup = window.open('about:blank', 'clankers-login', 'popup,width=500,height=680');
+  if (!popup) {
+    try { sessionStorage.setItem('clankers.loginMode', 'redirect'); } catch { /* fine */ }
+    void auth.startSignIn({ returnTo: '/' }); // leaves the page
+    return new Promise(() => {});
+  }
+  return (async () => {
+    const pkce = await auth.createPkceBundle();
+    popup.location.href = auth.createSignInUrl({ state: pkce.state, codeChallenge: pkce.challenge });
+    const reply = await new Promise<{ code?: string; state?: string }>((resolve) => {
+      const channel = new BroadcastChannel('clankers-login');
+      channel.onmessage = (e) => {
+        if (e.data?.state !== pkce.state) return; // an older attempt's popup
+        channel.close();
+        resolve(e.data);
+      };
+    });
+    if (!reply.code) return 'failed';
+    try {
+      const token = await auth.exchangeCode({ shooBaseUrl: SHOO, clientId: `origin:${location.origin}`, redirectUri: REDIRECT, code: reply.code, codeVerifier: pkce.verifier });
+      return (await finishLogin(token.id_token)) ? 'in' : 'failed';
+    } catch (error) {
+      console.warn('Login failed:', error);
+      return 'failed';
+    }
+  })();
+}
+
+// Shoo's ID token → our session, with this device's progress joining the account's.
+async function finishLogin(idToken: string) {
+  const res = await api('POST', '/api/login', { token: idToken, progress: allProgress() });
+  if (!res.ok) return false;
+  const { session, progress } = await res.json() as { session: string; progress: Progress };
+  write(SESSION, session);
+  write(PENDING, null); // the login just counted everything on this device
+  replaceProgress(progress);
+  return true;
 }
 
 export function logOut() {
@@ -45,23 +87,14 @@ export const authHeader = (): Record<string, string> => {
   return session ? { authorization: `Bearer ${session}` } : {};
 };
 
-// On every page load: finish a login that's coming back from Google, else bring this device up to date.
-// Resolves to 'in' when a login just finished, 'failed' when one didn't, otherwise null.
+// On every page load: finish a whole-page login that's coming back from Google, else bring this
+// device up to date. Resolves to 'in' when a login just finished, 'failed' when one didn't, otherwise null.
 export async function syncAccount(): Promise<'in' | 'failed' | null> {
-  if (location.pathname === CALLBACK) {
+  if (auth.parseCallback()) {
     let result: 'in' | 'failed' = 'failed';
     try {
       const token = await auth.finishSignIn({ redirectAfter: false });
-      if (token?.id_token) {
-        const res = await api('POST', '/api/login', { token: token.id_token, progress: allProgress() });
-        if (res.ok) {
-          const { session, progress } = await res.json() as { session: string; progress: Progress };
-          write(SESSION, session);
-          write(PENDING, null); // the login just counted everything on this device
-          replaceProgress(progress);
-          result = 'in';
-        }
-      }
+      if (token?.id_token && (await finishLogin(token.id_token))) result = 'in';
     } catch (error) {
       console.warn('Login failed:', error);
     }

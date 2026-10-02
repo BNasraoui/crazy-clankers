@@ -47,6 +47,8 @@ const prevButtons = new Map<number, boolean[]>();
 let keySteer = 0;
 // Stick-as-D-pad latch for menus, so one flick moves one step.
 let stickNav = { x: 0, y: 0 };
+// Holding up or down repeats in menus (letters, lists): a pause, then quick steps.
+let repeatY = { dir: 0, t: 0 };
 export let padName = '';
 // Live readout of every pad the browser reports (shown in the look panel).
 export let padDebug = '';
@@ -155,6 +157,17 @@ export function readInput(dt: number): Input {
     if (busy || !active) active = p;
     debug.push(`#${p.index} ${p.id.slice(0, 40)} [${p.mapping || 'unmapped'}] ` +
       `axes ${p.axes.map((a) => a.toFixed(1)).join(' ')} | buttons ${p.buttons.map((b, i) => (b.pressed ? i : '')).filter(String).join(',') || '-'}`);
+  }
+  let holdY = (down('ArrowDown', 'KeyS') ? 1 : 0) - (down('ArrowUp', 'KeyW') ? 1 : 0);
+  for (const p of pads) {
+    const st = readPad(p);
+    if (st.buttons[12] || st.ly < -0.6) holdY = -1;
+    if (st.buttons[13] || st.ly > 0.6) holdY = 1;
+  }
+  if (holdY !== repeatY.dir) repeatY = { dir: holdY, t: 0 };
+  else if (holdY && (repeatY.t += dt) > 0.38) {
+    repeatY.t -= 0.075;
+    input.navY ||= holdY;
   }
   padName = active?.id ?? '';
   padDebug = pads.length ? debug.join('\n') : 'No gamepads reported by the browser. Press any button on the controller.';

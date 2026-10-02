@@ -671,12 +671,22 @@ html.touch .radio-menu-button { min-height: 48px; padding: 8px 18px; font-size: 
 .sign { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 12px 18px; color: var(--ink);
   background: var(--paper); border: 3px solid var(--ink); border-radius: 8px; box-shadow: 5px 5px 0 var(--yellow); transform: rotate(1deg); }
 .sign > b { font: 20px var(--num); }
-.sign .slots { position: relative; display: flex; gap: 8px; pointer-events: auto; cursor: text; }
+.sign .slots { display: flex; gap: 8px; pointer-events: auto; }
+.sign .slot { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
 .sign .slots i { display: grid; place-items: center; width: 46px; height: 58px; font: 40px var(--num); font-style: normal; color: var(--ink);
   background: #fff; border: 3px solid var(--ink); border-radius: 6px; }
-.sign .slots i.cur { background: var(--yellow); box-shadow: 0 4px 0 var(--magenta); }
+.sign .slot.cur i { background: var(--yellow); box-shadow: 0 4px 0 var(--magenta); }
+.sign .slot.ghost i { color: #1b172266; } /* the suggested letters, until you change one */
+/* ▲ ▼ on the letter being changed: buttons on a touchscreen, a hint for a pad. */
+.sign .slot .up, .sign .slot .down { display: grid; place-items: center; width: 46px; height: 30px; font-size: 18px; line-height: 1; color: var(--ink); visibility: hidden; touch-action: manipulation; }
+.sign .slot.cur .up, .sign .slot.cur .down { visibility: visible; }
+html[data-input="pad"] .sign .slot .up, html[data-input="pad"] .sign .slot .down { display: grid !important; height: 16px; font-size: 12px; }
+html[data-input="kb"] .sign .slot .up, html[data-input="kb"] .sign .slot .down { display: none !important; }
+.sign .kbd { padding: 3px 10px; font: 13px var(--num); color: var(--ink); background: #fff; border: 2px solid var(--ink); border-radius: 6px; touch-action: manipulation; }
 /* The real text field sits invisibly over the letters: a keyboard types into it, a tap opens the phone's keyboard. */
-.sign .sign-input { position: absolute; inset: 0; width: 100%; opacity: 0; font-size: 16px; border: 0; padding: 0; caret-color: transparent; }
+.sign { position: relative; }
+/* The phone keyboard types into this; it's invisible, the letters above show what was typed. */
+.sign .sign-input { position: absolute; left: 50%; top: 40%; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: 0; padding: 0; caret-color: transparent; }
 .sign .sign-status { max-width: 260px; min-height: 1.3em; font: 600 14px/1.3 var(--body); text-align: center; }
 .sign .sign-status b { font-family: var(--num); color: var(--magenta); }
 #overlay .over-actions { display: flex; flex-direction: column; align-items: center; }
@@ -720,6 +730,7 @@ html.touch .radio-menu-button { min-height: 48px; padding: 8px 18px; font-size: 
   .sign { gap: 4px; padding: 6px 12px; }
   .sign > b { font-size: 15px; }
   .sign .slots i { width: 34px; height: 42px; font-size: 28px; }
+  .sign .slot .up, .sign .slot .down { width: 40px; height: 24px; }
   .sign .sign-status { font-size: 12px; max-width: 200px; }
   .board { padding: 8px 14px; gap: 5px; max-height: calc(100% - 16px); }
   .board h3 { font-size: 20px; }

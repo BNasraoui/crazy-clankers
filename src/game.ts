@@ -162,6 +162,7 @@ export class Game {
   private posting = false;
   private initials = '';
   private signCursor = 0;
+  private signEdited = false; // still the suggested letters (shown faint) until the player changes one
   private entry: Entry | null = null; // the shift that just ended, ready for the board
   private overAt = 0; // when the results appeared: a moment's grace so a held button doesn't skip them
 
@@ -242,6 +243,7 @@ export class Game {
 
     this.reset();
     this.showTitle();
+    addEventListener('keydown', (e) => this.signKey(e), true);
     onLang(() => this.relanguage());
     this.labelFont();
     // The EN / 中文 switch on the title screen: click it, or press L.
@@ -1121,6 +1123,7 @@ export class Game {
     this.signing = this.fares > 0;
     this.initials = savedInitials() || 'AAA';
     this.signCursor = 0;
+    this.signEdited = false;
     this.boardOpen = false;
     this.overAt = performance.now();
     const ov = $('#overlay');
@@ -1136,26 +1139,35 @@ export class Game {
         </div>
         <div class="sign">
           ${this.signing ? `<b>${t('sign.title')}</b>
-          <label class="slots"><i></i><i></i><i></i><input class="sign-input" maxlength="3" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done" aria-label="${t('sign.type')}"></label>
-          <div class="sign-status"><span class="touch-only">${t('sign.tap')}</span></div>` : ''}
+          <div class="slots">${[0, 1, 2].map((i) => `<span class="slot" data-slot="${i}"><b class="up touch-only" data-step="1">▲</b><i></i><b class="down touch-only" data-step="-1">▼</b></span>`).join('')}</div>
+          <input class="sign-input" maxlength="1" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done" aria-label="${t('sign.type')}">
+          <div class="sign-status"><button type="button" class="kbd touch-only" data-kbd>⌨ ${t('sign.keyboard')}</button></div>` : ''}
           <div class="account"></div>
         </div>
       </div>
       <div class="over-actions"></div>`;
+    // Touch: tap a letter to pick it, ▲ ▼ to change it; the phone keyboard is there if you'd rather type.
+    ov.querySelector('.slots')?.addEventListener('click', (e) => {
+      if (!this.signing || this.posting) return;
+      const slot = (e.target as Element).closest<HTMLElement>('[data-slot]');
+      const step = (e.target as Element).closest<HTMLElement>('[data-step]');
+      if (slot) this.signCursor = Number(slot.dataset.slot);
+      if (step) this.cycleLetter(Number(step.dataset.step));
+      else this.drawSlots();
+    });
     const input = ov.querySelector<HTMLInputElement>('.sign-input');
-    if (input) {
-      input.value = this.initials;
-      input.addEventListener('input', () => {
-        this.initials = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3);
-        input.value = this.initials;
-        this.signCursor = Math.min(this.initials.length, 2);
-        this.drawSlots();
-      });
-      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); this.submitSign(); } });
-      input.addEventListener('focus', () => input.select());
-      // On a keyboard, type straight away (on a phone the keyboard waits for a tap on the letters).
-      if (document.documentElement.dataset.input === 'kb') setTimeout(() => { if (this.signing) input.focus(); }, 900);
-    }
+    ov.querySelector('[data-kbd]')?.addEventListener('click', () => input?.focus());
+    input?.addEventListener('input', () => {
+      const typed = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      input.value = '';
+      if (typed) this.typeLetter(typed[typed.length - 1]);
+    });
+    input?.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace') this.backLetter();
+      else if (e.key === 'Enter') { input.blur(); this.submitSign(); }
+      else return;
+      e.preventDefault();
+    });
     this.drawSlots();
     this.drawOverActions();
     this.drawAccount();
@@ -1167,10 +1179,18 @@ export class Game {
     if (this.boardOpen) return this.boardFrame(inp);
     if (this.signing) {
       if (this.posting) return;
-      if (inp.navY) this.cycleLetter(-inp.navY); // up is the next letter, like an arcade cabinet
+      if (inp.navY) this.cycleLetter(-inp.navY); // up is the next letter, like an arcade cabinet (hold to scroll)
       if (inp.navX) { this.signCursor = THREE.MathUtils.clamp(this.signCursor + inp.navX, 0, 2); this.drawSlots(); }
-      if (inp.confirm) this.submitSign();
-      else if (inp.back) this.endSigning(true);
+      // A pad works letter by letter: A moves on and signs after the third, B steps back (skips from the first).
+      // Anywhere else (keyboard, the SIGN and SKIP buttons) confirm signs and back skips.
+      const pad = document.documentElement.dataset.input === 'pad';
+      if (inp.confirm) {
+        if (pad && this.signCursor < 2) { this.signCursor++; this.drawSlots(); sfx.tip(); }
+        else this.submitSign();
+      } else if (inp.back) {
+        if (pad && this.signCursor > 0) { this.signCursor--; this.drawSlots(); }
+        else this.endSigning(true);
+      }
       return;
     }
     if (inp.confirm) this.start();
@@ -1180,21 +1200,28 @@ export class Game {
   }
 
   // Under the initials (once they're done): log in to keep your XP, or that it's kept.
-  private drawAccount() {
+  private drawAccount(note = '') {
     const el = document.querySelector<HTMLElement>('#overlay .sign .account');
     if (!el) return;
     el.hidden = this.signing;
-    el.innerHTML = loggedIn()
+    el.innerHTML = (note ? `<span class="saved">${note}</span>` : '') + (loggedIn()
       ? `<span class="saved">${t('account.saved')}</span><a data-logout>${t('account.out')}</a>`
-      : `<button type="button" class="login" data-login>${key('alt')}<span>${t('account.save')}</span></button>`;
+      : `<button type="button" class="login" data-login>${key('alt')}<span>${t('account.save')}</span></button>`);
     el.querySelector('[data-login]')?.addEventListener('click', () => this.logIn());
     el.querySelector('[data-logout]')?.addEventListener('click', () => { logOut(); this.drawAccount(); });
   }
 
   private logIn() {
     const el = document.querySelector('#overlay .sign .account');
-    if (el) el.innerHTML = `<span class="saved">${t('account.going')}</span>`;
-    logIn().catch(() => this.drawAccount());
+    // Waiting on the popup; pressing the button again opens it again (closed it by mistake, say).
+    if (el) {
+      el.innerHTML = `<span class="saved">${t('account.waiting')}</span><button type="button" class="login" data-login>${t('account.again')}</button>`;
+      el.querySelector('[data-login]')?.addEventListener('click', () => this.logIn());
+    }
+    logIn().then((result) => {
+      if (this.state !== 'over' || !document.querySelector('#overlay .sign .account')) return this.loginNotice(result);
+      this.drawAccount(result === 'failed' ? t('account.failed') : '');
+    }, () => this.drawAccount(t('account.failed')));
   }
 
   // Back from Google: say how it went, over the title screen.
@@ -1206,21 +1233,58 @@ export class Game {
     setTimeout(() => el.remove(), 5000);
   }
 
+  private setLetter(c: string) {
+    const chars = this.initials.padEnd(3, 'A').split('');
+    chars[this.signCursor] = c;
+    this.initials = chars.join('');
+    this.signEdited = true;
+  }
+
   private cycleLetter(dir: number) {
     const ABC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const chars = this.initials.padEnd(this.signCursor + 1, 'A').split('');
-    chars[this.signCursor] = ABC[(ABC.indexOf(chars[this.signCursor]) + dir + ABC.length) % ABC.length];
-    this.initials = chars.join('').slice(0, 3);
-    const input = document.querySelector<HTMLInputElement>('.sign-input');
-    if (input) input.value = this.initials;
+    this.setLetter(ABC[(ABC.indexOf(this.initials[this.signCursor] ?? 'A') + dir + ABC.length) % ABC.length]);
     this.drawSlots();
     sfx.tip();
   }
 
+  // Typing (keyboard, or the phone's): the letter goes in and the cursor moves on.
+  private typeLetter(c: string) {
+    if (!this.signing || this.posting) return;
+    if (!this.signEdited) this.signCursor = 0; // the first key replaces the suggestion from the start
+    this.setLetter(c);
+    this.signCursor = Math.min(2, this.signCursor + 1);
+    this.drawSlots();
+    sfx.tip();
+  }
+
+  private backLetter() {
+    if (!this.signing || this.posting) return;
+    this.signEdited = true;
+    // On the last letter once it's typed, Backspace changes that one; otherwise step back first.
+    if (!(this.signCursor === 2 && this.initials[2])) this.signCursor = Math.max(0, this.signCursor - 1);
+    this.drawSlots();
+  }
+
+  // A keyboard types initials straight in: letters, Backspace, Enter to sign, Esc to skip.
+  // Runs before the game's own keys (capture), so W, S, H and E type instead of acting.
+  private signKey(e: KeyboardEvent) {
+    if (this.state !== 'over' || !this.signing || this.boardOpen || e.target instanceof HTMLInputElement) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const letter = /^Key([A-Z])$|^Digit([0-9])$/.exec(e.code);
+    if (letter) this.typeLetter(letter[1] ?? letter[2]);
+    else if (e.code === 'Backspace') this.backLetter();
+    else if (e.code === 'Enter' && performance.now() - this.overAt > 900) this.submitSign();
+    else if (e.code === 'Escape') this.endSigning(true);
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
   private drawSlots() {
-    document.querySelectorAll('.sign .slots i').forEach((el, i) => {
-      el.textContent = this.initials[i] ?? '';
+    document.querySelectorAll('.sign .slot').forEach((el, i) => {
+      el.querySelector('i')!.textContent = this.initials[i] ?? '';
       el.classList.toggle('cur', this.signing && i === this.signCursor);
+      el.classList.toggle('ghost', this.signing && !this.signEdited);
     });
   }
 
@@ -1228,7 +1292,7 @@ export class Game {
     const el = document.querySelector('#overlay .over-actions');
     if (!el) return;
     el.innerHTML = this.signing ? `
-      <div class="pad pad-only"><span class="k-pad">${btn('choose', t('sign.letters'))}</span><span class="k-kb prompt">${t('sign.type')}</span>${btn('confirm', t('sign.sign'))}${btn('back', t('sign.skip'))}</div>
+      <div class="pad pad-only"><span class="k-pad">${btn('choose', t('sign.letters'))}${btn('confirm', t('sign.next'))}${btn('back', t('sign.prev'))}</span><span class="k-kb"><span class="prompt">${t('sign.type')}</span>${btn('confirm', t('sign.sign'))}${btn('back', t('sign.skip'))}</span></div>
       <div class="tap-row touch-only">${tapButton('confirm', t('sign.sign'), 'go')}${tapButton('back', t('sign.skip'))}</div>` : `
       <div class="press pad-only">${btn('confirm', t('over.again'))}</div><div class="pad pad-only">${btn('back', t('over.change'))}${btn('board', t('title.board'))}</div>
       <div class="tap-row touch-only">${tapButton('confirm', t('over.again'), 'go')}${tapButton('back', t('over.change'))}${tapButton('board', t('title.board'))}</div>`;
