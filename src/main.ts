@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import './fit';
 import { Game } from './game';
 import { treeRefs } from './world';
 import { loadCars, loadPeople } from './models';
@@ -7,11 +8,10 @@ import { loadFacades } from './facades';
 import { loadSky } from './sky';
 import { Pedestrians } from './pedestrians';
 import { loadPassengerSprites } from './spritepeople';
-import { SMALL_SCREEN } from './look';
 
 const canvas = document.getElementById('view') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, SMALL_SCREEN ? 1.25 : 1.5));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 

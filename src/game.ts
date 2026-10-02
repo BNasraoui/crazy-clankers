@@ -3,7 +3,7 @@ import { Radio } from './radio';
 import { Car, MAX_SPEED, handlingOf } from './car';
 import { readInput, padName, padDebug, type Input } from './input';
 import { CABS, EXTRA_CARS, makeCar, makePerson, makeLabel, personFrom, type PersonModel } from './models';
-import { Look, SKY, SMALL_SCREEN, makeSky } from './look';
+import { Look, SKY, makeSky } from './look';
 import { paintSky, updateSky } from './sky';
 import { CHARACTER_LAYER, makeCharacter, sunDir } from './anime';
 import { pickPassenger, type PassengerType } from './passengers';
@@ -154,7 +154,7 @@ export class Game {
     this.sun.layers.enable(CHARACTER_LAYER);
     this.sun.shadow.camera.layers.enable(CHARACTER_LAYER);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.setScalar(SMALL_SCREEN ? 1024 : 2048);
+    this.sun.shadow.mapSize.set(2048, 2048);
     const sc = this.sun.shadow.camera;
     sc.left = sc.bottom = -70;
     sc.right = sc.top = 70;

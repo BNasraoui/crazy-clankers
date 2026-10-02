@@ -194,13 +194,18 @@ matchMedia('(orientation: portrait)').addEventListener('change', (e) => {
   if (e.matches && active && document.body.dataset.state === 'play') edges.add('pause');
 });
 
-// The first touch: go fullscreen and lock to landscape where the browser lets us
-// (Android Chrome; iPhones keep the browser bar unless the game is on the home screen).
-let firstTouch = true;
-addEventListener('touchend', () => {
+// Fullscreen on a phone: every tap asks again until the game is fullscreen (a first touch can be
+// refused, and leaving the app drops it), then locks to landscape where the browser lets us
+// (Android Chrome; iPhone Safari has no fullscreen for pages, only "Add to Home Screen").
+let asking = false;
+const goFullscreen = () => {
   unlockAudio(); // cheap after the first time; iOS can suspend the context when the app is backgrounded
-  if (!firstTouch) return;
-  firstTouch = false;
-  const fs = root.requestFullscreen?.({ navigationUI: 'hide' });
-  void fs?.then(() => (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape')).catch(() => {});
-}, { capture: true });
+  if (document.fullscreenElement || asking || !root.requestFullscreen) return;
+  asking = true;
+  root.requestFullscreen({ navigationUI: 'hide' })
+    .then(() => (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape'))
+    .catch(() => {})
+    .finally(() => { asking = false; });
+};
+addEventListener('touchend', goFullscreen, { capture: true });
+addEventListener('click', () => { if (active) goFullscreen(); }, { capture: true });

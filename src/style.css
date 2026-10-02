@@ -523,13 +523,13 @@ html.touch body[data-state="play"] #touch { display: block; }
   background-image: var(--halftone); transition: transform 0.06s, box-shadow 0.06s; }
 #touch .tb small { display: block; margin-top: 3px; font: 10px var(--pen); }
 #touch .tb.down { transform: translate(3px, 3px) scale(0.93); box-shadow: 1px 1px 0 var(--ink); }
-#touch .gas { width: 104px; height: 104px; right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+#touch .gas { width: calc(104px * var(--tbs, 1)); height: calc(104px * var(--tbs, 1)); right: calc(14px * var(--tbs, 1) + env(safe-area-inset-right, 0px)); bottom: calc(14px * var(--tbs, 1) + env(safe-area-inset-bottom, 0px));
   font-size: 22px; background-color: #b9f26bb8; }
-#touch .brake { width: 82px; height: 82px; right: calc(130px + env(safe-area-inset-right, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+#touch .brake { width: calc(82px * var(--tbs, 1)); height: calc(82px * var(--tbs, 1)); right: calc(130px * var(--tbs, 1) + env(safe-area-inset-right, 0px)); bottom: calc(14px * var(--tbs, 1) + env(safe-area-inset-bottom, 0px));
   font-size: 14px; background-color: #ff4a3ab0; }
-#touch .drift { width: 84px; height: 84px; right: calc(24px + env(safe-area-inset-right, 0px)); bottom: calc(132px + env(safe-area-inset-bottom, 0px));
+#touch .drift { width: calc(84px * var(--tbs, 1)); height: calc(84px * var(--tbs, 1)); right: calc(24px * var(--tbs, 1) + env(safe-area-inset-right, 0px)); bottom: calc(132px * var(--tbs, 1) + env(safe-area-inset-bottom, 0px));
   background-color: #ff4fa8b0; }
-#touch .hop { width: 70px; height: 70px; right: calc(124px + env(safe-area-inset-right, 0px)); bottom: calc(110px + env(safe-area-inset-bottom, 0px));
+#touch .hop { width: calc(70px * var(--tbs, 1)); height: calc(70px * var(--tbs, 1)); right: calc(124px * var(--tbs, 1) + env(safe-area-inset-right, 0px)); bottom: calc(110px * var(--tbs, 1) + env(safe-area-inset-bottom, 0px));
   background-color: #2fd6bfb0; }
 #touch .pause { width: 52px; height: 52px; left: 20%; top: calc(8px + env(safe-area-inset-top, 0px)); border-width: 3px;
   font: 18px/1 var(--body); font-weight: 800; letter-spacing: -2px; background-color: #f6f2e7c8; }
@@ -541,7 +541,7 @@ html.touch body[data-state="play"] #touch { display: block; }
 /* Short screens (a phone on its side): the whole HUD is drawn at desktop size and scaled
    down as one sticker sheet, inside the safe area, so the corner stacks keep their shape. */
 @media (max-height: 500px) {
-  :root { --hud: 0.58; }
+  :root { --hud: var(--ui, 0.58); } /* set from the real screen size in fit.ts */
   #hud { inset: auto; left: env(safe-area-inset-left, 0px); top: env(safe-area-inset-top, 0px); transform: scale(var(--hud)); transform-origin: 0 0;
     width: calc((100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)) / var(--hud));
     height: calc((100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / var(--hud));
@@ -581,8 +581,12 @@ html.touch body[data-state="play"] #touch { display: block; }
   html.touch .title-screen .corner-prompts.tap-row { bottom: calc(4% + env(safe-area-inset-bottom, 0px)); right: calc(3% + env(safe-area-inset-right, 0px));
     flex-direction: column; align-items: flex-end; gap: 12px; }
   .title-screen .radio-menu-button { bottom: auto; top: calc(5% + env(safe-area-inset-top, 0px)); right: calc(3% + env(safe-area-inset-right, 0px)); margin: 0; }
-  .picker-panel { top: 3%; bottom: auto; right: calc(2% + env(safe-area-inset-right, 0px)); width: calc(min(470px, 46vw) / 0.62); height: calc(94% / 0.62);
-    transform: rotate(1deg) scale(0.62); transform-origin: top right; }
+  .picker-panel { top: 3%; bottom: auto; right: calc(2% + env(safe-area-inset-right, 0px)); width: calc(min(470px, 46vw) / var(--hud)); height: calc(94% / var(--hud));
+    transform: rotate(1deg) scale(var(--hud)); transform-origin: top right; }
+  /* The cab list gives way (and scrolls) so the drive button is always on screen. */
+  .picker-panel > * { flex: none; }
+  .picker-panel .cab-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; touch-action: pan-y; padding: 2px 8px 6px 2px; }
+  #hud .note, #rating .note { display: none; }
   #lookpanel { top: 8px; right: 8px; max-height: calc(100% - 16px); overflow-y: auto; touch-action: pan-y; }
 }
 @keyframes pop-touch { from { transform: scale(0.85); } to { transform: scale(1); } }
@@ -599,3 +603,8 @@ html.touch body[data-state="play"] #touch { display: block; }
 @media (orientation: portrait) { html.touch #rotate { display: grid; } }
 @media (prefers-reduced-motion: reduce) { #rotate .phone { animation: none; transform: rotate(-90deg); } }
 html.touch .radio-menu-button { min-height: 48px; padding: 8px 18px; font-size: 18px; }
+
+/* Touch button labels shrink with the buttons on short screens. */
+#touch .tb { font-size: calc(17px * var(--tbs, 1)); }
+#touch .gas { font-size: calc(22px * var(--tbs, 1)); }
+#touch .brake { font-size: calc(14px * var(--tbs, 1)); }
