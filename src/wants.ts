@@ -42,11 +42,12 @@ export class Want {
   readonly ask: string;
   private steps: number[];
 
-  constructor(readonly id: WantId, passenger: string, tripSeconds: number) {
+  // `hard` raises every target as the shift's surge climbs (1 = normal).
+  constructor(readonly id: WantId, passenger: string, tripSeconds: number, hard = 1) {
     this.def = WANTS[id];
     this.ask = ASKS[passenger]?.[id] ?? this.def.how;
     const k = this.def.scaled ? Math.min(1.5, Math.max(0.7, tripSeconds / 22)) : 1;
-    this.steps = this.def.thresholds.map((t) => t * k);
+    this.steps = this.def.thresholds.map((t) => (id === 'ontime' ? Math.min(0.9, t * hard) : t * k * hard));
     if (id === 'smooth') this.value = 0;
     if (id === 'ontime') this.value = 1;
   }

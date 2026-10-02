@@ -30,6 +30,15 @@ const STEP = 1 / 120;
 const START_TIME = 75;
 const START = BAY; // every shift starts by pulling out of the robotaxi rank
 const WAITING_COUNT = 40;
+// Surge pricing is the difficulty: every 5 deliveries it climbs a level, up to 4.
+// [time added at pickup (share of the fare's limit), fare limit, want targets, fare pay]
+const SURGE: [number, number, number, number][] = [
+  [0.7, 1, 1, 1],
+  [0.6, 0.92, 1.1, 1.25],
+  [0.5, 0.85, 1.2, 1.5],
+  [0.42, 0.78, 1.3, 1.75],
+  [0.35, 0.72, 1.4, 2],
+];
 
 interface Waiting {
   type: PassengerType;
@@ -81,6 +90,7 @@ export class Game {
   equity = 0;
   promised = 0;
   private starsGiven: number[] = []; // each passenger's rating this shift
+  private get surge() { return Math.min(SURGE.length - 1, Math.floor(this.fares / 5)); }
   private stampTimer = 0;
   fares = 0;
   combo = 0;
@@ -676,18 +686,19 @@ export class Game {
     this.scene.remove(w.person.root, w.marker);
     this.waiting = this.waiting.filter((x) => x !== w);
     const d = blocks(w.curb.road, w.dest.curb.road);
-    const total = (d / 19 + 6) * w.type.timeMul;
+    const [give, limit, hard] = SURGE[this.surge];
+    const total = (d / 19 + 6) * w.type.timeMul * limit;
     const pool = w.type.wants;
-    const want = new Want(pool[Math.floor(this.rand() * pool.length)], w.type.id, total);
+    const want = new Want(pool[Math.floor(this.rand() * pool.length)], w.type.id, total, hard);
     this.ride = {
       type: w.type, dest: w.dest, base: 4 + d * 0.05, total, left: total, startDist: d,
       tips: 0, equity: 0, fareMul: w.type.fareMul, filmed: false, firedDone: false, firedT: 0,
       rerouted: false, incidents: 0, slowT: 0, idleT: 7, timeLowSaid: false, want,
     };
     this.showWantCard(this.ride);
-    // The fare's whole time limit goes on the shift clock: deliver fast and you keep the change.
-    this.time += total;
-    this.popup(`+${Math.round(total)}s`, 'big good');
+    // Part of the fare's time limit goes on the shift clock (less as the surge climbs): deliver fast and keep the change.
+    this.time += total * give;
+    this.popup(`+${Math.round(total * give)}s`, 'big good');
     this.setDest(w.dest);
     sfx.pickup();
     this.popup(w.type.label.replace('★ ', ''), 'big');
@@ -793,7 +804,7 @@ export class Game {
   private dropoff(r: Ride) {
     const ratio = r.left / r.total;
     const [grade, mul] = ratio > 0.45 ? ['SPEEDY!', 1.3] as const : ratio > 0.15 ? ['NICE', 1] as const : ['SLOW...', 0.8] as const;
-    const fare = Math.round(r.base * r.fareMul * mul);
+    const fare = Math.round(r.base * r.fareMul * mul * SURGE[this.surge][3]);
     this.cash += fare;
     this.popup(`${grade}  +${Math.ceil(r.left)}s SAVED`, 'big');
     this.popup(`FARE ${money(fare)}`, 'good');
@@ -814,7 +825,12 @@ export class Game {
       line = tip ? `${tip * 10} SHARES VESTING` : 'NO SHARES';
     } else this.cash += tip;
     this.stamp(stars, `${r.want.def.title} ${r.want.shown} · ${line}`);
+    const surgeBefore = this.surge;
     this.fares++;
+    if (this.surge > surgeBefore) {
+      this.popup(`SURGE PRICING ${SURGE[this.surge][3]}×`, 'big bad');
+      sfx.armed();
+    }
     sfx.cash();
     this.quips.say(r.type.id, 'dropoff', { force: true });
     if (this.rand() < 0.3) this.quips.say('cab', 'dropoff', { delay: 3 });
@@ -943,6 +959,8 @@ export class Game {
 
   private updateHud() {
     $('#time').textContent = String(Math.ceil(this.time));
+    const surge = this.surge;
+    $('#surge').textContent = surge ? `SURGE ${SURGE[surge][3]}×` : '';
     $('#clock').classList.toggle('low', this.time < 10);
     $('#money').textContent = money(this.cash);
     $('#rating .score b').textContent = this.rating.toFixed(2);

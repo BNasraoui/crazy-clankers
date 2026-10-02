@@ -471,3 +471,7 @@ html:not([data-input="pad"]) .k-pad, html:not([data-input="kb"]) .k-kb, html:not
 .glyph, .keycap { -webkit-text-stroke: 0; text-shadow: none; }
 #overlay .press .prompt { font-size: 26px; }
 #overlay .pad .prompt { font-size: 14px; margin: 0 8px; }
+
+/* Surge level, tucked into the cash sticker */
+#surge { display: block; margin: 0 -6px 4px; padding: 1px 6px; font: 12px var(--num); color: #fff; background: var(--red); border-radius: 4px; text-align: center; }
+#surge:empty { display: none; }
