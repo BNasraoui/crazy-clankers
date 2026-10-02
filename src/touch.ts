@@ -14,7 +14,7 @@ const DEAD = 8; // px of thumb travel before the wheel turns
 const FULL = 58; // px for full lock
 const AIM = 26; // px of drag before the station wheel follows the thumb
 
-export type TapAction = 'confirm' | 'back' | 'alt' | 'pause' | 'restart';
+export type TapAction = 'confirm' | 'back' | 'alt' | 'pause' | 'restart' | 'board';
 
 let active = false;
 const root = document.documentElement;
@@ -60,6 +60,7 @@ export function mergeTouch(input: Input) {
     input.alt ||= edges.has('alt');
     input.pause ||= edges.has('pause');
     input.restart ||= edges.has('restart');
+    input.board ||= edges.has('board');
     if (pick >= 0) input.select = pick;
     if (radioDown || radioPressed) {
       input.radioHold = true;

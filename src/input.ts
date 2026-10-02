@@ -22,13 +22,14 @@ export interface Input {
   navY: number;
   back: boolean; // edge-triggered: B / Esc / Backspace
   alt: boolean; // edge-triggered: Y / H
+  board: boolean; // edge-triggered: RB / Tab, the leaderboard (menus only)
   lookX: number; // right stick (or Q/E) for inspecting, -1..1
   select: number; // a cab tapped in the picker, or -1
 }
 
 const held = new Set<string>();
 const fresh = new Set<string>();
-const GAME_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'];
+const GAME_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Tab'];
 
 addEventListener('keydown', (e) => {
   const target = e.target instanceof HTMLElement ? e.target : null;
@@ -104,6 +105,7 @@ export function readInput(dt: number): Input {
     navY: (tapped('ArrowDown', 'KeyS') ? 1 : 0) - (tapped('ArrowUp', 'KeyW') ? 1 : 0),
     back: tapped('Escape', 'Backspace'),
     alt: tapped('KeyH'),
+    board: tapped('Tab'),
     lookX: (down('KeyX') ? 1 : 0) - (down('KeyZ') ? 1 : 0),
     select: -1,
   };
@@ -134,6 +136,7 @@ export function readInput(dt: number): Input {
     input.hop ||= edge(0);
     input.back ||= edge(1);
     input.alt ||= edge(3);
+    input.board ||= edge(5);
     if (edge(12)) input.navY = -1;
     if (edge(13)) input.navY = 1;
     if (edge(14)) input.navX = -1;

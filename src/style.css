@@ -657,3 +657,75 @@ html.touch .radio-menu-button { min-height: 48px; padding: 8px 18px; font-size: 
   .lang-switch { top: 31%; right: calc(3% + env(safe-area-inset-right, 0px)); }
   .lang-switch > b { font-size: 15px; padding: 3px 9px; }
 }
+
+/* ----- XP, signing the board, the leaderboard ----- */
+.xpbar { display: inline-block; position: relative; width: 90px; height: 11px; margin: 0 8px; vertical-align: middle; overflow: hidden;
+  background: #fff; border: 2px solid var(--ink); border-radius: 6px; }
+.xpbar::after { content: ''; position: absolute; inset: 0; width: calc(var(--fill, 0) * 100%); background: var(--teal); }
+#overlay .stats .xp { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; }
+#overlay .stats .xp .gain { font: 16px var(--num); color: var(--ink); }
+#overlay .stats .xp .up { padding: 0 6px; font: 13px var(--num); color: #fff; background: var(--magenta); border: 2px solid var(--ink); border-radius: 4px; transform: rotate(-2deg); }
+
+#overlay .over-row { display: flex; align-items: stretch; justify-content: center; gap: 18px; margin: 0 0 22px; }
+#overlay .over-row .stats { margin: 0; }
+.sign { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 12px 18px; color: var(--ink);
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 8px; box-shadow: 5px 5px 0 var(--yellow); transform: rotate(1deg); }
+.sign > b { font: 20px var(--num); }
+.sign .slots { position: relative; display: flex; gap: 8px; pointer-events: auto; cursor: text; }
+.sign .slots i { display: grid; place-items: center; width: 46px; height: 58px; font: 40px var(--num); font-style: normal; color: var(--ink);
+  background: #fff; border: 3px solid var(--ink); border-radius: 6px; }
+.sign .slots i.cur { background: var(--yellow); box-shadow: 0 4px 0 var(--magenta); }
+/* The real text field sits invisibly over the letters: a keyboard types into it, a tap opens the phone's keyboard. */
+.sign .sign-input { position: absolute; inset: 0; width: 100%; opacity: 0; font-size: 16px; border: 0; padding: 0; caret-color: transparent; }
+.sign .sign-status { max-width: 260px; min-height: 1.3em; font: 600 14px/1.3 var(--body); text-align: center; }
+.sign .sign-status b { font-family: var(--num); color: var(--magenta); }
+#overlay .over-actions { display: flex; flex-direction: column; align-items: center; }
+#overlay .over-actions .pad .prompt { font-size: 15px; margin: 0 8px; }
+
+.board { position: fixed; left: 50%; top: 50%; z-index: 4; transform: translate(-50%, -50%) rotate(-0.5deg); width: min(900px, 94vw); max-height: 94%;
+  display: flex; flex-direction: column; gap: 8px; padding: 14px 20px; overflow: hidden; text-align: left; color: var(--ink);
+  background: var(--paper); border: 4px solid var(--ink); border-radius: 10px; box-shadow: 7px 7px 0 var(--yellow); }
+.board h3 { margin: 0; font: 30px var(--num); color: var(--red); -webkit-text-stroke: 0.06em var(--ink); paint-order: stroke fill; text-shadow: 3px 3px 0 var(--ink); }
+.board h4 { margin: 0 0 4px; font: 15px var(--num); }
+.board .tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.board .tabs b { padding: 3px 10px; font: 14px var(--num); background: #fff; border: 2px solid var(--ink); border-radius: 6px; pointer-events: auto; cursor: pointer; }
+.board .tabs b.on { background: var(--yellow); box-shadow: 2px 2px 0 var(--ink); }
+.board .cols { display: grid; grid-template-columns: 1.15fr 1fr; gap: 18px; min-height: 0; overflow-y: auto; touch-action: pan-y; pointer-events: auto; }
+.board table { width: 100%; border-collapse: collapse; font: 600 14px/1.25 var(--body); }
+.board td, .board th { padding: 3px 6px; white-space: nowrap; }
+.board th { font: 11px var(--num); text-align: left; opacity: 0.7; }
+.board tr:nth-child(even) td { background: #00000009; }
+.board tr.me td, .board .cabs tr.on td { background: #ffd23a8c; }
+.board .n, .board .who, .board .cash { font-family: var(--num); }
+.board .who { letter-spacing: 0.08em; }
+.board .cab { font-weight: 800; }
+.board .cabs i { font: 12px var(--num); font-style: normal; opacity: 0.7; }
+.board .note { margin: 18px 0; font: 600 16px var(--body); }
+.board .board-prompts { align-self: center; margin-top: 2px; }
+.board .board-prompts .prompt { font-size: 15px; margin: 0 8px; }
+.board .tap-row { margin: 0; }
+.board .tap-btn { min-height: 44px; font-size: 16px; }
+
+/* RB and other two-letter buttons are pills, not circles. */
+.glyph.bumper { width: auto; padding: 0 0.35em; font-size: 0.7em; height: 1.9em; }
+
+/* Picker: each cab's level, and the selected cab's progress to the next. */
+.cab-line .lv { padding: 0 5px; font: 11px var(--num); color: #fff; background: var(--ink); border-radius: 4px; }
+.cab-row .xpbar { position: absolute; left: 12px; right: 12px; bottom: 3px; width: auto; height: 6px; margin: 0; border-width: 1.5px; }
+
+@media (max-height: 500px) {
+  #overlay .over-row { gap: 12px; margin-bottom: 10px; }
+  #overlay .stats .xp .gain { font-size: 13px; }
+  .xpbar { width: 60px; height: 9px; }
+  .sign { gap: 4px; padding: 6px 12px; }
+  .sign > b { font-size: 15px; }
+  .sign .slots i { width: 34px; height: 42px; font-size: 28px; }
+  .sign .sign-status { font-size: 12px; max-width: 200px; }
+  .board { padding: 8px 14px; gap: 5px; max-height: calc(100% - 16px); }
+  .board h3 { font-size: 20px; }
+  .board .tabs b { font-size: 12px; padding: 2px 8px; }
+  .board table { font-size: 12px; line-height: 1.15; }
+  .board td, .board th { padding: 0 5px; }
+  .board .tap-row { position: absolute; right: 12px; top: 8px; }
+  .board .tap-btn { min-height: 38px; font-size: 14px; padding: 2px 14px; }
+}

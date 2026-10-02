@@ -5,7 +5,7 @@
 import { setTouchMode } from './touch';
 
 export type Device = 'pad' | 'kb' | 'touch';
-export type Act = 'confirm' | 'back' | 'alt' | 'choose' | 'restart' | 'menu' | 'radio';
+export type Act = 'confirm' | 'back' | 'alt' | 'choose' | 'restart' | 'menu' | 'radio' | 'board';
 
 const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 let device: Device = coarse ? 'touch' : 'kb';
@@ -31,6 +31,7 @@ const KEYS: Record<Act, [string, string, string]> = {
   restart: ['Y', 'y', 'R'],
   menu: ['B', 'b', '⌫'],
   radio: ['X', 'x', 'M'],
+  board: ['RB', 'pad bumper', 'Tab'],
 };
 
 export const glyph = (cls: string, label: string) => `<i class="glyph ${cls}"><b>${label}</b></i>`;

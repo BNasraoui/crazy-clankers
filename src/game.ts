@@ -27,6 +27,8 @@ import { CableCars } from './cablecar';
 import { BAY, Rank, snapshotCabs } from './rank';
 import { btn, burst, fitPicker, howToHTML, pickerHTML, tapButton, titleHTML } from './menus';
 import { key } from './prompts';
+import { boardHTML, cabName, fetchBoard, postScore, type Entry } from './board';
+import { levelFill, levelOf, recordShift, saveInitials, savedInitials } from './progress';
 import { buzz } from './touch';
 
 const STEP = 1 / 120;
@@ -152,6 +154,14 @@ export class Game {
   private rank!: Rank;
   private thumbs: Record<string, string> = {};
   private howTo = false;
+  private boardOpen = false; // the leaderboard panel, over the title or the results
+  private boardTab = 0; // 0: every cab, i: CABS[i - 1]
+  private signing = false; // the results screen is asking for initials
+  private posting = false;
+  private initials = '';
+  private signCursor = 0;
+  private entry: Entry | null = null; // the shift that just ended, ready for the board
+  private overAt = 0; // when the results appeared: a moment's grace so a held button doesn't skip them
 
   constructor(public renderer: THREE.WebGLRenderer, private people: Partial<Record<string, THREE.Object3D>> = {}) {
     const cab = makeCar(CABS[this.cabIndex].id);
@@ -234,7 +244,12 @@ export class Game {
     this.labelFont();
     // The EN / 中文 switch on the title screen: click it, or press L.
     const flip = () => setLang(lang() === 'zh' ? 'en' : 'zh');
-    addEventListener('click', (e) => { if ((e.target as Element).closest?.('[data-lang]')) flip(); });
+    addEventListener('click', (e) => {
+      const el = e.target as Element;
+      if (el.closest?.('[data-lang]')) flip();
+      const tab = el.closest?.<HTMLElement>('[data-board-tab]');
+      if (tab && this.boardOpen) { this.boardTab = Number(tab.dataset.boardTab); this.loadBoard(); }
+    });
     addEventListener('keydown', (e) => { if (e.code === 'KeyL' && this.state === 'title' && !this.howTo) flip(); });
   }
 
@@ -322,8 +337,7 @@ export class Game {
       else if (inp.restart) this.start();
       else if (inp.back) this.showTitle(); // Backspace or B: back to the title screen
     } else if (this.state === 'over') {
-      if (inp.confirm) this.start();
-      else if (inp.back) this.showPicker();
+      if (performance.now() - this.overAt > 900) this.overFrame(inp);
       this.idleAnimations(dt);
     } else {
       if (inp.pause) this.setState('paused');
@@ -373,12 +387,14 @@ export class Game {
     sunDir.value.copy(this.sun.position).sub(this.sun.target.position).normalize();
     this.arrow.visible = false;
     if (this.state === 'title') {
+      if (this.boardOpen) { this.boardFrame(inp); return; }
       if (this.howTo) {
         if (inp.confirm || inp.back || inp.alt) this.toggleHowTo();
         return;
       }
       if (inp.confirm) { unlockAudio(); this.showPicker(); }
       else if (inp.alt) this.toggleHowTo();
+      else if (inp.board) this.openBoard();
       else if (inp.back) this.look.togglePanel();
     } else {
       const move = inp.navY || inp.navX;
@@ -447,6 +463,7 @@ export class Game {
   private showTitle() {
     this.setState('title');
     this.howTo = false;
+    this.boardOpen = false;
     this.rank?.setCarsVisible(true);
     this.car.model.root.visible = false;
     $('#overlay').innerHTML = titleHTML(padName);
@@ -1085,23 +1102,170 @@ export class Game {
       equityLine = `<div>${t(exit ? 'over.acquired' : 'over.folded', { n: this.equity, money: money(exit ? this.equity : 0) })}</div>`;
     }
     const given = this.starsGiven;
-    const starLine = given.length ? `<div>${t('over.stars', { avg: (given.reduce((a, b) => a + b, 0) / given.length).toFixed(1), n: given.filter((n) => n === 5).length })}</div>` : '';
+    const avg = given.length ? given.reduce((a, b) => a + b, 0) / given.length : 0;
+    const starLine = given.length ? `<div>${t('over.stars', { avg: avg.toFixed(1), n: given.filter((n) => n === 5).length })}</div>` : '';
     const airLine = this.maxAir > 0.85 ? `<div>${t('over.air', { s: secs(this.maxAir) })}</div>` : '';
     const promiseLine = this.promised ? `<div>${t('over.promised', { money: money(this.promised) })}</div>` : '';
     const shift = `${Math.floor(this.shiftTime / 60)}:${String(Math.floor(this.shiftTime % 60)).padStart(2, '0')}`;
+    // XP for the cab you drove, and the shift ready to sign onto the board.
+    const cab = CABS[this.cabIndex].id;
+    const cents = Math.round(this.cash * 100);
+    const run = recordShift(cab, this.fares, given, cents);
+    const level = levelOf(run.after.xp);
+    const xpLine = `<div class="xp">${t('xp.line', { cab: cabName(cab), level })}<i class="xpbar" style="--fill: ${levelFill(run.after.xp)}"></i>
+      <b class="gain">${t('xp.gain', { n: run.gained })}</b>${level > levelOf(run.before.xp) ? `<b class="up">${t('xp.up')}</b>` : ''}${run.best ? `<b class="up">${t('xp.best')}</b>` : ''}</div>`;
+    this.entry = { initials: '', cab, score: cents, fares: this.fares, stars: Math.round(avg * 100) / 100, seconds: Math.max(1, Math.round(this.shiftTime)) };
+    this.signing = this.fares > 0;
+    this.initials = savedInitials() || 'AAA';
+    this.signCursor = 0;
+    this.boardOpen = false;
+    this.overAt = performance.now();
     const ov = $('#overlay');
     ov.className = 'dim';
     ov.innerHTML = `
       <h2>${t(reason === 'deactivated' ? 'over.deactivated' : 'over.timeUp')}</h2>
-      <div class="stats">
-        <div>${t(reason === 'deactivated' ? 'over.deactivatedSub' : 'over.timeUpSub')}</div>
-        <div>${t('over.summary', { shift, fares: this.fares, rating: this.rating.toFixed(2) })}</div>
-        ${starLine}${airLine}${equityLine}${promiseLine}
-        <div class="total">${money(this.cash)}</div>
+      <div class="over-row">
+        <div class="stats">
+          <div>${t(reason === 'deactivated' ? 'over.deactivatedSub' : 'over.timeUpSub')}</div>
+          <div>${t('over.summary', { shift, fares: this.fares, rating: this.rating.toFixed(2) })}</div>
+          ${starLine}${airLine}${equityLine}${promiseLine}${xpLine}
+          <div class="total">${money(this.cash)}</div>
+        </div>
+        ${this.signing ? `<div class="sign">
+          <b>${t('sign.title')}</b>
+          <label class="slots"><i></i><i></i><i></i><input class="sign-input" maxlength="3" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done" aria-label="${t('sign.type')}"></label>
+          <div class="sign-status"><span class="touch-only">${t('sign.tap')}</span></div>
+        </div>` : ''}
       </div>
-      <div class="press pad-only">${btn('confirm', t('over.again'))}</div><div class="pad pad-only">${btn('back', t('over.change'))}</div>
-      <div class="tap-row touch-only">${tapButton('confirm', t('over.again'), 'go')}${tapButton('back', t('over.change'))}</div>`;
+      <div class="over-actions"></div>`;
+    const input = ov.querySelector<HTMLInputElement>('.sign-input');
+    if (input) {
+      input.value = this.initials;
+      input.addEventListener('input', () => {
+        this.initials = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3);
+        input.value = this.initials;
+        this.signCursor = Math.min(this.initials.length, 2);
+        this.drawSlots();
+      });
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); this.submitSign(); } });
+      input.addEventListener('focus', () => input.select());
+      // On a keyboard, type straight away (on a phone the keyboard waits for a tap on the letters).
+      if (document.documentElement.dataset.input === 'kb') setTimeout(() => { if (this.signing) input.focus(); }, 900);
+    }
+    this.drawSlots();
+    this.drawOverActions();
     sfx.bad();
+  }
+
+  // The results screen: initials first (when there's a shift to sign), then drive again, change cab or the board.
+  private overFrame(inp: Input) {
+    if (this.boardOpen) return this.boardFrame(inp);
+    if (this.signing) {
+      if (this.posting) return;
+      if (inp.navY) this.cycleLetter(-inp.navY); // up is the next letter, like an arcade cabinet
+      if (inp.navX) { this.signCursor = THREE.MathUtils.clamp(this.signCursor + inp.navX, 0, 2); this.drawSlots(); }
+      if (inp.confirm) this.submitSign();
+      else if (inp.back) this.endSigning(true);
+      return;
+    }
+    if (inp.confirm) this.start();
+    else if (inp.back) this.showPicker();
+    else if (inp.board) this.openBoard();
+  }
+
+  private cycleLetter(dir: number) {
+    const ABC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const chars = this.initials.padEnd(this.signCursor + 1, 'A').split('');
+    chars[this.signCursor] = ABC[(ABC.indexOf(chars[this.signCursor]) + dir + ABC.length) % ABC.length];
+    this.initials = chars.join('').slice(0, 3);
+    const input = document.querySelector<HTMLInputElement>('.sign-input');
+    if (input) input.value = this.initials;
+    this.drawSlots();
+    sfx.tip();
+  }
+
+  private drawSlots() {
+    document.querySelectorAll('.sign .slots i').forEach((el, i) => {
+      el.textContent = this.initials[i] ?? '';
+      el.classList.toggle('cur', this.signing && i === this.signCursor);
+    });
+  }
+
+  private drawOverActions() {
+    const el = document.querySelector('#overlay .over-actions');
+    if (!el) return;
+    el.innerHTML = this.signing ? `
+      <div class="pad pad-only"><span class="k-pad">${btn('choose', t('sign.letters'))}</span><span class="k-kb prompt">${t('sign.type')}</span>${btn('confirm', t('sign.sign'))}${btn('back', t('sign.skip'))}</div>
+      <div class="tap-row touch-only">${tapButton('confirm', t('sign.sign'), 'go')}${tapButton('back', t('sign.skip'))}</div>` : `
+      <div class="press pad-only">${btn('confirm', t('over.again'))}</div><div class="pad pad-only">${btn('back', t('over.change'))}${btn('board', t('title.board'))}</div>
+      <div class="tap-row touch-only">${tapButton('confirm', t('over.again'), 'go')}${tapButton('back', t('over.change'))}${tapButton('board', t('title.board'))}</div>`;
+  }
+
+  private signStatus(html: string) {
+    const el = document.querySelector('.sign .sign-status');
+    if (el) el.innerHTML = html;
+  }
+
+  private async submitSign() {
+    if (!this.signing || this.posting || !this.entry) return;
+    if (this.initials.length < 3) { this.signStatus(t('sign.type')); return; }
+    this.posting = true;
+    this.signStatus(t('sign.sending'));
+    const res = await postScore({ ...this.entry, initials: this.initials });
+    this.posting = false;
+    if (this.state !== 'over' || !this.signing) return;
+    if ('rank' in res) {
+      saveInitials(this.initials);
+      this.signStatus(t('sign.rank', { rank: res.rank, cabRank: res.cabRank, cab: cabName(this.entry.cab) }));
+      sfx.tip();
+      this.endSigning(false);
+    } else {
+      this.signStatus(t(`sign.${res.error}`));
+      if (res.error === 'offline' || res.error === 'rejected') this.endSigning(false);
+    }
+  }
+
+  private endSigning(skipped: boolean) {
+    this.signing = false;
+    const input = document.querySelector<HTMLInputElement>('.sign-input');
+    input?.blur();
+    if (input) input.disabled = true;
+    if (skipped) document.querySelector('.sign')?.remove();
+    this.drawSlots();
+    this.drawOverActions();
+  }
+
+  // ---------- leaderboard ----------
+
+  private openBoard() {
+    this.boardOpen = true;
+    this.boardTab = 0;
+    this.loadBoard();
+  }
+
+  private closeBoard() {
+    this.boardOpen = false;
+    document.querySelector('#overlay .board')?.remove();
+  }
+
+  private boardFrame(inp: Input) {
+    const move = inp.navX || inp.navY;
+    if (move) {
+      this.boardTab = (this.boardTab + move + CABS.length + 1) % (CABS.length + 1);
+      this.loadBoard();
+      sfx.tip();
+    } else if (inp.back || inp.confirm || inp.board) this.closeBoard();
+  }
+
+  private loadBoard() {
+    const tab = this.boardTab;
+    const draw = (board: Parameters<typeof boardHTML>[1]) => {
+      if (!this.boardOpen || this.boardTab !== tab) return;
+      document.querySelector('#overlay .board')?.remove();
+      $('#overlay').insertAdjacentHTML('beforeend', boardHTML(tab, board, savedInitials()));
+    };
+    if (!document.querySelector('#overlay .board')) draw(undefined);
+    fetchBoard(tab ? CABS[tab - 1].id : '').then(draw);
   }
 
   // ---------- camera & HUD ----------

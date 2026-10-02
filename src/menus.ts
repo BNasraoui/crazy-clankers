@@ -1,6 +1,7 @@
 import { CABS } from './models';
 import { glyph, key, keycap, phrase, type Act } from './prompts';
 import { lang, t, type Key } from './i18n';
+import { levelFill, levelOf, progressOf } from './progress';
 
 // Title screen and cab picker overlays (the 3D taxi rank sits behind them).
 
@@ -19,7 +20,7 @@ const cabText = (id: string, field: 'name' | 'tagline' | 'perk' | 'price' | 'eta
 const btn = (act: Act, text: string) => `<span class="prompt">${key(act)}${text}</span>`;
 
 // A sticker button for touch screens; tapping it acts like the pad button it stands for.
-export const tapButton = (action: 'confirm' | 'back' | 'alt' | 'restart', text: string, kind = '') =>
+export const tapButton = (action: 'confirm' | 'back' | 'alt' | 'restart' | 'board', text: string, kind = '') =>
   `<button type="button" class="tap-btn ${kind}" data-tap="${action}">${text}</button>`;
 
 // The logo stays English; in Chinese a subtitle sits under it.
@@ -38,8 +39,8 @@ export function titleHTML(padName: string) {
       <div class="press-start" data-tap="confirm">${phrase(t('title.pressPad', { a: glyph('a', 'A') }), t('title.pressKb', { key: keycap('Enter') }), t('title.tap'))}</div>
       <button class="radio-menu-button" data-radio-open>${key('radio')} ${t('menu.radio')}</button>
       <div class="lang-switch" data-lang role="button" aria-label="Language / 语言"><b class="${lang() === 'en' ? 'on' : ''}">EN</b><b class="${lang() === 'zh' ? 'on' : ''}">中文</b><span class="k-kb">${keycap('L')}</span></div>
-      <div class="corner-prompts pad-only">${btn('alt', t('title.howTo'))}${btn('back', t('title.options'))}</div>
-      <div class="corner-prompts tap-row touch-only">${tapButton('alt', t('title.howTo'))}${tapButton('back', t('title.options'))}</div>
+      <div class="corner-prompts pad-only">${btn('board', t('title.board'))}${btn('alt', t('title.howTo'))}${btn('back', t('title.options'))}</div>
+      <div class="corner-prompts tap-row touch-only">${tapButton('board', t('title.board'))}${tapButton('alt', t('title.howTo'))}${tapButton('back', t('title.options'))}</div>
       <div class="pad-note">${padName ? `🎮 ${padName}` : t('title.padNote')}</div>
     </div>`;
 }
@@ -68,10 +69,10 @@ export function pickerHTML(selected: number, thumbs: Record<string, string>) {
     const sel = i === selected;
     return `
       <div class="cab-row${sel ? ' selected' : ''}" data-cab="${i}">
-        ${sel ? `<span class="sel-tab">${t('picker.selected')}</span>` : ''}
+        ${sel ? `<span class="sel-tab">${t('picker.selected')}</span><i class="xpbar" style="--fill: ${levelFill(progressOf(c.id).xp)}"></i>` : ''}
         <img src="${thumbs[c.id] ?? ''}" alt="">
         <div class="cab-info">
-          <div class="cab-line"><b>${cabText(c.id, 'name')}</b><span class="price">${cabText(c.id, 'price')}</span><span class="eta">${cabText(c.id, 'eta')}</span></div>
+          <div class="cab-line"><b>${cabText(c.id, 'name')}</b><span class="lv">${t('picker.level', { n: levelOf(progressOf(c.id).xp) })}</span><span class="price">${cabText(c.id, 'price')}</span><span class="eta">${cabText(c.id, 'eta')}</span></div>
           ${sel ? `<div class="cab-tagline">${cabText(c.id, 'tagline')}</div>` : ''}
           ${sel && card.perk ? `<div class="cab-perk">★ ${cabText(c.id, 'perk')}</div>` : ''}
         </div>
