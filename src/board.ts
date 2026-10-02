@@ -4,6 +4,7 @@
 import { CABS } from './models';
 import { t, type Key } from './i18n';
 import { btn, tapButton } from './menus';
+import { authHeader } from './account';
 
 export interface Row { initials: string; cab: string; score: number; fares: number; stars: number; seconds: number }
 export interface CabStat { cab: string; shifts: number; best: number; average: number; stars: number; holder: string }
@@ -30,7 +31,7 @@ export async function fetchBoard(cab = ''): Promise<Board | null> {
 
 export async function postScore(entry: Entry): Promise<Posted> {
   try {
-    const res = await fetch('/api/scores', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(entry) });
+    const res = await fetch('/api/scores', { method: 'POST', headers: { 'content-type': 'application/json', ...authHeader() }, body: JSON.stringify(entry) });
     if (res.status === 201) { cache.clear(); return await res.json(); }
     if (res.status === 429) return { error: 'busy' };
     if (!isJson(res) || res.status >= 500) return { error: 'offline' };

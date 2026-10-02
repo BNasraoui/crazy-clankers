@@ -53,3 +53,9 @@ export function savedInitials() {
 export function saveInitials(initials: string) {
   try { localStorage.setItem(INITIALS, initials); } catch { /* storage unavailable */ }
 }
+
+// Everything, for the account (account.ts): sent up when logging in, replaced by the server's copy after.
+export const allProgress = () => load();
+export function replaceProgress(progress: Record<string, CabProgress>) {
+  try { localStorage.setItem(STORE, JSON.stringify(progress)); } catch { /* storage unavailable */ }
+}

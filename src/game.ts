@@ -29,6 +29,7 @@ import { btn, burst, fitPicker, howToHTML, pickerHTML, tapButton, titleHTML } fr
 import { key } from './prompts';
 import { boardHTML, cabName, fetchBoard, postScore, type Entry } from './board';
 import { levelFill, levelOf, recordShift, saveInitials, savedInitials } from './progress';
+import { loggedIn, logIn, logOut, pushShift } from './account';
 import { buzz } from './touch';
 
 const STEP = 1 / 120;
@@ -1111,6 +1112,7 @@ export class Game {
     const cab = CABS[this.cabIndex].id;
     const cents = Math.round(this.cash * 100);
     const run = recordShift(cab, this.fares, given, cents);
+    pushShift({ cab, xp: run.gained, cents }); // logged in: the account gets it too
     const level = levelOf(run.after.xp);
     const xpLine = `<div class="xp">${t('xp.line', { cab: cabName(cab), level })}<i class="xpbar" style="--fill: ${levelFill(run.after.xp)}"></i>
       <b class="gain">${t('xp.gain', { n: run.gained })}</b>${level > levelOf(run.before.xp) ? `<b class="up">${t('xp.up')}</b>` : ''}${run.best ? `<b class="up">${t('xp.best')}</b>` : ''}</div>`;
@@ -1131,11 +1133,12 @@ export class Game {
           ${starLine}${airLine}${equityLine}${promiseLine}${xpLine}
           <div class="total">${money(this.cash)}</div>
         </div>
-        ${this.signing ? `<div class="sign">
-          <b>${t('sign.title')}</b>
+        <div class="sign">
+          ${this.signing ? `<b>${t('sign.title')}</b>
           <label class="slots"><i></i><i></i><i></i><input class="sign-input" maxlength="3" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done" aria-label="${t('sign.type')}"></label>
-          <div class="sign-status"><span class="touch-only">${t('sign.tap')}</span></div>
-        </div>` : ''}
+          <div class="sign-status"><span class="touch-only">${t('sign.tap')}</span></div>` : ''}
+          <div class="account"></div>
+        </div>
       </div>
       <div class="over-actions"></div>`;
     const input = ov.querySelector<HTMLInputElement>('.sign-input');
@@ -1154,6 +1157,7 @@ export class Game {
     }
     this.drawSlots();
     this.drawOverActions();
+    this.drawAccount();
     sfx.bad();
   }
 
@@ -1171,6 +1175,34 @@ export class Game {
     if (inp.confirm) this.start();
     else if (inp.back) this.showPicker();
     else if (inp.board) this.openBoard();
+    else if (inp.alt && !loggedIn()) this.logIn();
+  }
+
+  // Under the initials (once they're done): log in to keep your XP, or that it's kept.
+  private drawAccount() {
+    const el = document.querySelector<HTMLElement>('#overlay .sign .account');
+    if (!el) return;
+    el.hidden = this.signing;
+    el.innerHTML = loggedIn()
+      ? `<span class="saved">${t('account.saved')}</span><a data-logout>${t('account.out')}</a>`
+      : `<button type="button" class="login" data-login>${key('alt')}<span>${t('account.save')}</span></button>`;
+    el.querySelector('[data-login]')?.addEventListener('click', () => this.logIn());
+    el.querySelector('[data-logout]')?.addEventListener('click', () => { logOut(); this.drawAccount(); });
+  }
+
+  private logIn() {
+    const el = document.querySelector('#overlay .sign .account');
+    if (el) el.innerHTML = `<span class="saved">${t('account.going')}</span>`;
+    logIn().catch(() => this.drawAccount());
+  }
+
+  // Back from Google: say how it went, over the title screen.
+  loginNotice(result: 'in' | 'failed') {
+    const el = document.createElement('div');
+    el.className = `notice ${result}`;
+    el.textContent = t(result === 'in' ? 'account.welcome' : 'account.failed');
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 5000);
   }
 
   private cycleLetter(dir: number) {
@@ -1230,9 +1262,10 @@ export class Game {
     const input = document.querySelector<HTMLInputElement>('.sign-input');
     input?.blur();
     if (input) input.disabled = true;
-    if (skipped) document.querySelector('.sign')?.remove();
+    if (skipped) document.querySelectorAll('.sign > :not(.account)').forEach((el) => el.remove());
     this.drawSlots();
     this.drawOverActions();
+    this.drawAccount();
   }
 
   // ---------- leaderboard ----------

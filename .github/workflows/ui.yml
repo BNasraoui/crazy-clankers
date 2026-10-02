@@ -19,6 +19,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The leaderboard and account API (worker/index.ts) in Node, against the real migrations.
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - run: npm ci
+      - run: npm run test:api
+
   ui:
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.63.0-noble

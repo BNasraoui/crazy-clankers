@@ -653,8 +653,8 @@ html.touch .radio-menu-button { min-height: 48px; padding: 8px 18px; font-size: 
   -webkit-text-stroke: 0.14em var(--ink); paint-order: stroke fill; text-shadow: 4px 4px 0 var(--ink); }
 #overlay .menu .logo-block.small .logo-sub { font-size: clamp(16px, 2vw, 26px); }
 @media (max-height: 500px) {
-  /* the bottom-left corner is the radio's; the gap under the Radio button is free */
-  .lang-switch { top: 31%; right: calc(3% + env(safe-area-inset-right, 0px)); }
+  /* the bottom-left corner is the radio's and the right column has the menu buttons: beside the Radio button */
+  .lang-switch { top: calc(5% + env(safe-area-inset-top, 0px)); right: calc(3% + 120px + env(safe-area-inset-right, 0px)); }
   .lang-switch > b { font-size: 15px; padding: 3px 9px; }
 }
 
@@ -728,4 +728,19 @@ html.touch .radio-menu-button { min-height: 48px; padding: 8px 18px; font-size: 
   .board td, .board th { padding: 0 5px; }
   .board .tap-row { position: absolute; right: 12px; top: 8px; }
   .board .tap-btn { min-height: 38px; font-size: 14px; padding: 2px 14px; }
+}
+
+/* Logging in to keep your XP (results screen), and the note when you're back from Google. */
+.sign .account { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 280px; pointer-events: auto; }
+.sign .account[hidden] { display: none; }
+.sign .account .login { display: inline-flex; align-items: center; gap: 2px; padding: 6px 12px; font: 15px/1.2 var(--num); color: var(--ink); text-align: left;
+  background: #fff; border: 3px solid var(--ink); border-radius: 8px; box-shadow: 3px 3px 0 var(--teal); cursor: pointer; touch-action: manipulation; }
+html.touch .sign .account .login .key { display: none; }
+.sign .account .saved { font: 600 14px var(--body); }
+.sign .account [data-logout] { font: 600 12px var(--body); text-decoration: underline; cursor: pointer; opacity: 0.7; }
+.notice { position: fixed; top: 18px; left: 50%; z-index: 20; transform: translateX(-50%) rotate(-1deg); padding: 8px 18px; font: 18px var(--num); color: var(--ink);
+  background: var(--lime); border: 3px solid var(--ink); border-radius: 8px; box-shadow: 4px 4px 0 var(--ink); pointer-events: none; }
+.notice.failed { background: var(--paper); }
+@media (max-height: 500px) {
+  .sign .account .login { font-size: 12px; padding: 4px 8px; }
 }

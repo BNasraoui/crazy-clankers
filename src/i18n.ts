@@ -231,6 +231,12 @@ const EN = {
   'xp.up': 'LEVEL UP!',
   'xp.best': 'PERSONAL BEST',
   'picker.level': 'LV {n}',
+  'account.save': 'SAVE YOUR XP: LOG IN WITH GOOGLE',
+  'account.saved': 'XP saved to your account ✓',
+  'account.out': 'Log out',
+  'account.going': 'Off to Google…',
+  'account.welcome': 'LOGGED IN · YOUR XP IS SAVED',
+  'account.failed': "Couldn't log in. Try again after a shift.",
 
   // settings panel
   'look.title': 'LOOK',
@@ -505,6 +511,12 @@ const ZH: Record<keyof typeof EN, string> = {
   'xp.up': '升级！',
   'xp.best': '个人最佳',
   'picker.level': 'LV {n}',
+  'account.save': '保存经验：用 Google 登录',
+  'account.saved': '经验已存进你的账号 ✓',
+  'account.out': '退出登录',
+  'account.going': '正在前往 Google…',
+  'account.welcome': '已登录 · 经验已保存',
+  'account.failed': '登录失败，下一班结束后再试。',
 
   'look.title': '画面',
   'look.close': '关闭设置',
