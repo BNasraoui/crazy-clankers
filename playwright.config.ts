@@ -3,6 +3,8 @@ import { defineConfig } from '@playwright/test';
 // UI tests: every screen at desktop, laptop, Steam Deck and phone sizes (tests/ui/).
 // Snapshots are made in the same container CI uses (mcr.microsoft.com/playwright, see
 // .github/workflows/ui.yml), because fonts render slightly differently on every machine.
+// PW_PORT moves the test server when 4173 is taken by something else.
+const port = Number(process.env.PW_PORT ?? 4173);
 const phone = { isMobile: true, hasTouch: true, deviceScaleFactor: 2 };
 
 export default defineConfig({
@@ -16,13 +18,13 @@ export default defineConfig({
   updateSnapshots: 'missing', // a new screen's first run approves its snapshot (CI commits it)
   snapshotPathTemplate: '{testDir}/snapshots/{projectName}/{arg}{ext}',
   use: {
-    baseURL: 'http://localhost:4173',
+    baseURL: `http://localhost:${port}`,
     launchOptions: { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] },
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'npx vite build && npx vite preview --port 4173 --strictPort',
-    url: 'http://localhost:4173',
+    command: `npx vite build && npx vite preview --port ${port} --strictPort`,
+    url: `http://localhost:${port}`,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
   },

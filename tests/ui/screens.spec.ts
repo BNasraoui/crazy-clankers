@@ -104,3 +104,30 @@ test('results', async ({ page }) => {
   expect(await offscreen(page, ['#overlay h2', '#overlay .stats', '#overlay .press', '#overlay .tap-btn'])).toEqual([]);
   await shot(page, 'results');
 });
+
+// The same screens in Chinese (the language follows the browser's until the player picks one).
+test.describe('中文', () => {
+  test.use({ locale: 'zh-CN' });
+
+  test('title', async ({ page }) => {
+    await boot(page);
+    expect(await page.evaluate(() => document.documentElement.lang)).toMatch(/^zh/);
+    expect(await offscreen(page, ['.press-start', '.logo-block', '.corner-prompts', '.radio-menu-button', '.lang-switch'])).toEqual([]);
+    await shot(page, 'title-zh');
+  });
+
+  test('picker', async ({ page }) => {
+    await boot(page);
+    await page.evaluate(() => { const g = (window as unknown as G).game; g.chooseCab(0); g.showPicker(); });
+    expect(await offscreen(page, ['.picker-panel h2', '.cab-row', '.confirm', '.prompt-strip', '.corner-back'])).toEqual([]);
+    await shot(page, 'picker-zh');
+  });
+
+  test('driving with a passenger', async ({ page }) => {
+    await boot(page);
+    await page.evaluate(() => { const g = (window as unknown as G).game; g.start(); g.pickup(g.waiting[0]); g.updateHud(); });
+    expect(await offscreen(page, ['#clock', '#want', '#fare', '#cash', '#rating', '#touch .tb'])).toEqual([]);
+    for (const hud of ['#rating', '#cash', '#want', '#clock', '#fare']) expect(await overlaps(page, hud, '#touch .tb')).toEqual([]);
+    await shot(page, 'driving-zh');
+  });
+});
