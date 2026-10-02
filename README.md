@@ -8,7 +8,9 @@ A Crazy Taxi-style arcade game where you play the robotaxi. Three.js + TypeScrip
 
 Controls: RT/W gas, LT/S brake and reverse, stick or A/D steer, B/RB/Space drift, Start/Esc pause.
 
-- `src/quips.ts`: every passenger line. Edit freely.
+- `src/lines/`: every passenger's (and the cab's) lines, English and Chinese, one file per speaker. Edit freely; `src/quips.ts` decides when they're said.
+- `src/names.ts`: the parody names each passenger type draws from.
+- `src/i18n.ts`: every other on-screen string in English and Simplified Chinese, looked up with `t('key')`.
 - `src/passengers.ts`: passenger types, odds and fare and tip rules.
 - `src/world.ts`: the map (hills, blocks, landmarks).
 - `src/car.ts`: driving physics constants.

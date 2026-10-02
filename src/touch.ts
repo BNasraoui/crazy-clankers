@@ -1,5 +1,6 @@
 import type { Input } from './input';
 import { unlockAudio } from './audio';
+import { translate } from './i18n';
 
 // Touch controls for phones held sideways. A floating thumb-stick on the left
 // for steering, sticker buttons on the right, a pause button up top, taps on
@@ -82,11 +83,12 @@ layer.id = 'touch';
 layer.innerHTML = `
   <div class="steer-zone"></div>
   <div class="stick" hidden><i></i></div>
-  <button type="button" class="tb gas" data-hold="gas">GAS</button>
-  <button type="button" class="tb brake" data-hold="brake">BRAKE<small>REVERSE</small></button>
-  <button type="button" class="tb drift" data-hold="drift">DRIFT</button>
-  <button type="button" class="tb hop" data-edge="hop">HOP</button>
-  <button type="button" class="tb pause" data-edge="pause" aria-label="Pause">❚❚</button>`;
+  <button type="button" class="tb gas" data-hold="gas"><span data-i18n="touch.gas"></span></button>
+  <button type="button" class="tb brake" data-hold="brake"><span data-i18n="touch.brake"></span><small data-i18n="touch.reverse"></small></button>
+  <button type="button" class="tb drift" data-hold="drift"><span data-i18n="touch.drift"></span></button>
+  <button type="button" class="tb hop" data-edge="hop"><span data-i18n="touch.hop"></span></button>
+  <button type="button" class="tb pause" data-edge="pause" data-i18n-aria="touch.pause">❚❚</button>`;
+translate(layer);
 document.body.appendChild(layer);
 const zone = layer.querySelector<HTMLElement>('.steer-zone')!;
 const stickEl = layer.querySelector<HTMLElement>('.stick')!;

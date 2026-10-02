@@ -1,9 +1,12 @@
 // Manga moments: a split-second freeze with a comic-panel burst and a big sound
 // word on the hardest hits, and slow motion at the top of a big jump.
 
+import { lang } from './i18n';
+
+// [katakana, English reading, Chinese reading]
 const WORDS = {
-  crash: [['ドカーン', 'KRAKOOM!'], ['ガシャーン', 'GASHAAN!'], ['バキッ', 'BAKKK!'], ['ドゴォ', 'DOGOOO!']],
-  land: [['ズドン', 'ZUDOOM!'], ['ドスン', 'THOOM!'], ['ドーン', 'DOOOON!']],
+  crash: [['ドカーン', 'KRAKOOM!', '轰隆！'], ['ガシャーン', 'GASHAAN!', '哐当！'], ['バキッ', 'BAKKK!', '咔嚓！'], ['ドゴォ', 'DOGOOO!', '咣！！']],
+  land: [['ズドン', 'ZUDOOM!', '咚！'], ['ドスン', 'THOOM!', '嘭！'], ['ドーン', 'DOOOON!', '轰——！']],
 } as const;
 export type Moment = keyof typeof WORDS;
 
@@ -53,10 +56,10 @@ export class Moments {
       this.slow = 0;
     }
     const words = WORDS[kind];
-    const [jp, en] = words[Math.floor(Math.random() * words.length)];
+    const [jp, en, zh] = words[Math.floor(Math.random() * words.length)];
     const tilt = (Math.random() * 14 - 7).toFixed(1);
     this.el.className = '';
-    this.el.innerHTML = `<div class="focus ${kind}"></div><div class="sfx" style="--tilt:${tilt}deg"><span class="jp">${jp}</span><span class="en">${en}</span></div>`;
+    this.el.innerHTML = `<div class="focus ${kind}"></div><div class="sfx" style="--tilt:${tilt}deg"><span class="jp">${jp}</span><span class="en">${lang() === 'zh' ? zh : en}</span></div>`;
     void this.el.offsetWidth; // restart the animation
     this.el.className = 'on';
   }

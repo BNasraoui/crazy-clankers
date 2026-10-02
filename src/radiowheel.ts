@@ -1,4 +1,5 @@
 import type { Input } from './input';
+import { t } from './i18n';
 
 // The station wheel, GTA style: hold LB (or T) and the stations fan out round the
 // screen while the game slows; aim with the right stick (or left/right) and let go
@@ -71,7 +72,7 @@ export class RadioWheel {
       const x = 50 + r * Math.sin(a), y = 50 - r * Math.cos(a);
       const cls = `${i === this.pick ? 'on' : ''} ${it.disabled ? 'off' : ''}`;
       return `<div class="slot ${cls}" style="left:${x.toFixed(1)}%;top:${y.toFixed(1)}%">${escape(it.name)}</div>`;
-    }).join('')}<div class="hub"><small>📻 CLANKERS FM</small><b>${escape(this.items[this.pick]?.name ?? '')}</b><small>release to tune</small></div></div>`;
+    }).join('')}<div class="hub"><small>📻 CLANKERS FM</small><b>${escape(this.items[this.pick]?.name ?? '')}</b><small>${t('radio.release')}</small></div></div>`;
     this.el.hidden = false;
   }
 }

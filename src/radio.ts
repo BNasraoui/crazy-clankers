@@ -1,6 +1,7 @@
 import { RadioWheel } from './radiowheel';
 import type { Input } from './input';
 import { voiceActive } from './audio';
+import { onLang, t, translate, type Key } from './i18n';
 
 export interface Station { name: string; source: string; genre?: string; credit?: string }
 // Internet radio: licensed stations streaming over HTTPS. They play through a plain
@@ -86,7 +87,7 @@ function loadYouTube(): Promise<YouTube> {
   if (window.YT?.Player) return Promise.resolve(window.YT);
   if (!api) api = new Promise((resolve, reject) => {
     const previous = window.onYouTubeIframeAPIReady;
-    const timer = window.setTimeout(() => reject(new Error('YouTube did not respond. Reload to retry.')), 15000);
+    const timer = window.setTimeout(() => reject(new Error(t('radio.ytTimeout'))), 15000);
     window.onYouTubeIframeAPIReady = () => {
       clearTimeout(timer);
       previous?.();
@@ -94,15 +95,17 @@ function loadYouTube(): Promise<YouTube> {
     };
     const script = document.createElement('script');
     script.src = 'https://www.youtube.com/iframe_api';
-    script.onerror = () => { clearTimeout(timer); reject(new Error('YouTube is unavailable. Try local files or reload.')); };
+    script.onerror = () => { clearTimeout(timer); reject(new Error(t('radio.ytDown'))); };
     document.head.append(script);
   });
   return api;
 }
 
-function button(text: string, action: () => void) {
+// A button whose label follows the language (fixed labels carry data-i18n; ones with vars are redrawn).
+function button(key: Key, action: () => void, vars?: Record<string, string>) {
   const el = document.createElement('button');
-  el.type = 'button'; el.textContent = text; el.onclick = action;
+  el.type = 'button'; el.textContent = t(key, vars); el.onclick = action;
+  if (!vars) el.dataset.i18n = key;
   return el;
 }
 function shuffle<T>(items: T[]): T[] {
@@ -143,8 +146,8 @@ export class Radio {
   private rows = document.createElement('div');
   private toast = document.createElement('div');
   private note = document.createElement('p');
-  private toggle = button('Play', () => this.playPause());
-  private collapsed = button('📻 Radio off · turn on', () => this.tune(this.selected));
+  private toggle = button('radio.play', () => this.playPause());
+  private collapsed = button('radio.collapsed', () => this.tune(this.selected));
   private returnFocus: HTMLElement | null = null;
   private wheel = new RadioWheel();
   private lastFrame = performance.now();
@@ -167,44 +170,52 @@ export class Radio {
       if (typeof vol === 'number' && Number.isFinite(vol)) this.volume = Math.max(0, Math.min(1, vol));
     } catch { /* Storage is optional, including in private browsing. */ }
     this.dashboard.id = 'radio-dashboard';
-    this.dashboard.setAttribute('aria-label', 'Dashboard radio');
+    this.dashboard.dataset.i18nAria = 'radio.dashAria';
     this.dashboard.hidden = true;
     this.playerSlot.className = 'radio-player';
     this.trackLabel.className = 'radio-track';
     const controls = document.createElement('div'); controls.className = 'radio-controls';
-    controls.append(button('◀ Station', () => this.nextStation(-1)), this.toggle, button('Skip ▶', () => this.nextTrack()), button('Station ▶', () => this.nextStation(1)), button('Collapse', () => this.setMini(true)), button('Off', () => this.off()));
+    delete this.toggle.dataset.i18n; // Play / Pause follows the state (see showToggle)
+    controls.append(button('radio.prevShort', () => this.nextStation(-1)), this.toggle, button('radio.skipShort', () => this.nextTrack()), button('radio.nextShort', () => this.nextStation(1)), button('radio.collapse', () => this.setMini(true)), button('radio.offShort', () => this.off()));
     controls.classList.add('radio-full');
     const volume = this.volumeControl(); volume.classList.add('radio-full');
     // Compact by default: just the station sticker (and YouTube's tile, which must stay visible). Click it for the controls.
     this.stationLabel.onclick = () => this.setMini(!this.dashboard.classList.contains('mini'));
-    this.stationLabel.title = 'Show or hide the radio controls';
+    this.stationLabel.title = t('radio.labelTitle');
     this.dashboard.classList.add('mini');
     this.dashboard.append(this.stationLabel, this.trackLabel, this.playerSlot, controls, volume);
     this.collapsed.id = 'radio-collapsed';
     this.toast.id = 'radio-toast'; this.toast.setAttribute('role', 'status'); this.toast.hidden = true;
     this.screen.id = 'radio-screen'; this.screen.hidden = true;
-    this.screen.setAttribute('aria-label', 'Radio stations');
-    this.screen.innerHTML = `<header><span>CLANKERS FM / YOUR AIRWAVES</span><h2>RADIO</h2></header><p>T / LB: next station · N / X: skip (driving)<br>D-pad: focus · A: select · B / Esc: back</p>`;
+    this.screen.dataset.i18nAria = 'radio.screenAria';
+    this.screen.innerHTML = `<header><span data-i18n="radio.kicker"></span><h2 data-i18n="radio.title"></h2></header><p><span data-i18n="radio.help1"></span><br><span data-i18n="radio.help2"></span></p>`;
     this.note.setAttribute('role', 'status');
     const form = document.createElement('form');
-    form.innerHTML = `<label>YouTube or radio stream URL<input name="source" required placeholder="A YouTube playlist, or an https stream"></label><label>Station name (optional)<input name="name" maxlength="80" placeholder="Late-night fares"></label><button type="submit">Add station</button>`;
+    form.innerHTML = `<label><span data-i18n="radio.urlLabel"></span><input name="source" required data-i18n-ph="radio.urlPh"></label><label><span data-i18n="radio.nameLabel"></span><input name="name" maxlength="80" data-i18n-ph="radio.namePh"></label><button type="submit" data-i18n="radio.add"></button>`;
     form.onsubmit = e => {
       e.preventDefault();
       const data = new FormData(form), source = String(data.get('source')).trim();
       const parsed = youtubeSource(source), stream = streamSource(source);
-      if (!parsed && !stream) { this.message('Paste a YouTube playlist or video, or an https radio stream URL.'); return; }
+      if (!parsed && !stream) { this.message(t('radio.badUrl')); return; }
       if (this.selected === this.stations.length) ++this.selected;
       this.stations.push({ source, name: String(data.get('name')).trim() || (parsed ? `YouTube ${parsed.kind} ${parsed.id}` : new URL(stream!).hostname) });
       this.save(); this.renderStations(); form.reset();
     };
     const local = document.createElement('div'); local.className = 'radio-local';
-    local.append(button('Play my own files', () => this.pickFiles(false)), button('Choose folder', () => this.pickFiles(true)));
-    const privacy = document.createElement('p'); privacy.textContent = 'Radio stations stream straight from their broadcasters; YouTube plays through its own embedded player. Local files stay on this device; choose them again after reloading.';
+    local.append(button('radio.myFiles', () => this.pickFiles(false)), button('radio.folder', () => this.pickFiles(true)));
+    const privacy = document.createElement('p'); privacy.dataset.i18n = 'radio.privacy';
     const transport = document.createElement('div'); transport.className = 'radio-controls';
-    transport.append(button('Previous station', () => this.nextStation(-1)), button('Play / pause', () => this.playPause()), button('Skip track', () => this.nextTrack()), button('Next station', () => this.nextStation(1)), button('Radio off', () => this.off()), this.volumeControl());
-    this.screen.append(transport, this.rows, form, local, privacy, this.note, button('Back to game', () => this.close()));
+    transport.append(button('radio.prev', () => this.nextStation(-1)), button('radio.playPause', () => this.playPause()), button('radio.skip', () => this.nextTrack()), button('radio.next', () => this.nextStation(1)), button('radio.off', () => this.off()), this.volumeControl());
+    this.screen.append(transport, this.rows, form, local, privacy, this.note, button('radio.back', () => this.close()));
     document.body.append(this.dashboard, this.collapsed, this.screen, this.toast);
+    translate(this.screen); translate(this.dashboard);
     this.renderStations();
+    onLang(() => {
+      this.renderStations();
+      this.stationLabel.title = t('radio.labelTitle');
+      this.showToggle();
+      if (this.enabled && this.selected === this.stations.length) this.stationLabel.textContent = t('radio.myFiles');
+    });
     // Start straight away where the browser allows it (the Deck's Chrome does); otherwise on the first input.
     setTimeout(() => this.autostart(), 0);
     this.audio.onended = () => (this.isStream() ? this.tune(this.selected, true) : this.nextTrack());
@@ -261,8 +272,8 @@ export class Radio {
   private wheelItems() {
     return [
       ...this.stations.map((s) => ({ name: s.name })),
-      { name: 'My files', disabled: !this.files.length },
-      { name: 'Off' },
+      { name: t('radio.wheelFiles'), disabled: !this.files.length },
+      { name: t('radio.offShort') },
     ];
   }
 
@@ -330,20 +341,20 @@ export class Radio {
     const station = this.stations[index];
     this.enabled = this.playing = true;
     this.dashboard.hidden = false; this.collapsed.hidden = true;
-    this.toggle.textContent = 'Pause';
-    this.stationLabel.textContent = station?.name || 'Play my own files';
-    this.trackLabel.textContent = 'Tuning…';
+    this.showToggle();
+    this.stationLabel.textContent = station?.name || t('radio.myFiles');
+    this.trackLabel.textContent = t('radio.tuning');
     this.playerSlot.hidden = !station || !this.isYouTube();
     this.message(`📻 ${this.stationLabel.textContent}`);
     if (station && this.isStream()) {
-      this.trackLabel.textContent = [station.genre, station.credit && `via ${station.credit}`].filter(Boolean).join(' · ') || 'Internet radio';
+      this.trackLabel.textContent = [station.genre, station.credit && t('radio.via', { name: station.credit })].filter(Boolean).join(' · ') || t('radio.internet');
       this.audio.src = streamSource(station.source)!;
       this.applyVolume(); this.startLocalAudio();
       return;
     }
     if (!station) {
       if (this.files.length) this.playFile();
-      else { this.off(); this.message('Choose files or a folder in the Radio screen (M / X in a menu).'); }
+      else { this.off(); this.message(t('radio.chooseFiles')); }
       return;
     }
     const token = this.generation;
@@ -377,16 +388,16 @@ export class Radio {
               this.autostarting = false;
               this.failedAttempts = 0;
               clearTimeout(this.watchdog);
-              this.playing = true; this.toggle.textContent = 'Pause';
+              this.playing = true; this.showToggle();
               this.trackLabel.textContent = this.player!.getVideoData().title || 'Playing on YouTube';
             }
-            if (data === 2) { clearTimeout(this.watchdog); this.playing = false; this.toggle.textContent = 'Play'; }
+            if (data === 2) { clearTimeout(this.watchdog); this.playing = false; this.showToggle(); }
             if (data === 0 && source.kind === 'video') this.nextStation(1);
           },
           onError: ({ data }) => {
             if (token !== this.generation) return;
             if ([2, 5, 100, 101, 150].includes(data)) this.trackFailed();
-            else { this.off(); this.message(`YouTube error ${data}. Try again using the visible player or another station.`); }
+            else { this.off(); this.message(t('radio.ytError', { n: String(data) })); }
           },
           onAutoplayBlocked: () => {
             if (token !== this.generation) return;
@@ -410,14 +421,14 @@ export class Radio {
 
   private trackFailed() {
     if (!this.enabled) return;
-    if (!this.playing) { this.off(); this.message('Track unavailable. Choose a station to resume.'); return; }
+    if (!this.playing) { this.off(); this.message(t('radio.trackGone')); return; }
     clearTimeout(this.watchdog); clearTimeout(this.retry);
     const local = this.selected === this.stations.length;
     const count = local ? this.files.length : this.player?.getPlaylist()?.length || 1;
     this.failedTracks.add(local ? this.fileIndex : this.player?.getPlaylistIndex() ?? 0);
     ++this.failedAttempts;
     if (this.failedTracks.size >= count || (!local && this.failedAttempts >= count)) { this.stationFailed(); return; }
-    this.message('Track unavailable — skipping.');
+    this.message(t('radio.trackSkip'));
     this.retry = window.setTimeout(() => this.nextTrack(), 300);
   }
 
@@ -427,16 +438,16 @@ export class Radio {
     for (let step = 1; step <= this.stations.length + 1; step++) {
       const next = (this.selected + step) % (this.stations.length + 1);
       if (!this.failedStations.has(next) && (next < this.stations.length || this.files.length)) {
-        this.tune(next, true); this.message(`${name} unavailable — trying ${this.stationLabel.textContent}.`); return;
+        this.tune(next, true); this.message(t('radio.tryingNext', { name: name ?? '', next: this.stationLabel.textContent ?? '' })); return;
       }
     }
-    this.off(); this.message('No playable stations. Add another station or choose local files.');
+    this.off(); this.message(t('radio.noneLeft'));
   }
 
   playPause() {
     if (!this.enabled) { this.tune(this.selected); return; }
     this.playing = !this.playing;
-    this.toggle.textContent = this.playing ? 'Pause' : 'Play';
+    this.showToggle();
     clearTimeout(this.watchdog);
     if (this.selected === this.stations.length || this.isStream()) {
       if (this.playing) this.startLocalAudio(); else this.audio.pause();
@@ -458,11 +469,15 @@ export class Radio {
     }
   }
 
+  private showToggle() { this.toggle.textContent = t(this.playing ? 'radio.pause' : 'radio.play'); }
+
   private volumeControl() {
-    const label = document.createElement('label'); label.textContent = 'Volume ';
+    const label = document.createElement('label');
+    const text = document.createElement('span'); text.dataset.i18n = 'radio.volume'; text.textContent = t('radio.volume');
+    label.append(text, ' ');
     const slider = document.createElement('input');
     slider.type = 'range'; slider.min = '0'; slider.max = '100'; slider.value = String(this.volume * 100);
-    slider.setAttribute('aria-label', 'Radio volume'); slider.dataset.radioVolume = '';
+    slider.dataset.i18nAria = 'radio.volumeAria'; slider.setAttribute('aria-label', t('radio.volumeAria')); slider.dataset.radioVolume = '';
     slider.oninput = () => {
       this.volume = Number(slider.value) / 100;
       document.querySelectorAll<HTMLInputElement>('[data-radio-volume]').forEach(el => { el.value = slider.value; });
@@ -483,7 +498,7 @@ export class Radio {
     if (folder) picker.setAttribute('webkitdirectory', '');
     picker.onchange = () => {
       const files = [...(picker.files || [])].filter(f => f.type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac|flac|opus|webm)$/i.test(f.name));
-      if (!files.length) { this.message('No audio files selected.'); return; }
+      if (!files.length) { this.message(t('radio.noFiles')); return; }
       this.files = shuffle(files); this.fileIndex = 0; this.tune(this.stations.length);
     };
     picker.click();
@@ -495,7 +510,7 @@ export class Radio {
     this.objectURL = URL.createObjectURL(this.files[this.fileIndex]);
     this.audio.src = this.objectURL;
     this.trackLabel.textContent = this.files[this.fileIndex].name;
-    this.playing = true; this.toggle.textContent = 'Pause';
+    this.playing = true; this.showToggle();
     this.applyVolume(); this.startLocalAudio();
   }
 
@@ -506,7 +521,7 @@ export class Radio {
       if (error.name === 'NotAllowedError') {
         // Before any input: wait quietly, and start on the first key, click or button.
         if (this.autostarting) { this.waitForInput(); return; }
-        this.playing = false; this.toggle.textContent = 'Play'; this.message('Press Play to start the radio.');
+        this.playing = false; this.showToggle(); this.message(t('radio.pressPlay'));
       } else this.trackFailed();
     });
   }
@@ -528,8 +543,8 @@ export class Radio {
     this.rows.replaceChildren();
     this.stations.forEach((station, index) => {
       const row = document.createElement('div'); row.className = 'radio-station';
-      const name = document.createElement('input'); name.value = station.name; name.maxLength = 80; name.setAttribute('aria-label', 'Station name');
-      const rename = button('Save name', () => {
+      const name = document.createElement('input'); name.value = station.name; name.maxLength = 80; name.setAttribute('aria-label', t('radio.stationName'));
+      const rename = button('radio.save', () => {
         station.name = name.value.trim() || station.name; this.save(); this.renderStations();
         if (this.selected === index) this.stationLabel.textContent = station.name;
       });
@@ -539,9 +554,9 @@ export class Radio {
         if (this.selected === index) this.selected = next; else if (this.selected === next) this.selected = index;
         this.failedStations.clear(); this.save(); this.renderStations();
       };
-      const up = button('Move up', () => move(-1)); up.disabled = index === 0;
-      const down = button('Move down', () => move(1)); down.disabled = index === this.stations.length - 1;
-      row.append(button(`Tune ${station.name}`, () => this.tune(index)), name, rename, up, down, button('Remove', () => {
+      const up = button('radio.up', () => move(-1)); up.disabled = index === 0;
+      const down = button('radio.down', () => move(1)); down.disabled = index === this.stations.length - 1;
+      row.append(button('radio.tune', () => this.tune(index), { name: station.name }), name, rename, up, down, button('radio.remove', () => {
         if (this.selected === index) this.off();
         this.stations.splice(index, 1);
         if (this.selected > index) --this.selected;

@@ -1,6 +1,8 @@
 // What a passenger wants from this ride, and the 1-5 stars they'll give for it.
 // Every passenger picks one want per trip from their own pool (passengers.ts).
 
+import { t } from './i18n';
+
 export type WantId = 'speed' | 'air' | 'drift' | 'closecalls' | 'reckless' | 'smooth' | 'ontime';
 const FAST = 20; // m/s, about 45 mph
 
@@ -15,26 +17,24 @@ interface WantDef {
   show: (v: number) => string;
 }
 
+const secs = (v: number) => t('unit.s', { n: v.toFixed(1) });
+const def = (id: WantId, d: Omit<WantDef, 'title' | 'how'>): WantDef => ({
+  ...d,
+  get title() { return t(`want.${id}`); },
+  get how() { return t(`want.${id}.how`); },
+});
+
 export const WANTS: Record<WantId, WantDef> = {
-  speed: { title: 'OVER 45 MPH', how: 'Seconds above 45 mph', icon: '💨', thresholds: [2, 5, 8, 12, 16], scaled: true, show: (v) => `${v.toFixed(1)}s` },
-  air: { title: 'AIR TIME', how: 'Seconds off the ground', icon: '🛫', thresholds: [1, 2.5, 4, 6, 8], scaled: true, show: (v) => `${v.toFixed(1)}s` },
-  drift: { title: 'DRIFT', how: 'Seconds sideways', icon: '🌀', thresholds: [1.5, 4, 7, 11, 16], scaled: true, show: (v) => `${v.toFixed(1)}s` },
-  closecalls: { title: 'CLOSE CALLS', how: 'Near misses', icon: '😱', thresholds: [1, 3, 5, 8, 12], scaled: true, show: (v) => `${Math.round(v)}` },
-  reckless: { title: 'RECKLESS', how: 'Near misses, smashes, jumps and crashes', icon: '🔥', thresholds: [2, 5, 9, 14, 20], scaled: true, show: (v) => `${Math.round(v)}` },
-  smooth: { title: 'SMOOTH RIDE', how: 'Every bump, jump or close call costs a star', icon: '☕', thresholds: [], scaled: false, show: (v) => `${Math.max(1, 5 - Math.floor(v))}★` },
-  ontime: { title: 'ON TIME', how: 'Time left when you arrive', icon: '⏱️', thresholds: [0.1, 0.2, 0.3, 0.4, 0.5], scaled: false, show: (v) => `${Math.round(v * 100)}% left` },
+  speed: def('speed', { icon: '💨', thresholds: [2, 5, 8, 12, 16], scaled: true, show: secs }),
+  air: def('air', { icon: '🛫', thresholds: [1, 2.5, 4, 6, 8], scaled: true, show: secs }),
+  drift: def('drift', { icon: '🌀', thresholds: [1.5, 4, 7, 11, 16], scaled: true, show: secs }),
+  closecalls: def('closecalls', { icon: '😱', thresholds: [1, 3, 5, 8, 12], scaled: true, show: (v) => `${Math.round(v)}` }),
+  reckless: def('reckless', { icon: '🔥', thresholds: [2, 5, 9, 14, 20], scaled: true, show: (v) => `${Math.round(v)}` }),
+  smooth: def('smooth', { icon: '☕', thresholds: [], scaled: false, show: (v) => `${Math.max(1, 5 - Math.floor(v))}★` }),
+  ontime: def('ontime', { icon: '⏱️', thresholds: [0.1, 0.2, 0.3, 0.4, 0.5], scaled: false, show: (v) => t('unit.left', { n: Math.round(v * 100) }) }),
 };
 
-// What each passenger says when they tell you what they want.
-export const ASKS: Record<string, Partial<Record<WantId, string>>> = {
-  techbro: { speed: 'Move fast. Literally.', air: 'Do a sick jump. For the vlog.', closecalls: 'Thread the needle, bro.' },
-  cmo: { air: "Get some air. I'm filming.", drift: 'Drift it. Slow-mo is on.' },
-  ceo: { speed: "I'm late. Which means you're late.", reckless: 'Disrupt something.', ontime: 'Every second costs me $40,000.' },
-  founder: { reckless: 'Move fast and break things.', speed: 'Runway is short. Go.' },
-  rocket: { air: 'To Mars. Or at least up.', speed: 'Faster. This is Plaid, right?' },
-  safety: { smooth: 'Gently. I have a paper due on alignment.', reckless: 'I need evidence these models are dangerous. Show me.' },
-  sweater: { smooth: 'Please. I just need one calm thing today.' },
-};
+// What each passenger says when they tell you what they want lives with their lines (src/lines/).
 
 export class Want {
   value = 0; // smooth: penalty points · ontime: fraction left · else: running total
@@ -42,10 +42,10 @@ export class Want {
   readonly ask: string;
   private steps: number[];
 
-  // `hard` raises every target as the shift's surge climbs (1 = normal).
-  constructor(readonly id: WantId, passenger: string, tripSeconds: number, hard = 1) {
+  // `ask` is how the passenger puts it; `hard` raises every target as the shift's surge climbs (1 = normal).
+  constructor(readonly id: WantId, ask: string | undefined, tripSeconds: number, hard = 1) {
     this.def = WANTS[id];
-    this.ask = ASKS[passenger]?.[id] ?? this.def.how;
+    this.ask = ask ?? this.def.how;
     const k = this.def.scaled ? Math.min(1.5, Math.max(0.7, tripSeconds / 22)) : 1;
     this.steps = this.def.thresholds.map((t) => (id === 'ontime' ? Math.min(0.9, t * hard) : t * k * hard));
     if (id === 'smooth') this.value = 0;
