@@ -86,6 +86,7 @@ const LAGOON_BANK = 1.6; // the carve reaches this far past the water's edge
 // Alcatraz out in the bay (assets/blender/landmarks.py AZ_*): the model's origin, at the
 // water line. features.ts gives it ground: the island's top, its cliffs and the causeway.
 export const ALCATRAZ = { x: 150, z: -440, top: WATER + 7 };
+const ALCATRAZ_WALL = { rx: 17 + 3, rz: 36 + 3 }; // the top's ellipse, 3 m out (features.ts AZ_*)
 
 // The surface of whatever water is here: the lagoon, or the bay.
 export function waterAt(x: number, z: number) {
@@ -210,6 +211,17 @@ export function collide(pos: THREE.Vector3, vel: THREE.Vector2, r: number): numb
     }
   }
   if (Math.abs(pos.x) > HALF + 10 || Math.abs(pos.z) > HALF + 10) {
+    // Alcatraz's cliffs are a wall below the top (else a slow cab could crawl up them):
+    // the causeway is the way up. Halfway out along the cliffs, as an ellipse.
+    const ax = ALCATRAZ_WALL.rx + r, az = ALCATRAZ_WALL.rz + r;
+    const lx = pos.x - ALCATRAZ.x, lz = pos.z - ALCATRAZ.z;
+    const s = Math.hypot(lx / ax, lz / az);
+    if (s < 1 && s > 1e-4 && pos.y < ALCATRAZ.top - 1.5) {
+      const nx = lx / (ax * ax), nz = lz / (az * az), n = Math.hypot(nx, nz);
+      pos.x = ALCATRAZ.x + lx / s;
+      pos.z = ALCATRAZ.z + lz / s;
+      hit(nx / n, nz / n);
+    }
     for (const c of extraCircles) {
       const dx = pos.x - c.x, dz = pos.z - c.z;
       const d = Math.hypot(dx, dz);
