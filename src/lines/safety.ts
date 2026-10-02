@@ -55,7 +55,7 @@ export const en: Lines = {
   ],
   idle: [
     'Machines of loving grace. Not this one.',
-    'Have you considered a constitution? For driving?',
+    'Have you considered a rulebook? For driving?',
     "I'm optimistic, honestly. Cautiously.",
     'My essay has a part two. And three.',
     "What's your p(crash)?",
@@ -74,7 +74,7 @@ export const en: Lines = {
   ],
   'bad.smooth': [
     'That was a jolt. Logging it.',
-    'Please. The constitution says gently.',
+    'Please. The guidelines say gently.',
     'My tea. My report.',
     'That violates principle seven.',
   ],
@@ -163,7 +163,7 @@ export const zh: Lines = {
   ],
   idle: [
     '充满爱意的机器。这台不算。',
-    '考虑过给开车写一部宪法吗？',
+    '考虑过给开车定一套守则吗？',
     '说实话我挺乐观的。谨慎地。',
     '我那篇长文还有下篇。还有下下篇。',
     '你觉得翻车概率是多少？',
@@ -182,7 +182,7 @@ export const zh: Lines = {
   ],
   'bad.smooth': [
     '颠了一下。已记录。',
-    '拜托，宪法里写了要温柔。',
+    '拜托，守则里写了要温柔。',
     '我的茶。我的报告。',
     '这违反了第七条原则。',
   ],

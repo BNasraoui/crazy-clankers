@@ -35,7 +35,7 @@ export const en: Lines = {
     'sideways is still progress.',
   ],
   slow: [
-    'we could go faster with seven trillion dollars.',
+    'we could go faster with a few more data centres.',
     'intelligence too cheap to meter. unlike this fare.',
     "i think we're compute-constrained here.",
     'this feels like the old model.',
@@ -47,7 +47,7 @@ export const en: Lines = {
   fired: [
     "oh. i've been fired. i love the board.",
     'going to spend some time with my family.',
-    'huh. the board says i was not consistently candid.',
+    "huh. the board wants to 'go in a different direction.'",
     "i learned about it in a video call. that's fine.",
     "so, i'm unemployed. this ride is still important though.",
   ],
@@ -72,10 +72,10 @@ export const en: Lines = {
   idle: [
     "we're a small nonprofit. mostly.",
     "i don't really think about money.",
-    'can i interest you in a scan of your eyeball?',
+    "can i interest you in my vision for the future? it's mostly vibes.",
     'i think about the future a lot. like, a lot.',
     "i don't have equity. well. didn't.",
-    'i asked for seven trillion. they said maybe.',
+    'i asked for a bigger data centre. they said maybe.',
   ],
   smash: [
     'some disruption is expected.',
@@ -96,7 +96,7 @@ export const en: Lines = {
   ],
   carpool: [
     'oh. hi. are you on the board?',
-    'nice to meet you. do you want to scan your eyeball?',
+    'nice to meet you. have you read my blog post?',
     'oh, a co-rider. so, shared compute.',
     "hi. i'm nobody. i run a small lab.",
   ],
@@ -147,7 +147,7 @@ export const zh: Lines = {
     '横着走，也是进步。',
   ],
   slow: [
-    '要是有七万亿，就能开快点。',
+    '要是再多几个数据中心，就能开快点。',
     '智能便宜到不用计费。车费可不是。',
     '我们好像是算力不够了。',
     '这感觉像是上一代模型。',
@@ -159,7 +159,7 @@ export const zh: Lines = {
   fired: [
     '哦。我被开除了。我爱董事会。',
     '我打算多陪陪家人。',
-    '嗯。董事会说我“沟通不够坦诚”。',
+    '嗯。董事会说想“换个方向”。',
     '视频会议里通知的。没事的。',
     '所以我失业了。但这趟车依然重要。',
   ],
@@ -184,10 +184,10 @@ export const zh: Lines = {
   idle: [
     '我们是个小小的非营利组织。大体上。',
     '我其实不怎么考虑钱。',
-    '要不要扫一下你的眼球？',
+    '想听听我对未来的愿景吗？主要靠感觉。',
     '我经常思考未来。真的，经常。',
     '我没有股权。嗯，以前没有。',
-    '我要了七万亿。他们说考虑一下。',
+    '我要了个更大的数据中心。他们说考虑一下。',
   ],
   smash: [
     '一定程度的颠覆是预料之中的。',
@@ -208,7 +208,7 @@ export const zh: Lines = {
   ],
   carpool: [
     '哦，你好。你是董事会的吗？',
-    '幸会。要扫一下眼球吗？',
+    '幸会。看过我的博客吗？',
     '哦，拼车啊。共享算力嘛。',
     '你好。我没什么，就开个小实验室。',
   ],

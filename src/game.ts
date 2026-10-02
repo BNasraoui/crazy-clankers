@@ -85,7 +85,8 @@ interface Ride {
 }
 
 // "Brayden Seedround · Tech Bro", with a star for the VIPs.
-const nameTag = (type: PassengerType, name: number) => `${type.vip ? '★ ' : ''}${fullName(type.id, name)} · ${roleOf(type)}`;
+// Just the name (a VIP gets a star): the type shows in who they are and what they say.
+const nameTag = (type: PassengerType, name: number) => `${type.vip ? '★ ' : ''}${fullName(type.id, name)}`;
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const flat = (a: THREE.Vector3, b: THREE.Vector3) => Math.hypot(a.x - b.x, a.z - b.z);

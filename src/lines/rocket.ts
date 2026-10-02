@@ -2,7 +2,7 @@ import type { Asks, Lines } from '../quips';
 
 export const en: Lines = {
   pickup: [
-    "Take me to Mars. Or Fremont, whichever's closer.",
+    "Take me to Mars. Or the airport, whichever's closer.",
     'This car will be fully self-driving next year.',
     'Interesting.',
     'I own 9% of this taxi. Just kidding. For now.',
@@ -49,7 +49,7 @@ export const en: Lines = {
     'New idea. {dest}. Now.',
     'Just bought {dest}. Go.',
     'Polled my followers. They said {dest}.',
-    "Forget it. {dest}. I'm renaming it X.",
+    "Forget it. {dest}. I'm renaming it after myself.",
   ],
   dropoff: [
     'Massive tip incoming. Next year.',
@@ -63,11 +63,11 @@ export const en: Lines = {
     'Firing you. Over a post.',
   ],
   idle: [
-    "I'm going to rename this street X.",
+    "I'm going to rename this street after me.",
     'The algorithm likes you.',
     'I posted 400 times today. Light day.',
     'Should I buy the Bay? Poll.',
-    'Mars is basically Fremont with less traffic.',
+    'Mars is basically the suburbs with less traffic.',
     'I sleep 3 hours. Mostly in cars.',
   ],
   smash: [
@@ -103,7 +103,7 @@ export const en: Lines = {
   carpool: [
     'Who are you? Do you post?',
     'Interesting. Are you a bot?',
-    'Welcome aboard. Verified is $8.',
+    'Welcome aboard. Premium seating is $8 a month.',
     'A stranger. Great. More followers.',
   ],
   premium: [
@@ -121,7 +121,7 @@ export const en: Lines = {
 
 export const zh: Lines = {
   pickup: [
-    '去火星。或者弗里蒙特，哪个近去哪个。',
+    '去火星。或者机场，哪个近去哪个。',
     '这辆车明年就能全自动驾驶。',
     '有意思。',
     '这家出租车公司我占9%。开玩笑的，暂时。',
@@ -168,7 +168,7 @@ export const zh: Lines = {
     '新想法。{dest}。马上。',
     '刚把{dest}买下来了。走。',
     '发推投票了，粉丝说去{dest}。',
-    '算了，去{dest}。我要改名叫X。',
+    '算了，去{dest}。我要用我的名字给它改名。',
   ],
   dropoff: [
     '巨额小费马上到。明年。',
@@ -182,11 +182,11 @@ export const zh: Lines = {
     '你被开除了。发推通知。',
   ],
   idle: [
-    '我要把这条街改名叫X。',
+    '我要用我的名字给这条街改名。',
     '算法很喜欢你。',
     '今天才发了400条推。比较闲。',
     '要不要把湾区买下来？发个投票。',
-    '火星基本就是不堵车的弗里蒙特。',
+    '火星基本就是不堵车的郊区。',
     '我一天睡三小时，主要在车上。',
   ],
   smash: [
@@ -222,7 +222,7 @@ export const zh: Lines = {
   carpool: [
     '你谁？你发推吗？',
     '有意思。你是机器人吗？',
-    '欢迎上车。蓝标八块钱。',
+    '欢迎上车。高级座位每月八块。',
     '陌生人。很好，又多个粉丝。',
   ],
   premium: [
