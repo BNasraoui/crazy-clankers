@@ -33,30 +33,53 @@ export async function pool<T>(items: T[], limit: number, job: (item: T) => Promi
   }));
 }
 
-// The landmarks (assets/blender/landmarks.py), one of each, placed by world.ts.
-export const landmarkModels: Partial<Record<string, THREE.Object3D>> = {};
+// The landmarks (assets/blender/landmarks.py), one of each, placed by world.ts. They load after
+// the title is up (main.ts): world.ts stands an empty holder at each spot and the model drops in.
+const landmarkModels: Partial<Record<string, THREE.Object3D>> = {};
 const LANDMARKS = ['salesfarce_tower', 'pyramid', 'ferry_building', 'coit_tower', 'golden_gate',
   'city_hall', 'dragon_gate', 'palace_of_fine_arts', 'alcatraz'];
+const waiting = new Map<string, ((model: THREE.Object3D) => void)[]>();
 
-// Loads the street kit and the landmarks; a model that fails to load is just missing.
+export const isLandmark = (id: string) => LANDMARKS.includes(id);
+
+// Calls back with the landmark now if it's here, or as soon as it arrives.
+export function whenLandmark(id: string, done: (model: THREE.Object3D) => void) {
+  const model = landmarkModels[id];
+  if (model) done(model);
+  else waiting.set(id, [...(waiting.get(id) ?? []), done]);
+}
+
+async function loadModel(loader: GLTFLoader, id: string, dir: string, into: Partial<Record<string, THREE.Object3D>>) {
+  try {
+    const gltf = await retry(() => loader.loadAsync(`/models/${dir}/${id}.glb`));
+    gltf.scene.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const src = mesh.material as THREE.MeshStandardMaterial;
+      mesh.material = src.name.startsWith('light_') ? new THREE.MeshBasicMaterial({ color: src.color }) : toon({ color: src.color });
+      mesh.castShadow = mesh.receiveShadow = !src.name.startsWith('light_');
+    });
+    gltf.scene.updateMatrixWorld(true);
+    into[id] = gltf.scene;
+  } catch (err) {
+    console.warn(`No ${dir} model ${id}:`, err); // a model that fails to load is just missing
+  }
+}
+
+// The street kit, which the world is built from.
 export async function loadStreetKit() {
   const loader = gltfLoader();
-  const jobs = [...KIT.map((id) => ({ id, dir: 'street', into: kit })), ...LANDMARKS.map((id) => ({ id, dir: 'landmarks', into: landmarkModels }))];
-  await pool(jobs, 4, async ({ id, dir, into }) => {
-    try {
-      const gltf = await retry(() => loader.loadAsync(`/models/${dir}/${id}.glb`));
-      gltf.scene.traverse((o) => {
-        const mesh = o as THREE.Mesh;
-        if (!mesh.isMesh) return;
-        const src = mesh.material as THREE.MeshStandardMaterial;
-        mesh.material = src.name.startsWith('light_') ? new THREE.MeshBasicMaterial({ color: src.color }) : toon({ color: src.color });
-        mesh.castShadow = mesh.receiveShadow = !src.name.startsWith('light_');
-      });
-      gltf.scene.updateMatrixWorld(true);
-      into[id] = gltf.scene;
-    } catch (err) {
-      console.warn(`No ${dir} model ${id}:`, err);
-    }
+  await pool(KIT, 4, (id) => loadModel(loader, id, 'street', kit));
+}
+
+// The landmarks, once the game is up.
+export async function loadLandmarks() {
+  const loader = gltfLoader();
+  await pool(LANDMARKS, 3, async (id) => {
+    await loadModel(loader, id, 'landmarks', landmarkModels);
+    const model = landmarkModels[id];
+    if (model) for (const done of waiting.get(id) ?? []) done(model);
+    waiting.delete(id);
   });
 }
 

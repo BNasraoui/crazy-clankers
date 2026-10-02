@@ -3,7 +3,7 @@ import './fit';
 import { Game } from './game';
 import { treeRefs } from './world';
 import { loadCars, loadPeople } from './models';
-import { loadStreetKit } from './scenery';
+import { loadLandmarks, loadStreetKit } from './scenery';
 import { loadFacades, paintFacades } from './facades';
 import { loadSky } from './sky';
 import { Pedestrians } from './pedestrians';
@@ -20,6 +20,7 @@ const [, people] = await Promise.all([loadCars(), loadPeople(), loadStreetKit(),
 const game = new Game(renderer, people);
 document.body.classList.add('ready'); // the boot screen's title is now the real one
 const painted = paintFacades(); // the building drawings stream in behind the title
+const landmarks = loadLandmarks(); // and the landmark models, which you can't see from the taxi rank
 account.then((login) => { if (login) game.loginNotice(login); });
 const sprites = loadPassengerSprites().then((s) => { game.paxSprites = s; game.refreshPassengers(); }).catch((err) => console.warn('No passenger sprites:', err));
 const peds = Pedestrians.load(game.scene).then((p) => { game.peds = p; }).catch((err) => console.warn('No pedestrians:', err));
@@ -35,7 +36,7 @@ fit();
 // ?still (the world snapshots, tests/ui/world.spec.ts): nothing moves; the test frames each view itself.
 const still = new URLSearchParams(location.search).has('still');
 if (still) {
-  void Promise.all([painted, sprites, peds]).then(() => {
+  void Promise.all([painted, landmarks, sprites, peds]).then(() => {
     (window as unknown as { still: unknown }).still = (eye: THREE.Vector3Tuple, target: THREE.Vector3Tuple) => {
       game.camera.position.set(...eye);
       game.camera.up.set(0, 1, 0);

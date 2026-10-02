@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { glslColor, toon } from './look';
 import { districtOf, type District } from './districts';
-import { instance, kit, landmarkModels, sag, wirePoints } from './scenery';
+import { instance, isLandmark, kit, sag, whenLandmark, wirePoints } from './scenery';
 import { FacadeBuilder, facadeSets, houseSet, type FacadeImage } from './facades';
 
 // The city is a 10x10 grid of blocks. Street centerlines sit every CELL units.
@@ -1040,6 +1040,14 @@ function blockCenter(bi: number, bj: number) {
   return { x, z, y: heightAt(x, z) };
 }
 
+// Where a landmark model goes; it arrives after the title is up (scenery.ts loadLandmarks).
+function holder(id: string, x: number, y: number, z: number) {
+  const g = new THREE.Group();
+  g.position.set(x, y, z);
+  whenLandmark(id, (model) => g.add(model));
+  return g;
+}
+
 function addLandmarks(scene: THREE.Scene) {
   const lam = (c: number) => toon({ color: c });
   // The modelled landmarks (assets/blender/landmarks.py) sit level at the highest ground
@@ -1050,10 +1058,8 @@ function addLandmarks(scene: THREE.Scene) {
     return top;
   };
   const place = (id: string, x: number, y: number, z: number) => {
-    const model = landmarkModels[id];
-    if (!model) return false;
-    model.position.set(x, y, z);
-    scene.add(model);
+    if (!isLandmark(id)) return false;
+    scene.add(holder(id, x, y, z));
     return true;
   };
 
@@ -1216,10 +1222,8 @@ function addGoldenGate(scene: THREE.Scene) {
   const towers = [-340, -150];
   // The model (assets/blender/landmarks.py): origin at the water line midway between the
   // towers, deck and cables included. Each tower stands on a 10 x 18 m pier.
-  const model = landmarkModels.golden_gate;
-  if (model) {
-    model.position.set((towers[0] + towers[1]) / 2, 0, zc);
-    scene.add(model);
+  if (isLandmark('golden_gate')) {
+    scene.add(holder('golden_gate', (towers[0] + towers[1]) / 2, 0, zc));
     for (const tx of towers) for (const off of [-4.5, 0, 4.5]) extraCircles.push({ x: tx, z: zc + off, r: 5 });
     return;
   }
