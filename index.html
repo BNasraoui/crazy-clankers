@@ -15,6 +15,8 @@
     <meta name="format-detection" content="telephone=no" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Permanent+Marker&family=Inter:wght@600;800&display=block" />
+    <!-- Chinese display and body fonts: only fetched (in unicode-range slices) when the page is in Chinese. -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@500;700;900&display=swap" />
     <link rel="preload" as="image" href="/keyart/jump.avif" fetchpriority="high" />
     <link rel="stylesheet" href="/src/style.css" />
     <style>
@@ -27,7 +29,7 @@
   <body>
     <canvas id="view"></canvas>
     <div id="hud" class="hidden">
-      <div id="clock" class="sticker"><span class="lbl">TIME</span><b id="time">75</b></div>
+      <div id="clock" class="sticker"><span class="lbl" data-i18n="hud.time">TIME</span><b id="time">75</b></div>
       <div id="want" class="hidden">
         <div class="lbl"></div>
         <div class="score"><b></b></div>
@@ -35,12 +37,12 @@
         <div class="note"></div>
       </div>
       <div id="right">
-        <div id="cash" class="sticker"><span class="lbl">CASH</span><b id="money">$0</b><span id="surge"></span></div>
+        <div id="cash" class="sticker"><span class="lbl" data-i18n="hud.cash">CASH</span><b id="money">$0</b><span id="surge"></span></div>
         <div id="rating">
-          <div class="lbl">DRIVER RATING</div>
+          <div class="lbl" data-i18n="hud.rating">DRIVER RATING</div>
           <div class="score"><b>5.00</b><span class="star">★</span></div>
           <div class="track"><div class="fill"></div><div class="cutoff"></div></div>
-          <div class="note">Deactivation below 4.00</div>
+          <div class="note" data-i18n="hud.deactivation">Deactivation below 4.00</div>
         </div>
       </div>
       <div id="fare" class="hidden">
@@ -52,17 +54,17 @@
       <div id="popups"></div>
       <div id="stamp"></div>
       <div id="quip" class="hidden"><img class="face" alt="" /><div><span class="who"></span><span class="text"></span></div></div>
-      <div id="launch" hidden><span>LAUNCH MODE</span><div class="bar"><div class="fill"></div></div></div>
-      <div id="speed"><b>0</b><small>MPH</small></div>
+      <div id="launch" hidden><span data-i18n="pop.launchMode">LAUNCH MODE</span><div class="bar"><div class="fill"></div></div></div>
+      <div id="speed"><b>0</b><small data-i18n="hud.mph">MPH</small></div>
     </div>
     <div id="overlay">
       <div class="menu title-screen boot">
         <img class="keyart" src="/keyart/jump.avif" alt="" fetchpriority="high" />
-        <div class="logo-block"><h1 class="logo">CRAZY<span>CLANKERS</span></h1><div class="tag">You are AGI. Drive like it.</div></div>
-        <div class="press-start loading"><i class="spinner"></i>LOADING</div>
+        <div class="logo-block"><h1 class="logo">CRAZY<span>CLANKERS</span></h1><div class="tag" data-i18n="tagline">You are AGI. Drive like it.</div></div>
+        <div class="press-start loading"><i class="spinner"></i><span data-i18n="boot.loading">LOADING</span></div>
       </div>
     </div>
-    <div id="rotate"><div class="card"><div class="phone">📱</div><b>TURN YOUR PHONE</b><span>Clankers drive sideways.</span></div></div>
+    <div id="rotate"><div class="card"><div class="phone">📱</div><b data-i18n="rotate.title">TURN YOUR PHONE</b><span data-i18n="rotate.sub">Clankers drive sideways.</span></div></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

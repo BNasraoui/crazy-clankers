@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CHARACTER_LAYER, setOutlineResolution } from './anime';
+import { translate } from './i18n';
 
 // The game's look: cel lighting with one shadow tone, ink outlines drawn from
 // the depth buffer, the 3D rendered at low resolution and scaled up with hard
@@ -249,22 +250,23 @@ export class Look {
     panel.id = 'lookpanel';
     panel.hidden = true;
     panel.innerHTML = `
-      <div class="lk-head"><b>LOOK</b><button type="button" id="lk-close" aria-label="Close settings">✕</button></div>
-      <label>Resolution <select id="lk-res">
-        ${[240, 360, 480, 720, 4000].map((v) => `<option value="${v}">${v === 4000 ? 'native' : v + 'p'}</option>`).join('')}
+      <div class="lk-head"><b data-i18n="look.title"></b><button type="button" id="lk-close" data-i18n-aria="look.close">✕</button></div>
+      <label><span data-i18n="look.res"></span> <select id="lk-res">
+        ${[240, 360, 480, 720, 4000].map((v) => `<option value="${v}"${v === 4000 ? ' data-i18n="look.native"' : ''}>${v + 'p'}</option>`).join('')}
       </select></label>
-      <label>Grain <input id="lk-grain" type="range" min="0" max="0.25" step="0.01"></label>
-      <label><input id="lk-outline" type="checkbox"> Outlines</label>
-      <label><input id="lk-speed" type="checkbox"> Speed lines</label>
-      <label>People size <input id="lk-people" type="range" min="0.8" max="2" step="0.05"><output id="lk-people-v"></output></label>
-      <label>Camera distance <input id="lk-back" type="range" min="4" max="12" step="0.25"><output id="lk-back-v"></output></label>
-      <label>Camera height <input id="lk-up" type="range" min="1.5" max="7" step="0.1"><output id="lk-up-v"></output></label>
-      <label>Field of view <input id="lk-fov" type="range" min="45" max="90" step="1"><output id="lk-fov-v"></output></label>
-      <label><input id="lk-pax" type="checkbox"> Passengers as sprites</label>
-      <button id="lk-reset" type="button">Reset</button>
-      <b>CONTROLLERS</b>
+      <label><span data-i18n="look.grain"></span> <input id="lk-grain" type="range" min="0" max="0.25" step="0.01"></label>
+      <label><input id="lk-outline" type="checkbox"> <span data-i18n="look.outlines"></span></label>
+      <label><input id="lk-speed" type="checkbox"> <span data-i18n="look.speedLines"></span></label>
+      <label><span data-i18n="look.people"></span> <input id="lk-people" type="range" min="0.8" max="2" step="0.05"><output id="lk-people-v"></output></label>
+      <label><span data-i18n="look.camBack"></span> <input id="lk-back" type="range" min="4" max="12" step="0.25"><output id="lk-back-v"></output></label>
+      <label><span data-i18n="look.camUp"></span> <input id="lk-up" type="range" min="1.5" max="7" step="0.1"><output id="lk-up-v"></output></label>
+      <label><span data-i18n="look.fov"></span> <input id="lk-fov" type="range" min="45" max="90" step="1"><output id="lk-fov-v"></output></label>
+      <label><input id="lk-pax" type="checkbox"> <span data-i18n="look.pax"></span></label>
+      <button id="lk-reset" type="button" data-i18n="look.reset"></button>
+      <b data-i18n="look.pads"></b>
       <pre id="lk-pads"></pre>`;
     document.body.appendChild(panel);
+    translate(panel);
     const res = panel.querySelector<HTMLSelectElement>('#lk-res')!;
     const grain = panel.querySelector<HTMLInputElement>('#lk-grain')!;
     const outline = panel.querySelector<HTMLInputElement>('#lk-outline')!;

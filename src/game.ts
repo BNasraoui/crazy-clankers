@@ -6,8 +6,10 @@ import { CABS, EXTRA_CARS, makeCar, makePerson, makeLabel, personFrom, type Pers
 import { Look, SKY, makeSky } from './look';
 import { paintSky, updateSky } from './sky';
 import { CHARACTER_LAYER, makeCharacter, sunDir } from './anime';
-import { pickPassenger, type PassengerType } from './passengers';
-import { QuipDirector, SPEAKERS } from './quips';
+import { pickPassenger, roleOf, type PassengerType } from './passengers';
+import { QuipDirector, SPEAKERS, askLine, type QuipEvent } from './quips';
+import { fullName, nameCount, shortName } from './names';
+import { lang, onLang, place, setLang, t } from './i18n';
 import { Traffic } from './traffic';
 import { sfx, setEngine, unlockAudio } from './audio';
 import { bump, crunch, splash as splashLayers } from './sfx';
@@ -50,11 +52,13 @@ interface Waiting {
   marker: THREE.Group;
   label: THREE.Object3D;
   want: WantId; // chosen as they arrive at the curb, so the Wayfarer can see it
+  name: number; // their parody name, as a place in their type's pool (names.ts)
   phase: number;
 }
 
 interface Ride {
   type: PassengerType;
+  name: number;
   dest: Landmark;
   base: number;
   total: number;
@@ -74,12 +78,17 @@ interface Ride {
   ejected?: PersonModel;
   want: Want; // what this passenger wants from the ride, rated 1-5 stars
   marker?: THREE.Group; // a carpool rider's own destination beam (the lead's is destMarker)
+  moodT: number; // countdown to the next word on how the want is going
 }
+
+// "Brayden Seedround · Tech Bro", with a star for the VIPs.
+const nameTag = (type: PassengerType, name: number) => `${type.vip ? '★ ' : ''}${fullName(type.id, name)} · ${roleOf(type)}`;
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const flat = (a: THREE.Vector3, b: THREE.Vector3) => Math.hypot(a.x - b.x, a.z - b.z);
 const blocks = (a: THREE.Vector3, b: THREE.Vector3) => Math.abs(a.x - b.x) + Math.abs(a.z - b.z);
 const money = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
+const secs = (n: number) => t('unit.s', { n: n.toFixed(1) });
 
 export class Game {
   private radio = new Radio();
@@ -204,7 +213,7 @@ export class Game {
     this.arrow.add(outline, body);
     this.scene.add(this.arrow);
 
-    this.quips = new QuipDirector((who, color, text, seconds, speaker) => {
+    this.quips = new QuipDirector((speaker, color, text, seconds, who) => {
       const el = $('#quip');
       const face = $<HTMLImageElement>('#quip .face');
       face.hidden = speaker === 'cab';
@@ -213,7 +222,7 @@ export class Game {
       el.style.animation = 'none';
       void el.offsetWidth;
       el.style.animation = '';
-      ($('#quip .who').textContent = who), ($('#quip .who').style.color = color);
+      ($('#quip .who').textContent = speaker === 'cab' ? t('speaker.cab') : who ?? this.tagFor(speaker)), ($('#quip .who').style.color = color);
       $('#quip .text').textContent = text;
       clearTimeout(this.quipTimer);
       this.quipTimer = window.setTimeout(() => el.classList.add('hidden'), seconds * 1000);
@@ -221,6 +230,27 @@ export class Game {
 
     this.reset();
     this.showTitle();
+    onLang(() => this.relanguage());
+    // The EN / 中文 switch on the title screen: click it, or press L.
+    const flip = () => setLang(lang() === 'zh' ? 'en' : 'zh');
+    addEventListener('click', (e) => { if ((e.target as Element).closest?.('[data-lang]')) flip(); });
+    addEventListener('keydown', (e) => { if (e.code === 'KeyL' && this.state === 'title' && !this.howTo) flip(); });
+  }
+
+  // The language changed (title screen switch): redraw whatever is showing.
+  private relanguage() {
+    if (this.state === 'title') this.showTitle();
+    else if (this.state === 'picker') this.renderCabPicker();
+    else if (this.state === 'paused') this.setState('paused');
+    this.relabelFares();
+    this.setDest(this.ride?.dest ?? null);
+    for (const p of this.pool) if (p.marker) { this.scene.remove(p.marker); p.marker = this.poolMarker(p.dest); }
+  }
+
+  // A speaker's name tag: the rider of that type aboard (the lead first), else just the role.
+  private tagFor(speaker: string) {
+    const r = [this.ride, ...this.pool].find((x) => x?.type.id === speaker);
+    return r ? nameTag(r.type, r.name) : t(`role.${speaker}` as 'role.techbro');
   }
 
   resize(w: number, h: number) {
@@ -314,7 +344,7 @@ export class Game {
     this.rank.setCarsVisible(false);
     this.car.model.root.visible = true;
     this.setState('play');
-    this.popup('GO!', 'big');
+    this.popup(t('pop.go'), 'big');
   }
 
   // Title screen and cab picker, staged at the taxi rank.
@@ -368,9 +398,9 @@ export class Game {
     if (s === 'play') ov.innerHTML = '';
     if (s === 'paused') {
       ov.className = 'dim';
-      ov.innerHTML = `<h2>PAUSED</h2><div class="press pad-only">${btn('confirm', 'RESUME')}</div><div class="pad pad-only">${btn('restart', 'Restart')}${btn('menu', 'Main menu')}</div>
-        <div class="tap-row touch-only">${tapButton('confirm', 'RESUME', 'go')}${tapButton('restart', 'RESTART')}${tapButton('back', 'MAIN MENU')}</div>
-        <button class="radio-menu-button" data-radio-open>${key('radio')} Radio</button>`;
+      ov.innerHTML = `<h2>${t('pause.title')}</h2><div class="press pad-only">${btn('confirm', t('pause.resume'))}</div><div class="pad pad-only">${btn('restart', t('pause.restart'))}${btn('menu', t('pause.menu'))}</div>
+        <div class="tap-row touch-only">${tapButton('confirm', t('pause.resume'), 'go')}${tapButton('restart', t('pause.restart'))}${tapButton('back', t('pause.menu'))}</div>
+        <button class="radio-menu-button" data-radio-open>${key('radio')} ${t('menu.radio')}</button>`;
     }
   }
 
@@ -428,25 +458,25 @@ export class Game {
     if (hop) { sfx.hop(); this.ride?.want.feed('hop'); for (const p of this.pool) p.want.feed('hop'); }
     if (armed) {
       sfx.armed();
-      this.popup('LAUNCH MODE');
+      this.popup(t('pop.launchMode'));
     }
     if (launch >= 0) {
       sfx.dash();
-      this.popup(launch > 0.95 ? 'FULL LAUNCH!!' : 'LAUNCH!', launch > 0.95 ? 'big' : '');
+      this.popup(launch > 0.95 ? t('pop.fullLaunch') : t('pop.launch'), launch > 0.95 ? 'big' : '');
       this.quips.say('cab', 'dash');
     }
     if (splash) {
       sfx.splash();
       splashLayers();
       this.particles.emit(this.car.pos.clone().setY(waterAt(this.car.pos.x, this.car.pos.z)), 50, 0xe6f6ff, 9, 12, 0.45);
-      this.popup('SEABED MODE', 'big');
+      this.popup(t('pop.seabed'), 'big');
       this.quips.say('cab', 'underwater', { force: true });
     }
     for (const hit of this.props.update(dt, this.car)) this.onSmash(hit.kind, hit.pos);
     if (this.geysers.update(dt, this.car)) {
       this.car.launch(17);
       sfx.geyser();
-      this.popup('GEYSER LAUNCH!', 'big');
+      this.popup(t('pop.geyser'), 'big');
     }
     for (const hit of this.trees.update(dt, this.car.pos, this.car.vel)) {
       this.shake = Math.max(this.shake, 0.4);
@@ -454,14 +484,14 @@ export class Game {
         sfx.timber();
         this.particles.emit(hit.at.clone().setY(hit.at.y + 3 * hit.size), 22, 0x4f8f45, 6, 6, 0.4);
         this.particles.emit(hit.at.clone().setY(hit.at.y + 0.5), 8, 0x6b4a2f, 4, 5, 0.25);
-        this.popup('TIMBER!', 'big');
+        this.popup(t('pop.timber'), 'big');
         if (Math.random() < 0.4) this.quips.say('cab', 'timber');
       } else {
         sfx.smash();
         this.particles.emit(hit.at.clone().setY(hit.at.y + 1), 12, 0x2f4f45, 5, 6, 0.25);
-        this.popup(hit.kind === 'lamp' ? 'LIGHTS OUT!' : 'POLE DOWN!');
+        this.popup(hit.kind === 'lamp' ? t('pop.lightsOut') : t('pop.poleDown'));
       }
-      this.tip('smash', 1, hit.kind === 'tree' ? 'TIMBER' : 'SMASH');
+      this.tip('smash', 1, hit.kind === 'tree' ? t('tip.timber') : t('tip.smash'));
     }
     this.particles.update(dt);
     if (this.peds) {
@@ -471,7 +501,7 @@ export class Game {
         sfx.yelp();
         if (Math.random() < 0.3) this.quips.say('cab', 'pedDive');
       }
-      for (let k = 0; k < pev.closeCalls; k++) this.tip('nearMiss', 1, 'CLOSE CALL');
+      for (let k = 0; k < pev.closeCalls; k++) this.tip('nearMiss', 1, t('tip.closeCall'));
     }
     const tev = this.traffic.update(dt, this.car, this.peds?.inRoad() ?? []);
     impact = Math.max(impact, this.cableCars.update(dt, this.car));
@@ -483,8 +513,10 @@ export class Game {
       this.shake = Math.max(this.shake, 0.35);
       this.particles.emit(at, 18, 0x2a2730, 7, 6, 0.3);
       this.moments.panel('crash', 0.5, false); // the art without the freeze: rams are frequent
-      this.popup('BULLDOZED!', 'big');
-      this.tip('smash', 1, 'RAM');
+      this.popup(t('pop.bulldozed'), 'big');
+      this.tip('smash', 1, t('tip.ram'));
+      if (this.ride && this.rand() < 0.5) this.say(this.ride, 'ram');
+      else this.quips.say('cab', 'ram', { force: this.rand() < 0.3 });
     }
 
     if (impact > 5) this.onCrash(impact);
@@ -507,18 +539,18 @@ export class Game {
       this.maxAir = Math.max(this.maxAir, landed);
       if (landed > 1.8) {
         this.moments.panel('land', landed / 3);
-        this.popup('CRAZY AIR!!', 'big');
+        this.popup(t('pop.crazyAir'), 'big');
         if (!this.ride) this.quips.say('cab', 'bigAir', { force: true });
       }
-      this.tip('jump', landed, `AIR ${landed.toFixed(1)}s`);
+      this.tip('jump', landed, t('tip.air', { s: secs(landed) }));
     } else if (landed > 0.3) sfx.land(landed * 2);
     for (let k = 0; k < tev.nearMisses; k++) {
       sfx.whoosh();
-      this.tip('nearMiss', 1, 'NEAR MISS');
+      this.tip('nearMiss', 1, t('tip.nearMiss'));
     }
     if (this.car.grounded && Math.abs(this.car.lateral) > 5 && this.car.speed > 12) this.driftT += dt;
     else {
-      if (this.driftT > 0.8) this.tip('drift', this.driftT, `DRIFT ${this.driftT.toFixed(1)}s`);
+      if (this.driftT > 0.8) this.tip('drift', this.driftT, t('tip.drift', { s: secs(this.driftT) }));
       this.driftT = 0;
     }
 
@@ -529,7 +561,7 @@ export class Game {
     this.updateRide(dt);
     this.time -= dt;
     this.shiftTime += dt;
-    if (this.time <= 0) { this.time = 0; this.gameOver('TIME UP'); }
+    if (this.time <= 0) { this.time = 0; this.gameOver('time'); }
     this.driveCamera(dt);
     this.updateArrow();
     this.updateHud();
@@ -545,13 +577,13 @@ export class Game {
     this.combo = 0;
     this.safetyHit(THREE.MathUtils.clamp(impact * 0.9, 4, 22));
     if (impact > 16) this.moments.panel('crash', impact / 30);
-    if (impact > 12) this.popup('CRASH!', 'bad');
+    if (impact > 12) this.popup(t('pop.crash'), 'bad');
     const r = this.ride;
     if (r && r.firedT <= 0) {
       r.incidents++;
       r.want.feed('crash', impact);
       for (const p of this.pool) p.want.feed('crash', impact);
-      if (!this.quips.say(r.type.id, 'crash')) this.quips.say('cab', 'crash');
+      if (!this.say(r, 'crash')) this.quips.say('cab', 'crash');
     } else this.quips.say('cab', 'crash');
   }
 
@@ -563,7 +595,7 @@ export class Game {
       this.geysers.spawn(at);
       this.quips.say('cab', 'geyser', { force: true });
     } else this.quips.say('cab', 'smash');
-    this.tip('smash', 1, kind === 'cone' ? 'CONE' : 'SMASH');
+    this.tip('smash', 1, kind === 'cone' ? t('tip.cone') : t('tip.smash'));
   }
 
   // The rating is the safety meter shown Uber-style: 5.00 at full, deactivated at 4.00.
@@ -582,18 +614,17 @@ export class Game {
       this.lowWarned = true;
       this.quips.say('cab', 'safetyLow', { force: true });
     }
-    if (this.safety <= 0) { this.safety = 0; this.gameOver('DEACTIVATED'); }
+    if (this.safety <= 0) { this.safety = 0; this.gameOver('deactivated'); }
   }
 
   // A stunt during a ride counts towards the passenger's want, if they care about it.
   private tip(kind: Feed, amount: number, label: string) {
     const r = this.ride;
     if (!r || r.firedT > 0) return;
-    const t = r.type;
-    if (t.id === 'cmo' && kind === 'jump' && !r.filmed) {
+    if (r.type.id === 'cmo' && kind === 'jump' && !r.filmed) {
       r.filmed = true;
-      this.quips.say('cmo', 'jumpFirst', { force: true });
-      this.popup('SHE MISSED IT', 'bad');
+      this.say(r, 'jumpFirst', { force: true });
+      this.popup(t('pop.missedIt'), 'bad');
       return;
     }
     for (const p of this.pool) p.want.feed(kind, amount); // carpool riders count it too
@@ -601,7 +632,7 @@ export class Game {
     if (!r.want.feed(kind, amount)) return; // they don't care
     if (r.want.id === 'smooth') {
       r.incidents++;
-      this.quips.say(t.id, kind === 'smash' ? 'smash' : kind === 'drift' ? 'drift' : kind === 'nearMiss' ? 'nearMiss' : 'jump', { force: true });
+      if (!this.say(r, 'bad.smooth', { force: this.rand() < 0.5 })) this.say(r, kind === 'smash' ? 'smash' : kind === 'drift' ? 'drift' : kind === 'nearMiss' ? 'nearMiss' : 'jump', { force: true });
       this.popup(`-1★  ${label}`, 'bad');
       sfx.bad();
       return;
@@ -610,7 +641,8 @@ export class Game {
     const after = r.want.stars;
     this.popup(after > before ? `${'★'.repeat(after)}  ${label}` : `+ ${label}`, after > before ? 'good' : '');
     if (after > before) sfx.tip();
-    if (!this.quips.say(t.id, kind as 'jump') && kind === 'jump') this.quips.say('cab', 'jump');
+    if (after > before && this.rand() < 0.45 && this.say(r, `good.${r.want.id}`)) return;
+    if (!this.say(r, kind as 'jump') && kind === 'jump') this.quips.say('cab', 'jump');
   }
 
   // The want panel under the timer pops when a new passenger says what they want.
@@ -661,10 +693,11 @@ export class Game {
       marker.add(groundRing(c.road.x, c.road.z, 5, 6.2, color, 0.85));
       marker.add(beam(c.road, 6, 14, color, 0.16));
       const want = type.wants[Math.floor(this.rand() * type.wants.length)];
-      const label = this.fareLabel(type, want, c, dest);
+      const name = Math.floor(this.rand() * nameCount(type.id));
+      const label = this.fareLabel(type, name, want, c, dest);
       marker.add(label);
       this.scene.add(person.root, marker);
-      this.waiting.push({ type, dest, curb: c, person, marker, label, want, phase: this.rand() * 6 });
+      this.waiting.push({ type, dest, curb: c, person, marker, label, want, name, phase: this.rand() * 6 });
       return;
     }
   }
@@ -697,11 +730,11 @@ export class Game {
   private get premium() { return CABS[this.cabIndex].id === 'wayfarer'; } // Waymo's perk: sees every fare, pays 1.3×
 
   // The tag over a waiting passenger. In the Wayfarer it also shows what they want and roughly what they'll pay.
-  private fareLabel(type: PassengerType, want: WantId, c: Curb, dest: Landmark) {
-    let text = type.label;
+  private fareLabel(type: PassengerType, name: number, want: WantId, c: Curb, dest: Landmark) {
+    let text = nameTag(type, name);
     if (this.premium) {
       const pay = (4 + blocks(c.road, dest.curb.road) * 0.05) * type.fareMul * SURGE[this.surge][3] * 1.3;
-      text = `${type.label} · ${WANTS[want].icon} ${WANTS[want].title} · $${Math.round(pay)}`;
+      text += ` · ${WANTS[want].icon} ${WANTS[want].title} · $${Math.round(pay)}`;
     }
     const label = makeLabel(text, { bg: type.vip ? '#3a2a00e0' : '#000000c0', fg: type.vip ? '#ffd23a' : '#ffffff', height: 1 });
     label.position.copy(c.walk).add(new THREE.Vector3(0, 3.4, 0));
@@ -715,7 +748,7 @@ export class Game {
       const old = (w.label as THREE.Sprite).material; // sprites share one geometry: free only the texture and material
       old.map?.dispose();
       old.dispose();
-      w.label = this.fareLabel(w.type, w.want, w.curb, w.dest);
+      w.label = this.fareLabel(w.type, w.name, w.want, w.curb, w.dest);
       w.marker.add(w.label);
     }
   }
@@ -746,9 +779,9 @@ export class Game {
     const d = blocks(w.curb.road, w.dest.curb.road);
     const [give, limit, hard] = SURGE[this.surge];
     const total = (d / 19 + 6) * w.type.timeMul * limit;
-    const want = new Want(w.want, w.type.id, total, hard);
+    const want = new Want(w.want, askLine(w.type.id, w.want), total, hard);
     const ride: Ride = {
-      type: w.type, dest: w.dest, base: 4 + d * 0.05, total, left: total, startDist: d,
+      type: w.type, name: w.name, moodT: 9, dest: w.dest, base: 4 + d * 0.05, total, left: total, startDist: d,
       tips: 0, equity: 0, fareMul: w.type.fareMul, filmed: false, firedDone: false, firedT: 0,
       rerouted: false, incidents: 0, slowT: 0, idleT: 7, timeLowSaid: false, want,
     };
@@ -756,7 +789,7 @@ export class Game {
       // Zoombox carpool: they ride along with their own stop, timer and want.
       ride.marker = this.poolMarker(ride.dest);
       this.pool.push(ride);
-      this.popup(`CARPOOL ×${this.aboard}`, 'big good');
+      this.popup(t('pop.carpool', { n: this.aboard }), 'big good');
       this.relead();
     } else {
       this.ride = ride;
@@ -764,12 +797,19 @@ export class Game {
     }
     // Part of the fare's time limit goes on the shift clock (less as the surge climbs): deliver fast and keep the change.
     this.time += total * give;
-    this.popup(`+${Math.round(total * give)}s`, 'big good');
+    this.popup(t('pop.time', { n: Math.round(total * give) }), 'big good');
     if (this.ride === ride) this.setDest(w.dest);
     sfx.pickup();
-    this.popup(w.type.label.replace('★ ', ''), 'big');
-    this.quips.line(w.type.id, ride.want.ask); // they say what they want
-    if (this.rand() < 0.35) this.quips.say('cab', 'pickup', { delay: 3 });
+    this.popup(fullName(w.type.id, w.name), 'big');
+    this.quips.line(w.type.id, ride.want.ask, nameTag(w.type, w.name)); // they say what they want
+    if (this.pool.includes(ride)) {
+      const host = [this.ride, ...this.pool].find((x) => x && x !== ride)!;
+      if (this.rand() < 0.6) this.say(host, 'carpool', { delay: 3.2 });
+      else this.quips.say('cab', 'carpool', { delay: 3.2 });
+    } else if (this.premium && this.rand() < 0.4) {
+      if (this.rand() < 0.6) this.say(ride, 'premium', { delay: 3.2 });
+      else this.quips.say('cab', 'premium', { delay: 3.2 });
+    } else if (this.rand() < 0.35) this.quips.say('cab', 'pickup', { delay: 3 });
     while (this.waiting.length < WAITING_COUNT) this.spawnWaiting();
   }
 
@@ -779,7 +819,7 @@ export class Game {
     const c = dest.curb.road;
     g.add(groundRing(c.x, c.z, 6, 7.2, 0xff9a3a, 0.85));
     g.add(beam(c, 6, 40, 0xff9a3a, 0.2));
-    const label = makeLabel(dest.name, { bg: '#4a2a0ae0', fg: '#ffd2a0', height: 2.2 });
+    const label = makeLabel(place(dest.name), { bg: '#4a2a0ae0', fg: '#ffd2a0', height: 2.2 });
     label.position.set(c.x, c.y + 12, c.z);
     g.add(label);
     this.scene.add(g);
@@ -830,8 +870,8 @@ export class Game {
         if (r.ejected) this.scene.remove(r.ejected.root);
         r.ejected = undefined;
         r.fareMul *= 2;
-        this.quips.say('sweater', 'back', { force: true });
-        this.popup("HE'S BACK! FARE x2", 'big good');
+        this.say(r, 'back', { force: true });
+        this.popup(t('pop.back'), 'big good');
         sfx.pickup();
       }
       return;
@@ -847,7 +887,9 @@ export class Game {
     if (r.want.id !== 'ontime' && r.want.stars > before) {
       this.popup('★'.repeat(r.want.stars), 'good');
       sfx.tip();
+      if (this.rand() < 0.3) this.say(r, `good.${r.want.id}`);
     }
+    this.wantMood(r, dt);
 
     const remaining = blocks(this.car.pos, r.dest.curb.road) / r.startDist;
     if (id === 'sweater' && !r.firedDone && remaining < 0.55) this.fireSweater(r);
@@ -855,18 +897,37 @@ export class Game {
 
     if (this.car.speed < 5 && flat(this.car.pos, r.dest.curb.road) > 25) {
       r.slowT += dt;
-      if (r.slowT > 3) { this.quips.say(id, 'slow', { force: true }); r.slowT = -6; }
+      if (r.slowT > 3) { this.say(r, 'slow', { force: true }); r.slowT = -6; }
     } else r.slowT = Math.min(0, r.slowT + dt);
 
-    if (r.left < 6 && !r.timeLowSaid) { r.timeLowSaid = true; this.quips.say(id, 'timeLow', { force: true }); }
+    if (r.left < 6 && !r.timeLowSaid) { r.timeLowSaid = true; this.say(r, 'timeLow', { force: true }); }
     r.idleT -= dt;
     if (r.idleT <= 0) {
       r.idleT = 8 + this.rand() * 6;
-      if (this.rand() < 0.8) this.quips.say(id, 'idle');
+      if (this.rand() < 0.8) this.say(r, 'idle');
       else this.quips.say('cab', 'idle');
     }
 
     if (flat(this.car.pos, r.dest.curb.road) < 9 && this.car.speed < 5) this.dropoff(r);
+  }
+
+  // A rider speaks, with their own name tag on the bubble.
+  private say(r: Ride, event: QuipEvent, opts: { delay?: number; vars?: Record<string, string>; force?: boolean } = {}) {
+    return this.quips.say(r.type.id, event, { ...opts, who: nameTag(r.type, r.name) });
+  }
+
+  // Every so often a rider says how their want is going: pleased when the stars are ahead
+  // of the clock, fed up when they're behind it.
+  private wantMood(r: Ride, dt: number) {
+    r.moodT -= dt;
+    if (r.moodT > 0) return;
+    r.moodT = 9 + this.rand() * 7;
+    const w = r.want;
+    if (w.id === 'smooth') { if (w.stars >= 4) this.say(r, 'good.smooth'); return; }
+    const elapsed = 1 - r.left / r.total;
+    const due = w.id === 'ontime' ? 5 * (1 - elapsed) : 1 + elapsed * 4; // the stars they'd expect by now
+    if (w.stars >= due) this.say(r, `good.${w.id}`);
+    else if (w.stars < due - 1.5) this.say(r, `bad.${w.id}`);
   }
 
   private fireSweater(r: Ride) {
@@ -879,8 +940,8 @@ export class Game {
     p.root.rotation.y = this.car.yaw;
     this.scene.add(p.root);
     r.ejected = p;
-    this.quips.say('sweater', 'fired', { force: true });
-    this.popup('FIRED BY THE BOARD!', 'big bad');
+    this.say(r, 'fired', { force: true });
+    this.popup(t('pop.fired'), 'big bad');
     sfx.bad();
   }
 
@@ -896,14 +957,14 @@ export class Game {
     r.left += (d / 19) * r.type.timeMul;
     r.total = Math.max(r.total, r.left);
     this.setDest(dest);
-    this.quips.say('rocket', 'reroute', { force: true, vars: { dest: dest.name } });
-    this.popup('REROUTED!', 'big bad');
+    this.say(r, 'reroute', { force: true, vars: { dest: place(dest.name) } });
+    this.popup(t('pop.rerouted'), 'big bad');
   }
 
   private walkout(r: Ride = this.ride!) {
-    this.quips.say(r.type.id, 'walkout', { force: true });
+    this.say(r, 'walkout', { force: true });
     if (this.rand() < 0.5) this.quips.say('cab', 'walkout', { delay: 2.6 });
-    this.popup('PASSENGER BAILED', 'big bad');
+    this.popup(t('pop.bailed'), 'big bad');
     sfx.bad();
     this.combo = 0;
     this.leave(r);
@@ -931,39 +992,40 @@ export class Game {
 
   private dropoff(r: Ride) {
     const ratio = r.left / r.total;
-    const [grade, mul] = ratio > 0.45 ? ['SPEEDY!', 1.3] as const : ratio > 0.15 ? ['NICE', 1] as const : ['SLOW...', 0.8] as const;
+    const [grade, mul] = ratio > 0.45 ? [t('grade.speedy'), 1.3] as const : ratio > 0.15 ? [t('grade.nice'), 1] as const : [t('grade.slow'), 0.8] as const;
     const others = this.aboard - 1; // Zoombox carpool: +25% for every other rider still aboard
     const fare = Math.round(r.base * r.fareMul * mul * SURGE[this.surge][3] * (this.premium ? 1.3 : 1) * (1 + 0.25 * others));
-    if (others > 0) this.popup(`CARPOOL BONUS ×${1 + 0.25 * others}`, 'good');
+    if (others > 0) this.popup(t('pop.carpoolBonus', { n: 1 + 0.25 * others }), 'good');
     this.cash += fare;
-    this.popup(`${grade}  +${Math.ceil(r.left)}s SAVED`, 'big');
-    this.popup(`FARE ${money(fare)}`, 'good');
+    this.popup(t('pop.saved', { grade, n: Math.ceil(r.left) }), 'big');
+    this.popup(t('pop.fare', { money: money(fare) }), 'good');
     // The passenger rates the ride on what they wanted: the stars set the tip and move the driver rating.
     if (r.want.id === 'ontime') r.want.tick(0, 0, ratio, false, false);
     const stars = Math.max(1, r.want.stars);
     this.starsGiven.push(stars);
     this.safety = Math.min(100, Math.max(0, this.safety + [0, -15, -8, -2, 2, 6][stars]));
-    if (this.safety <= 0) this.gameOver('DEACTIVATED');
+    if (this.safety <= 0) this.gameOver('deactivated');
     const tip = Math.round(r.base * [0, 0, 0.25, 0.6, 1, 1.6][stars] * r.type.tipMul);
-    let line = tip ? `TIP ${money(tip)}` : 'NO TIP';
+    let line = tip ? t('stamp.tip', { money: money(tip) }) : t('stamp.noTip');
     if (r.type.id === 'rocket') {
       const promise = Math.max(1, tip) * 100000;
       this.promised += promise;
-      line = `TIP ${money(promise)} (NEXT YEAR)`;
+      line = t('stamp.tipNextYear', { money: money(promise) });
     } else if (r.type.id === 'founder') {
       this.equity += tip * 10;
-      line = tip ? `${tip * 10} SHARES VESTING` : 'NO SHARES';
+      line = tip ? t('stamp.shares', { n: tip * 10 }) : t('stamp.noShares');
     } else this.cash += tip;
     this.stamp(stars, `${r.want.def.title} ${r.want.shown} · ${line}`);
     const surgeBefore = this.surge;
     this.fares++;
     if (this.surge > surgeBefore) {
       this.relabelFares(); // prices went up
-      this.popup(`SURGE PRICING ${SURGE[this.surge][3]}×`, 'big bad');
+      this.popup(t('pop.surge', { n: SURGE[this.surge][3] }), 'big bad');
       sfx.armed();
+      this.quips.say('cab', 'surge', { delay: 3.5 });
     }
     sfx.cash();
-    this.quips.say(r.type.id, 'dropoff', { force: true });
+    this.say(r, 'dropoff', { force: true });
     if (this.rand() < 0.3) this.quips.say('cab', 'dropoff', { delay: 3 });
     this.leave(r);
   }
@@ -976,14 +1038,14 @@ export class Game {
     const c = dest.curb.road;
     g.add(groundRing(c.x, c.z, 7, 8.5, 0x46e0c4, 0.9));
     g.add(beam(c, 8, 60, 0x46e0c4, 0.22));
-    const label = makeLabel(dest.name, { bg: '#0b3d36e0', fg: '#7dfff0', height: 3 });
+    const label = makeLabel(place(dest.name), { bg: '#0b3d36e0', fg: '#7dfff0', height: 3 });
     label.position.set(c.x, c.y + 16, c.z);
     g.add(label);
     this.destMarker = g;
     this.scene.add(g);
   }
 
-  private gameOver(reason: string) {
+  private gameOver(reason: 'time' | 'deactivated') {
     if (this.state !== 'play') return;
     this.state = 'over';
     document.body.dataset.state = 'over';
@@ -992,27 +1054,25 @@ export class Game {
     if (this.equity > 0) {
       const exit = this.rand() < 0.15;
       if (exit) this.cash += this.equity;
-      equityLine = exit
-        ? `<div>Founder's startup got acquired! ${this.equity} shares → <b>${money(this.equity)}</b></div>`
-        : `<div>Founder's startup folded. ${this.equity} shares → <b>$0</b></div>`;
+      equityLine = `<div>${t(exit ? 'over.acquired' : 'over.folded', { n: this.equity, money: money(exit ? this.equity : 0) })}</div>`;
     }
     const given = this.starsGiven;
-    const starLine = given.length ? `<div>Passenger rating: <b>${(given.reduce((a, b) => a + b, 0) / given.length).toFixed(1)} ★</b> · five-star rides: <b>${given.filter((n) => n === 5).length}</b></div>` : '';
-    const airLine = this.maxAir > 0.85 ? `<div>Biggest air: <b>${this.maxAir.toFixed(1)} s</b></div>` : '';
-    const promiseLine = this.promised ? `<div>Tips promised for next year: <b>${money(this.promised)}</b> (received: $0)</div>` : '';
-    const sub = reason === 'DEACTIVATED' ? 'Your driver rating fell below 4.00. Your account has been deactivated.' : 'Your shift is over.';
+    const starLine = given.length ? `<div>${t('over.stars', { avg: (given.reduce((a, b) => a + b, 0) / given.length).toFixed(1), n: given.filter((n) => n === 5).length })}</div>` : '';
+    const airLine = this.maxAir > 0.85 ? `<div>${t('over.air', { s: secs(this.maxAir) })}</div>` : '';
+    const promiseLine = this.promised ? `<div>${t('over.promised', { money: money(this.promised) })}</div>` : '';
+    const shift = `${Math.floor(this.shiftTime / 60)}:${String(Math.floor(this.shiftTime % 60)).padStart(2, '0')}`;
     const ov = $('#overlay');
     ov.className = 'dim';
     ov.innerHTML = `
-      <h2>${reason}</h2>
+      <h2>${t(reason === 'deactivated' ? 'over.deactivated' : 'over.timeUp')}</h2>
       <div class="stats">
-        <div>${sub}</div>
-        <div>Shift: <b>${Math.floor(this.shiftTime / 60)}:${String(Math.floor(this.shiftTime % 60)).padStart(2, '0')}</b> · Fares delivered: <b>${this.fares}</b> · Final rating: <b>${this.rating.toFixed(2)} ★</b></div>
+        <div>${t(reason === 'deactivated' ? 'over.deactivatedSub' : 'over.timeUpSub')}</div>
+        <div>${t('over.summary', { shift, fares: this.fares, rating: this.rating.toFixed(2) })}</div>
         ${starLine}${airLine}${equityLine}${promiseLine}
         <div class="total">${money(this.cash)}</div>
       </div>
-      <div class="press pad-only">${btn('confirm', 'DRIVE AGAIN')}</div><div class="pad pad-only">${btn('back', 'Change cab')}</div>
-      <div class="tap-row touch-only">${tapButton('confirm', 'DRIVE AGAIN', 'go')}${tapButton('back', 'CHANGE CAB')}</div>`;
+      <div class="press pad-only">${btn('confirm', t('over.again'))}</div><div class="pad pad-only">${btn('back', t('over.change'))}</div>
+      <div class="tap-row touch-only">${tapButton('confirm', t('over.again'), 'go')}${tapButton('back', t('over.change'))}</div>`;
     sfx.bad();
   }
 
@@ -1092,14 +1152,14 @@ export class Game {
   private updateHud() {
     $('#time').textContent = String(Math.ceil(this.time));
     const surge = this.surge;
-    $('#surge').textContent = surge ? `SURGE ${SURGE[surge][3]}×` : '';
+    $('#surge').textContent = surge ? t('hud.surge', { n: SURGE[surge][3] }) : '';
     $('#clock').classList.toggle('low', this.time < 10);
     $('#money').textContent = money(this.cash);
     $('#rating .score b').textContent = this.rating.toFixed(2);
     $('#rating .fill').style.width = `${this.safety}%`;
     $('#rating').classList.toggle('low', this.safety < 30);
     $('#speed b').textContent = String(Math.round(this.car.speed * 2.237));
-    $('#combo').textContent = this.combo > 1 ? `COMBO ×${this.combo}` : '';
+    $('#combo').textContent = this.combo > 1 ? t('hud.combo', { n: this.combo }) : '';
     const lc = this.car.launchCharge;
     $('#launch').hidden = lc <= 0;
     $('#launch .fill').style.width = `${Math.min(100, (lc / 0.8) * 100)}%`;
@@ -1112,23 +1172,23 @@ export class Game {
       const src = `/portraits/${r.type.id}.avif`;
       if (!face.src.endsWith(src)) face.src = src;
       const who = $('#fare .who');
-      who.textContent = r.type.label.replace('★ ', '★ ') + (this.pool.length ? `  +${this.pool.length} aboard` : '');
+      who.textContent = nameTag(r.type, r.name) + (this.pool.length ? `  ${t('hud.aboard', { n: this.pool.length })}` : '');
       who.style.color = SPEAKERS[r.type.id].color;
-      $('#fare .dest').textContent = r.firedT > 0 ? 'Temporarily fired by the board…' : `→ ${r.dest.name}`;
+      $('#fare .dest').textContent = r.firedT > 0 ? t('hud.firedNote') : `→ ${place(r.dest.name)}`;
       $('#fare .clock').textContent = r.firedT > 0 ? `${Math.ceil(r.firedT)}` : `${Math.ceil(r.left)}`;
-      const t = r.left / r.total;
-      fare.classList.toggle('warn', t <= 0.45 && t > 0.15);
-      fare.classList.toggle('urgent', t <= 0.15);
+      const share = r.left / r.total;
+      fare.classList.toggle('warn', share <= 0.45 && share > 0.15);
+      fare.classList.toggle('urgent', share <= 0.15);
     }
     // What this passenger wants, under the timer: like the driver rating, five stars to fill.
     const want = $('#want');
     want.classList.toggle('hidden', !r);
     if (r) {
       const w = r.want;
-      $('#want .lbl').textContent = `${r.type.label.replace('★ ', '')} WANTS`;
+      $('#want .lbl').textContent = t('hud.wants', { name: shortName(r.type.id, r.name).toUpperCase() });
       $('#want .score b').textContent = `${w.def.icon} ${w.def.title}`;
       $('#want .fill').style.width = `${(w.fill * 100).toFixed(1)}%`;
-      $('#want .note').textContent = w.targets.length ? `GOAL ${w.targets.at(-1)!.toUpperCase()} · NOW ${w.shown.toUpperCase()}` : 'EVERY BUMP COSTS YOU';
+      $('#want .note').textContent = w.targets.length ? t('hud.goal', { goal: w.targets.at(-1)!.toUpperCase(), now: w.shown.toUpperCase() }) : t('hud.everyBump');
     }
   }
 
