@@ -35,7 +35,8 @@ export async function pool<T>(items: T[], limit: number, job: (item: T) => Promi
 
 // The landmarks (assets/blender/landmarks.py), one of each, placed by world.ts.
 export const landmarkModels: Partial<Record<string, THREE.Object3D>> = {};
-const LANDMARKS = ['salesfarce_tower', 'pyramid', 'ferry_building', 'coit_tower', 'golden_gate'];
+const LANDMARKS = ['salesfarce_tower', 'pyramid', 'ferry_building', 'coit_tower', 'golden_gate',
+  'city_hall', 'dragon_gate', 'palace_of_fine_arts', 'alcatraz'];
 
 // Loads the street kit and the landmarks; a model that fails to load is just missing.
 export async function loadStreetKit() {
