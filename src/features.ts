@@ -182,7 +182,7 @@ export function buildFeatures(scene: THREE.Scene) {
 // The Alcatraz Express: a pier off the end of the street at x = 192, angled at the clear lane
 // along the island's east side, with a boost strip and a kicker. Every cab leaves the lip at the
 // same speed, flies about 80 m (21 m up at the top) and lands in the lane, heading for the tyre
-// wall in front of the water tower (world.ts). The flight is checked in tests/api/alcatraz.test.mts.
+// wall in front of the water tower (world.ts). tests/ui/alcatraz.spec.ts flies every cab off it.
 export const ALCATRAZ_JUMP = (() => {
   const start = { x: 192, z: -HALF - 2 };
   const target = { x: ALCATRAZ.x + 11, z: ALCATRAZ.z + 8 }; // where it lands: the lane, south of the drop-off
