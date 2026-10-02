@@ -31,6 +31,7 @@ const STEP = 1 / 120;
 const START_TIME = 90; // with SURGE below, aimed at a 3-5 minute shift
 const START = BAY; // every shift starts by pulling out of the robotaxi rank
 const WAITING_COUNT = 40;
+const CARPOOL_MAX = 3; // the Zoombox carries up to this many fares at once
 // Surge pricing is the difficulty: every 5 deliveries it climbs a level, up to 4.
 // [time added at pickup (share of the fare's limit), fare limit, want targets, fare pay]
 const SURGE: [number, number, number, number][] = [
@@ -72,6 +73,7 @@ interface Ride {
   timeLowSaid: boolean;
   ejected?: PersonModel;
   want: Want; // what this passenger wants from the ride, rated 1-5 stars
+  marker?: THREE.Group; // a carpool rider's own destination beam (the lead's is destMarker)
 }
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector(sel) as T;
@@ -94,6 +96,9 @@ export class Game {
   equity = 0;
   promised = 0;
   private starsGiven: number[] = []; // each passenger's rating this shift
+  private pool: Ride[] = []; // the Zoombox's other riders; this.ride is the one whose stop is nearest
+  private get carpool() { return CABS[this.cabIndex].id === 'zoox'; }
+  private get aboard() { return (this.ride ? 1 : 0) + this.pool.length; }
   private get surge() { return Math.min(SURGE.length - 1, Math.floor(this.fares / 5)); }
   private stampTimer = 0;
   fares = 0;
@@ -247,6 +252,8 @@ export class Game {
     this.waiting = [];
     if (this.ride?.ejected) this.scene.remove(this.ride.ejected.root);
     this.ride = null;
+    for (const p of this.pool) if (p.marker) this.scene.remove(p.marker);
+    this.pool = [];
     this.setDest(null);
     this.quips.reset();
     $('#quip').classList.add('hidden');
@@ -418,7 +425,7 @@ export class Game {
       splash ||= ev.splash;
       this.acc -= STEP;
     }
-    if (hop) { sfx.hop(); this.ride?.want.feed('hop'); }
+    if (hop) { sfx.hop(); this.ride?.want.feed('hop'); for (const p of this.pool) p.want.feed('hop'); }
     if (armed) {
       sfx.armed();
       this.popup('LAUNCH MODE');
@@ -543,6 +550,7 @@ export class Game {
     if (r && r.firedT <= 0) {
       r.incidents++;
       r.want.feed('crash', impact);
+      for (const p of this.pool) p.want.feed('crash', impact);
       if (!this.quips.say(r.type.id, 'crash')) this.quips.say('cab', 'crash');
     } else this.quips.say('cab', 'crash');
   }
@@ -588,6 +596,7 @@ export class Game {
       this.popup('SHE MISSED IT', 'bad');
       return;
     }
+    for (const p of this.pool) p.want.feed(kind, amount); // carpool riders count it too
     const before = r.want.stars;
     if (!r.want.feed(kind, amount)) return; // they don't care
     if (r.want.id === 'smooth') {
@@ -724,8 +733,9 @@ export class Game {
   private updateWaiting(dt: number) {
     this.idleAnimations(dt);
     // With a passenger aboard, the others' rings and beams are just noise: hide them (they still wait).
-    for (const w of this.waiting) w.marker.visible = !this.ride;
-    if (this.ride || this.car.speed > 4) return;
+    const room = !this.ride || (this.carpool && this.aboard < CARPOOL_MAX);
+    for (const w of this.waiting) w.marker.visible = room;
+    if (!room || this.car.speed > 4) return;
     const w = this.waiting.find((w) => flat(w.curb.road, this.car.pos) < 7);
     if (w) this.pickup(w);
   }
@@ -737,24 +747,77 @@ export class Game {
     const [give, limit, hard] = SURGE[this.surge];
     const total = (d / 19 + 6) * w.type.timeMul * limit;
     const want = new Want(w.want, w.type.id, total, hard);
-    this.ride = {
+    const ride: Ride = {
       type: w.type, dest: w.dest, base: 4 + d * 0.05, total, left: total, startDist: d,
       tips: 0, equity: 0, fareMul: w.type.fareMul, filmed: false, firedDone: false, firedT: 0,
       rerouted: false, incidents: 0, slowT: 0, idleT: 7, timeLowSaid: false, want,
     };
-    this.showWantCard(this.ride);
+    if (this.ride) {
+      // Zoombox carpool: they ride along with their own stop, timer and want.
+      ride.marker = this.poolMarker(ride.dest);
+      this.pool.push(ride);
+      this.popup(`CARPOOL ×${this.aboard}`, 'big good');
+      this.relead();
+    } else {
+      this.ride = ride;
+      this.showWantCard(this.ride);
+    }
     // Part of the fare's time limit goes on the shift clock (less as the surge climbs): deliver fast and keep the change.
     this.time += total * give;
     this.popup(`+${Math.round(total * give)}s`, 'big good');
-    this.setDest(w.dest);
+    if (this.ride === ride) this.setDest(w.dest);
     sfx.pickup();
     this.popup(w.type.label.replace('★ ', ''), 'big');
-    this.quips.line(w.type.id, this.ride.want.ask); // they say what they want
+    this.quips.line(w.type.id, ride.want.ask); // they say what they want
     if (this.rand() < 0.35) this.quips.say('cab', 'pickup', { delay: 3 });
     while (this.waiting.length < WAITING_COUNT) this.spawnWaiting();
   }
 
+  // A carpool rider's destination: a smaller orange beam (the lead's is the big teal one).
+  private poolMarker(dest: Landmark) {
+    const g = new THREE.Group();
+    const c = dest.curb.road;
+    g.add(groundRing(c.x, c.z, 6, 7.2, 0xff9a3a, 0.85));
+    g.add(beam(c, 6, 40, 0xff9a3a, 0.2));
+    const label = makeLabel(dest.name, { bg: '#4a2a0ae0', fg: '#ffd2a0', height: 2.2 });
+    label.position.set(c.x, c.y + 12, c.z);
+    g.add(label);
+    this.scene.add(g);
+    return g;
+  }
+
+  // The lead ride is the one whose stop is nearest: the arrow, fare panel and want panel follow it.
+  private relead() {
+    const lead = this.ride;
+    if (!lead || !this.pool.length || lead.firedT > 0) return;
+    const dist = (r: Ride) => blocks(this.car.pos, r.dest.curb.road);
+    const best = this.pool.reduce((a, b) => (dist(b) < dist(a) ? b : a));
+    if (dist(best) >= dist(lead) - 20) return; // a margin, so the lead doesn't flicker
+    this.pool = this.pool.filter((p) => p !== best);
+    if (best.marker) this.scene.remove(best.marker);
+    best.marker = undefined;
+    lead.marker = this.poolMarker(lead.dest);
+    this.pool.push(lead);
+    this.ride = best;
+    this.setDest(best.dest);
+    this.showWantCard(best);
+  }
+
+  // The Zoombox's other riders: their clocks run, their wants fill, and any of them can be dropped off.
+  private updatePool(dt: number) {
+    if (!this.pool.length) return;
+    const airborne = !this.car.grounded, sliding = this.car.grounded && Math.abs(this.car.lateral) > 3 && this.car.speed > 8;
+    for (const p of [...this.pool]) {
+      p.left -= dt;
+      if (p.left <= 0) { this.walkout(p); continue; }
+      p.want.tick(dt, this.car.speed, p.left / p.total, airborne && (p.type.id !== 'cmo' || p.filmed), sliding);
+      if (flat(this.car.pos, p.dest.curb.road) < 9 && this.car.speed < 5) this.dropoff(p);
+    }
+    if (Math.floor(this.clock * 2) !== Math.floor((this.clock - dt) * 2)) this.relead();
+  }
+
   private updateRide(dt: number) {
+    this.updatePool(dt);
     const r = this.ride;
     if (!r) return;
     const id = r.type.id;
@@ -775,7 +838,7 @@ export class Game {
     }
 
     r.left -= dt;
-    if (r.left <= 0) return this.walkout();
+    if (r.left <= 0) return this.walkout(r);
     // The CMO's air only counts once her phone is up (after the first jump).
     const airborne = !this.car.grounded && (r.type.id !== 'cmo' || r.filmed);
     const sliding = this.car.grounded && Math.abs(this.car.lateral) > 3 && this.car.speed > 8;
@@ -837,21 +900,41 @@ export class Game {
     this.popup('REROUTED!', 'big bad');
   }
 
-  private walkout() {
-    const r = this.ride!;
+  private walkout(r: Ride = this.ride!) {
     this.quips.say(r.type.id, 'walkout', { force: true });
     if (this.rand() < 0.5) this.quips.say('cab', 'walkout', { delay: 2.6 });
     this.popup('PASSENGER BAILED', 'big bad');
     sfx.bad();
     this.combo = 0;
+    this.leave(r);
+  }
+
+  // A passenger gets out (delivered or bailed): the next nearest carpool rider becomes the lead.
+  private leave(r: Ride) {
+    if (r !== this.ride) {
+      this.pool = this.pool.filter((p) => p !== r);
+      if (r.marker) this.scene.remove(r.marker);
+      return;
+    }
     this.ride = null;
     this.setDest(null);
+    if (!this.pool.length) return;
+    const dist = (p: Ride) => blocks(this.car.pos, p.dest.curb.road);
+    const next = this.pool.reduce((a, b) => (dist(b) < dist(a) ? b : a));
+    this.pool = this.pool.filter((p) => p !== next);
+    if (next.marker) this.scene.remove(next.marker);
+    next.marker = undefined;
+    this.ride = next;
+    this.setDest(next.dest);
+    this.showWantCard(next);
   }
 
   private dropoff(r: Ride) {
     const ratio = r.left / r.total;
     const [grade, mul] = ratio > 0.45 ? ['SPEEDY!', 1.3] as const : ratio > 0.15 ? ['NICE', 1] as const : ['SLOW...', 0.8] as const;
-    const fare = Math.round(r.base * r.fareMul * mul * SURGE[this.surge][3] * (this.premium ? 1.3 : 1));
+    const others = this.aboard - 1; // Zoombox carpool: +25% for every other rider still aboard
+    const fare = Math.round(r.base * r.fareMul * mul * SURGE[this.surge][3] * (this.premium ? 1.3 : 1) * (1 + 0.25 * others));
+    if (others > 0) this.popup(`CARPOOL BONUS ×${1 + 0.25 * others}`, 'good');
     this.cash += fare;
     this.popup(`${grade}  +${Math.ceil(r.left)}s SAVED`, 'big');
     this.popup(`FARE ${money(fare)}`, 'good');
@@ -882,8 +965,7 @@ export class Game {
     sfx.cash();
     this.quips.say(r.type.id, 'dropoff', { force: true });
     if (this.rand() < 0.3) this.quips.say('cab', 'dropoff', { delay: 3 });
-    this.ride = null;
-    this.setDest(null);
+    this.leave(r);
   }
 
   private setDest(dest: Landmark | null) {
@@ -1030,7 +1112,7 @@ export class Game {
       const src = `/portraits/${r.type.id}.avif`;
       if (!face.src.endsWith(src)) face.src = src;
       const who = $('#fare .who');
-      who.textContent = r.type.label.replace('★ ', '★ ');
+      who.textContent = r.type.label.replace('★ ', '★ ') + (this.pool.length ? `  +${this.pool.length} aboard` : '');
       who.style.color = SPEAKERS[r.type.id].color;
       $('#fare .dest').textContent = r.firedT > 0 ? 'Temporarily fired by the board…' : `→ ${r.dest.name}`;
       $('#fare .clock').textContent = r.firedT > 0 ? `${Math.ceil(r.firedT)}` : `${Math.ceil(r.left)}`;
