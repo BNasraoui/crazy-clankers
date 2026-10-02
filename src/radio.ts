@@ -6,6 +6,16 @@ import { onLang, t, translate, type Key } from './i18n';
 export interface Station { name: string; source: string; genre?: string; credit?: string }
 // Internet radio: licensed stations streaming over HTTPS. They play through a plain
 // audio element, so they need nothing on screen. Credit goes to each broadcaster.
+// A tenth of a second of silence (8 kHz, 8-bit WAV), for unlocking the <audio> element inside an input.
+const SILENCE = (() => {
+  const n = 800, b = new Uint8Array(44 + n), v = new DataView(b.buffer);
+  const str = (o: number, x: string) => [...x].forEach((c, i) => (b[o + i] = c.charCodeAt(0)));
+  str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+  v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+  str(36, 'data'); v.setUint32(40, n, true); b.fill(128, 44);
+  return `data:audio/wav;base64,${btoa(String.fromCharCode(...b))}`;
+})();
+
 export const DEFAULT_STATIONS: Station[] = [
   // Game soundtracks: YouTube playlists whose tracks all allow embedding (checked 2026-10-02).
   { name: 'SSX Tricky', genre: 'Game soundtrack', credit: 'YouTube playlist', source: 'PL8E46108211380524' },
@@ -67,6 +77,7 @@ interface Player {
   setVolume(volume: number): void;
   getPlaylist(): string[] | undefined;
   getPlaylistIndex(): number;
+  getPlayerState(): number; // -1 unstarted, 0 ended, 1 playing, 2 paused, 3 buffering, 5 cued
   getVideoData(): { title?: string; video_id?: string };
   destroy(): void;
 }
@@ -129,6 +140,8 @@ export class Radio {
   private blocked = false; // the browser refused to start: the station stays loaded and starts on the next input
   private retried = false; // one retry per station when the browser blocks it after an input
   private refused = false; // blocked since it last played: YouTube only says so once, later blocks look like stalls
+  private audioUnlocked = false; // the <audio> element has played inside an input, so it may play later without one
+  private fallback = 0; // timer: YouTube still silent after an input means a strict browser, so switch to a stream
   private volume = 0.35;
   private ducked = false;
   private failedTracks = new Set<number>();
@@ -224,13 +237,13 @@ export class Radio {
     this.audio.onended = () => (this.isStream() ? this.tune(this.selected, true) : this.nextTrack());
     this.audio.onerror = () => (this.isStream() ? this.stationFailed() : this.trackFailed());
     document.addEventListener('click', e => {
-      if ((e.target as Element).closest('[data-radio-open]')) this.open();
-      else if (this.waiting && e.isTrusted) this.gesture();
+      if ((e.target as Element).closest('[data-radio-open]')) this.open(e.isTrusted);
+      else if (this.waiting && e.isTrusted) this.gesture(true);
     });
     // Phones: driving taps never become clicks, so start on the first lifted finger (iOS counts touchend as a gesture).
-    document.addEventListener('touchend', e => { if (this.waiting && e.isTrusted) this.gesture(); });
+    document.addEventListener('touchend', e => { if (this.waiting && e.isTrusted) this.gesture(true); });
     // Keys too, inside the keydown itself: the game reads keys on the next frame, outside the event.
-    addEventListener('keydown', e => { if (this.waiting && e.isTrusted && e.key !== 'Escape') this.gesture(); });
+    addEventListener('keydown', e => { if (this.waiting && e.isTrusted && e.key !== 'Escape') this.gesture(true); });
   }
 
   /** Returns true when the radio screen consumes menu input. */
@@ -308,11 +321,45 @@ export class Radio {
   }
 
   // Start the waiting station; called from input events so the play counts as the player's.
-  private resume() {
+  private resume(trusted = false) {
     this.blocked = false;
     this.playing = true; this.showToggle();
     if (this.selected === this.stations.length || this.isStream()) this.startLocalAudio();
-    else { if (this.ready) this.player?.playVideo(); this.armWatchdog(); } // not ready yet: onReady plays it
+    else {
+      if (this.ready) this.player?.playVideo(); // not ready yet: onReady plays it
+      this.armWatchdog();
+      if (trusted || this.audioUnlocked) this.armFallback(); // after a person's input, not a retry on our own
+    }
+  }
+
+  // Some browsers (in-app browsers, iPhone) only let a YouTube player start from a tap on the player
+  // itself, and ours is out of sight. If it's still silent a few seconds after the player's input,
+  // switch to the first internet station: those play on our own <audio>, which that input unlocked.
+  private armFallback() {
+    clearTimeout(this.fallback);
+    const token = this.generation;
+    this.fallback = window.setTimeout(() => {
+      if (token !== this.generation || (!this.playing && !this.blocked) || !this.isYouTube()) return; // paused on purpose: leave it
+      const state = this.player?.getPlayerState?.();
+      if (state !== undefined && state !== -1 && state !== 5) return; // playing, buffering or paused: YouTube is fine
+      const stream = this.stations.findIndex((st) => !!streamSource(st.source));
+      if (stream < 0) return;
+      const from = this.stationLabel.textContent ?? '';
+      this.tune(stream, true);
+      this.message(t('radio.ytFallback', { name: from, next: this.stations[stream].name }));
+    }, 6000);
+  }
+
+  // Inside an input: play a moment of silence on the <audio> element, so a stream can start on it
+  // later without another input (browsers remember per element that a person started it).
+  private unlockAudio() {
+    if (this.audioUnlocked || !this.audio.paused) return;
+    const had = this.audio.getAttribute('src');
+    this.audio.src = SILENCE;
+    void this.audio.play().then(() => {
+      this.audioUnlocked = true;
+      if (this.audio.src === SILENCE) { this.audio.pause(); if (had) this.audio.src = had; else this.audio.removeAttribute('src'); }
+    }, () => { /* not counted as an input here: the next one tries again */ });
   }
 
   private firstStation() { return Math.max(0, this.stations.findIndex((s) => s.source === FIRST_STATION)); }
@@ -321,9 +368,13 @@ export class Radio {
   // loads must not be lost, or a blocked autostart waits for a second one.
   private get waiting() { return !this.interacted || this.autostarting || this.blocked; }
 
-  private gesture() {
-    if (this.blocked) this.resume();
-    else if (this.autostarting) this.autostarting = false; // let it load; from now on a block retries (waitForInput)
+  private gesture(trusted = false) {
+    if (trusted && !this.isStream()) this.unlockAudio();
+    if (this.blocked) this.resume(trusted);
+    else if (this.autostarting) { // let it load; from now on a block retries (waitForInput)
+      this.autostarting = false;
+      if (trusted && this.isYouTube()) this.armFallback();
+    }
     else {
       this.interacted = true;
       if (this.stations.length) this.tune(this.firstStation());
@@ -417,6 +468,7 @@ export class Radio {
               } else if (this.playing) this.player!.playVideo();
             }
             if (data === 1) {
+              clearTimeout(this.fallback);
               this.autostarting = this.refused = this.blocked = false;
               this.failedAttempts = 0;
               clearTimeout(this.watchdog);
@@ -562,8 +614,8 @@ export class Radio {
     });
   }
 
-  private open() {
-    if (this.waiting) this.gesture();
+  private open(trusted = false) {
+    if (this.waiting) this.gesture(trusted);
     this.returnFocus = document.activeElement as HTMLElement;
     this.screen.hidden = false;
     this.screen.querySelector<HTMLElement>('button')?.focus();

@@ -312,6 +312,7 @@ const EN = {
   'radio.trackSkip': 'Track unavailable — skipping.',
   'radio.noFiles': 'No audio files selected.',
   'radio.pressPlay': 'Press Play to start the radio.',
+  'radio.ytFallback': "{name} won't play in this browser. Switched to {next}.",
 };
 
 const ZH: Record<keyof typeof EN, string> = {
@@ -593,6 +594,7 @@ const ZH: Record<keyof typeof EN, string> = {
   'radio.trackSkip': '这首歌放不了，跳过。',
   'radio.noFiles': '没有选中音频文件。',
   'radio.pressPlay': '点播放来开启电台。',
+  'radio.ytFallback': '这个浏览器放不了 {name}，已换成 {next}。',
 };
 
 // Drop-off names on the beams, the fare panel and the Rocket Guy's reroutes (world.ts keeps the English).
