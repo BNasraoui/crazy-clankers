@@ -259,7 +259,7 @@ export class Game {
     this.quips.reset();
     $('#quip').classList.add('hidden');
     $('#popups').replaceChildren();
-    while (this.waiting.length < WAITING_COUNT) this.spawnWaiting();
+    this.fillWaiting();
   }
 
   // ---------- main loop ----------
@@ -632,10 +632,18 @@ export class Game {
 
   // ---------- passengers ----------
 
+  // Top up the waiting fares; bounded, so a crowded city can never stall the game.
+  private fillWaiting() {
+    for (let k = 0; k < WAITING_COUNT * 3 && this.waiting.length < WAITING_COUNT; k++) this.spawnWaiting();
+  }
+
   private spawnWaiting() {
     // Keep about half the fares within a short drive of the cab, so one is usually in view.
-    const near = this.waiting.filter((w) => flat(w.curb.road, this.car.pos) < 220).length < WAITING_COUNT * 0.6;
-    for (let tries = 0; tries < 50; tries++) {
+    const wantNear = this.waiting.filter((w) => flat(w.curb.road, this.car.pos) < 220).length < WAITING_COUNT * 0.6;
+    for (let tries = 0; tries < 100; tries++) {
+      // The first 50 tries look near the cab (when it needs more fares close by), the rest anywhere:
+      // when the blocks around the cab are full, the fare goes elsewhere instead of failing.
+      const near = wantNear && tries < 50;
       let bi = Math.floor(this.rand() * N), bj = Math.floor(this.rand() * N);
       if (near) {
         const ci = Math.floor((this.car.pos.x + HALF) / CELL), cj = Math.floor((this.car.pos.z + HALF) / CELL);
@@ -772,7 +780,7 @@ export class Game {
     this.popup(w.type.label.replace('★ ', ''), 'big');
     this.quips.line(w.type.id, ride.want.ask); // they say what they want
     if (this.rand() < 0.35) this.quips.say('cab', 'pickup', { delay: 3 });
-    while (this.waiting.length < WAITING_COUNT) this.spawnWaiting();
+    this.fillWaiting();
   }
 
   // A carpool rider's destination: a smaller orange beam (the lead's is the big teal one).

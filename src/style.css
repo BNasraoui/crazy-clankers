@@ -218,7 +218,7 @@ body { font-family: var(--body); color: var(--paper); user-select: none; }
 
 /* ===== Title screen + cab picker (taxi rank) ===== */
 .menu { position: fixed; inset: 0; pointer-events: none; }
-.menu .logo-block { position: absolute; top: 4%; left: 3%; transform: rotate(-5deg); text-align: left; }
+.menu .logo-block { position: absolute; top: max(4%, 26px); /* room for the tilt on short screens */ left: 3%; transform: rotate(-5deg); text-align: left; }
 #overlay .menu .logo { margin: 0; transform: none; font: clamp(40px, 8.2vw, 104px)/0.9 var(--num); color: var(--yellow);
   -webkit-text-stroke: 0.07em var(--ink); paint-order: stroke fill; text-shadow: 6px 6px 0 var(--ink); }
 #overlay .menu .logo span { display: block; color: var(--teal); }
