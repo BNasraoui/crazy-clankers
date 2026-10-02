@@ -614,3 +614,7 @@ html.touch .radio-menu-button { min-height: 48px; padding: 8px 18px; font-size: 
 #lookpanel .lk-head { display: flex; align-items: center; justify-content: space-between; }
 #lk-close { width: 34px; height: 34px; padding: 0; font: 800 16px var(--body); color: var(--ink); background: var(--paper);
   border: 2px solid var(--ink); border-radius: 50%; box-shadow: 2px 2px 0 var(--ink); cursor: pointer; pointer-events: auto; touch-action: manipulation; }
+
+/* A crowded station wheel: smaller stickers so neighbours don't overlap. */
+#radio-wheel .ring.dense .slot { font-size: 12px; padding: 3px 7px; max-width: 18%; }
+#radio-wheel .ring.dense .slot.on { transform: translate(-50%, -50%) rotate(-3deg) scale(1.3); }

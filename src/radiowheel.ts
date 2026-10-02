@@ -66,7 +66,7 @@ export class RadioWheel {
   private render() {
     const n = this.items.length;
     const r = 39; // % of the wheel's size
-    this.el.innerHTML = `<div class="ring">${this.items.map((it, i) => {
+    this.el.innerHTML = `<div class="ring${n > 14 ? ' dense' : ''}">${this.items.map((it, i) => {
       const a = (i / n) * Math.PI * 2;
       const x = 50 + r * Math.sin(a), y = 50 - r * Math.cos(a);
       const cls = `${i === this.pick ? 'on' : ''} ${it.disabled ? 'off' : ''}`;

@@ -6,6 +6,14 @@ export interface Station { name: string; source: string; genre?: string; credit?
 // Internet radio: licensed stations streaming over HTTPS. They play through a plain
 // audio element, so they need nothing on screen. Credit goes to each broadcaster.
 export const DEFAULT_STATIONS: Station[] = [
+  // Game soundtracks: YouTube playlists whose tracks all allow embedding (checked 2026-10-02).
+  { name: 'Crazy Taxi', genre: 'Game soundtrack', credit: 'YouTube playlist', source: 'PL1769A4saL4KY16HsbBRuie0aK2gc1Ukz' },
+  { name: 'Jet Set Radio', genre: 'Game soundtrack', credit: 'YouTube playlist', source: 'PLE3VL-5NEtZiefRHaaTUGnU7JhOkbd3mT' },
+  { name: 'Jet Set Radio Future', genre: 'Game soundtrack', credit: 'YouTube playlist', source: 'PL0541582D4B7CA841' },
+  { name: "Tony Hawk's Pro Skater 1-4", genre: 'Game soundtrack', credit: 'YouTube playlist', source: 'PLB3FnBA-48BED8VsTro4T0-emKTPWI7iK' },
+  { name: 'Aggressive Inline', genre: 'Game soundtrack', credit: 'YouTube playlist', source: 'PL1NMu3P_ZJ911aICRc2YuwJrl0wNms37e' },
+  { name: 'SSX Tricky', genre: 'Game soundtrack', credit: 'YouTube playlist', source: 'PL8E46108211380524' },
+  // Internet radio.
   { name: "Punk's Not Dead", genre: 'Punk', credit: 'Polygon.FM', source: 'https://eu6.fastcast4u.com/proxy/pnd?mp=/stream' },
   { name: 'Alt Rock', genre: 'Alternative', credit: 'Best Of Rock.FM', source: 'https://bestofrockfm.stream.vip/altrock/mp3-256/bestofrock.fm/' },
   { name: 'Hip Hop Mixtape', genre: 'Hip hop', credit: 'NTS', source: 'https://stream-mixtape-geo.ntslive.net/mixtape2' },
@@ -146,7 +154,12 @@ export class Radio {
       const old = saved ? null : JSON.parse(localStorage.getItem(OLD_STORAGE_KEY) || 'null');
       const keep = (list: unknown[]) => list.filter((s): s is Station => !!s && typeof (s as Station).name === 'string' && typeof (s as Station).source === 'string' && validSource((s as Station).source))
         .map((s) => ({ name: s.name.slice(0, 80), source: s.source, genre: s.genre, credit: s.credit }));
-      if (saved && Array.isArray(saved.stations)) this.stations = keep(saved.stations);
+      if (saved && Array.isArray(saved.stations)) {
+        this.stations = keep(saved.stations);
+        // Stations added to the defaults since this list was saved join it (at the front, like the defaults).
+        const have = new Set(this.stations.map((s) => s.source));
+        this.stations = [...DEFAULT_STATIONS.filter((d) => !have.has(d.source) && !(saved.seen ?? []).includes(d.source)), ...this.stations];
+      }
       // From the first build: keep anything Ben added, drop its two placeholders, add the new defaults.
       else if (old && Array.isArray(old.stations)) this.stations = [...this.stations, ...keep(old.stations).filter((s) => !OLD_DEFAULTS.includes(s.source))];
       const vol = (saved ?? old)?.volume;
@@ -253,10 +266,18 @@ export class Radio {
   }
 
   private autostart() {
-    if (this.interacted || !this.stations.length || !streamSource(this.stations[0].source)) return;
+    if (this.interacted || !this.stations.length) return;
     this.autostarting = true;
     this.tune(0);
     this.audio.addEventListener('playing', () => { this.autostarting = false; }, { once: true });
+  }
+
+  // The browser wants a tap or key before sound: wait quietly and start on the next input.
+  private waitForInput() {
+    this.autostarting = false;
+    this.off();
+    this.collapsed.hidden = true;
+    this.interacted = false;
   }
 
   private gesture() {
@@ -269,7 +290,7 @@ export class Radio {
   private setMini(mini: boolean) { this.dashboard.classList.toggle('mini', mini); }
 
   private save() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ stations: this.stations, volume: this.volume })); } catch { /* Play without persistence. */ }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ stations: this.stations, volume: this.volume, seen: DEFAULT_STATIONS.map((d) => d.source) })); } catch { /* Play without persistence. */ }
   }
 
   private message(text: string) {
@@ -350,6 +371,7 @@ export class Radio {
               } else if (this.playing) this.player!.playVideo();
             }
             if (data === 1) {
+              this.autostarting = false;
               this.failedAttempts = 0;
               clearTimeout(this.watchdog);
               this.playing = true; this.toggle.textContent = 'Pause';
@@ -365,8 +387,8 @@ export class Radio {
           },
           onAutoplayBlocked: () => {
             if (token !== this.generation) return;
-            clearTimeout(this.watchdog); this.playing = false; this.toggle.textContent = 'Play';
-            this.message('Press Play in the YouTube player to start audio.');
+            clearTimeout(this.watchdog);
+            this.waitForInput(); // the player is off screen, so there's no Play button to press
           },
         },
       });
@@ -480,7 +502,7 @@ export class Radio {
       if (token !== this.generation || error.name === 'AbortError') return;
       if (error.name === 'NotAllowedError') {
         // Before any input: wait quietly, and start on the first key, click or button.
-        if (this.autostarting) { this.autostarting = false; this.off(); this.collapsed.hidden = true; this.interacted = false; return; }
+        if (this.autostarting) { this.waitForInput(); return; }
         this.playing = false; this.toggle.textContent = 'Play'; this.message('Press Play to start the radio.');
       } else this.trackFailed();
     });
