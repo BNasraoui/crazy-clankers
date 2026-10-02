@@ -1,4 +1,7 @@
 // Everything is synthesized; no audio files.
+let voiceUntil = 0;
+export const voiceActive = () => performance.now() < voiceUntil;
+
 let ctx: AudioContext | null = null;
 let master: GainNode;
 let engineGain: GainNode;
@@ -76,6 +79,7 @@ function noise(dur: number, vol: number, cutoff: number) {
 // Animal Crossing-style babble: one blip per couple of letters.
 export function babble(text: string, pitch: number) {
   const n = Math.min(14, Math.ceil(text.length / 3));
+  voiceUntil = performance.now() + n * 70 + 100;
   for (let i = 0; i < n; i++) tone(pitch * (0.85 + Math.random() * 0.4), 0.05, 'square', 0.05, i * 0.07);
 }
 
@@ -94,5 +98,9 @@ export const sfx = {
   smash: () => { noise(0.12, 0.18, 1800); tone(140, 0.1, 'square', 0.06, 0, 70); },
   splash: () => { noise(0.7, 0.35, 1500); tone(300, 0.4, 'sine', 0.08, 0, 80); },
   geyser: () => noise(1.2, 0.2, 5000),
+  timber: () => { noise(0.5, 0.3, 700); tone(160, 0.5, 'sawtooth', 0.08, 0, 50); noise(0.6, 0.12, 3500); },
   yelp: () => tone(700 + Math.random() * 400, 0.22, 'triangle', 0.07, 0, 1300 + Math.random() * 500),
 };
+
+// For src/sfx.ts and src/voices.ts: the shared context and master bus, once unlocked.
+export const audioOut = () => (ctx ? { ctx, master } : null);

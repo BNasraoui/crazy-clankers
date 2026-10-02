@@ -1,23 +1,55 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <!-- One address: logins (Shoo) give a different player id per address, so www goes to the bare domain. -->
+    <script>if (location.hostname === 'www.crazyclankers.com') location.replace('https://crazyclankers.com' + location.pathname + location.search + location.hash);</script>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <title>Crazy Clankers</title>
+    <meta name="theme-color" content="#1b1722" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Clankers" />
+    <meta name="format-detection" content="telephone=no" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Permanent+Marker&family=Inter:wght@600;800&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Permanent+Marker&family=Inter:wght@600;800&display=block" />
+    <!-- Chinese display and body fonts: only fetched (in unicode-range slices) when the page is in Chinese. -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@500;700;900&display=swap" />
+    <link rel="preload" as="image" href="/keyart/jump.avif" fetchpriority="high" />
+    <link rel="stylesheet" href="/src/style.css" />
+    <script>
+      // The boot screen in the player's language before the game loads (src/i18n.ts takes over from here).
+      try { var l = localStorage.getItem('clankers.lang'); } catch (e) {}
+      if (l === 'zh' || (!l && /^zh/i.test(navigator.language))) document.documentElement.lang = 'zh-Hans';
+    </script>
+    <style>
+      /* Until the game is ready only the boot screen shows: no bare canvas, no unstyled HUD. */
+      html, body { background: #1b1722; }
+      .hidden { display: none !important; }
+      body:not(.ready) #view { visibility: hidden; }
+    </style>
   </head>
   <body>
     <canvas id="view"></canvas>
     <div id="hud" class="hidden">
-      <div id="clock" class="sticker"><span class="lbl">TIME</span><b id="time">75</b></div>
+      <div id="clock" class="sticker"><span class="lbl" data-i18n="hud.time">TIME</span><b id="time">75</b></div>
+      <div id="want" class="hidden">
+        <div class="lbl"></div>
+        <div class="score"><b></b></div>
+        <div class="track"><div class="fill"></div></div>
+        <div class="note"></div>
+      </div>
       <div id="right">
-        <div id="cash" class="sticker"><span class="lbl">CASH</span><b id="money">$0</b></div>
+        <div id="cash" class="sticker"><span class="lbl" data-i18n="hud.cash">CASH</span><b id="money">$0</b><span id="surge"></span></div>
         <div id="rating">
-          <div class="lbl">DRIVER RATING</div>
+          <div class="lbl" data-i18n="hud.rating">DRIVER RATING</div>
           <div class="score"><b>5.00</b><span class="star">★</span></div>
           <div class="track"><div class="fill"></div><div class="cutoff"></div></div>
-          <div class="note">Deactivation below 4.00</div>
+          <div class="note" data-i18n="hud.deactivation">Deactivation below 4.00</div>
         </div>
       </div>
       <div id="fare" class="hidden">
@@ -27,11 +59,19 @@
       </div>
       <div id="combo"></div>
       <div id="popups"></div>
+      <div id="stamp"></div>
       <div id="quip" class="hidden"><img class="face" alt="" /><div><span class="who"></span><span class="text"></span></div></div>
-      <div id="launch" hidden><span>LAUNCH MODE</span><div class="bar"><div class="fill"></div></div></div>
-      <div id="speed"><b>0</b><small>MPH</small></div>
+      <div id="launch" hidden><span data-i18n="pop.launchMode">LAUNCH MODE</span><div class="bar"><div class="fill"></div></div></div>
+      <div id="speed"><b>0</b><small data-i18n="hud.mph">MPH</small></div>
     </div>
-    <div id="overlay"></div>
+    <div id="overlay">
+      <div class="menu title-screen boot">
+        <img class="keyart" src="/keyart/jump.avif" alt="" fetchpriority="high" />
+        <div class="logo-block"><h1 class="logo">CRAZY<span>CLANKERS</span></h1><div class="tag" data-i18n="tagline">You are AGI. Drive like it.</div></div>
+        <div class="press-start loading"><i class="spinner"></i><span data-i18n="boot.loading">LOADING</span></div>
+      </div>
+    </div>
+    <div id="rotate"><div class="card"><div class="phone">📱</div><b data-i18n="rotate.title">TURN YOUR PHONE</b><span data-i18n="rotate.sub">Clankers drive sideways.</span></div></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

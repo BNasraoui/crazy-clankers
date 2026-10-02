@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Rebuild Tech Bro v6 and its measured turnaround acceptance artifacts.
+# Rebuild Tech Bro v6 and its measured turnaround acceptance artifacts, the cab, the robotaxis,
+# the San Francisco street kit or its landmarks.
 set -euo pipefail
 cd "$(dirname "$0")"
 if [[ -z "${BLENDER:-}" ]]; then
@@ -10,8 +11,40 @@ fi
 ASSET_PYTHON="${ASSET_PYTHON:-$(dirname "$(readlink -f "$BLENDER")")/5.2/python/bin/python3.13}"
 case "${1:-techbro}" in
   cab) "$BLENDER" --background --factory-startup --python-exit-code 1 --python cab.py; exit ;;
+  robotaxis)
+    # Downloads the Sketchfab sources once (needs ~/.config/sketchfab/token).
+    "$ASSET_PYTHON" fetch_sources.py
+    for car in wayfarer cybercab lineup style; do
+      "$BLENDER" --background --factory-startup --python-exit-code 1 --python robotaxis.py -- "$car"
+    done
+    exit ;;
+  sheet-robotaxis)
+    # Zoox and Apollo, modelled from docs/art/vehicles; no downloads. Scores each glb
+    # against its sheet, then renders the four robotaxis together.
+    for step in zoox apollo fit-zoox fit-apollo four; do
+      "$BLENDER" --background --factory-startup --python-exit-code 1 --python sheet_robotaxis.py -- "$step"
+    done
+    exit ;;
+  street)
+    # Every street prop to public/models/street with a close-up sheet each, the strip
+    # render with the Wayfarer for scale, then a reimport check of nodes and budgets.
+    for step in all strip check; do
+      "$BLENDER" --background --factory-startup --python-exit-code 1 --python street_kit.py -- "$step"
+    done
+    exit ;;
+  landmarks)
+    # Salesforce Tower, the Pyramid, the Ferry Building, Coit Tower, the Golden Gate, City
+    # Hall, the Dragon Gate, the Palace of Fine Arts and Alcatraz to public/models/landmarks
+    # with a toon sheet each, a reimport check, then meshopt compression (the game expects it).
+    for step in all check; do
+      "$BLENDER" --background --factory-startup --python-exit-code 1 --python landmarks.py -- "$step"
+    done
+    for glb in ../../public/models/landmarks/*.glb; do
+      npx -y @gltf-transform/cli meshopt "$glb" "$glb.tmp" && mv "$glb.tmp" "$glb"
+    done
+    exit ;;
   techbro) ;;
-  *) echo 'Usage: build.sh [techbro|cab]' >&2; exit 2 ;;
+  *) echo 'Usage: build.sh [techbro|cab|robotaxis|sheet-robotaxis|street|landmarks]' >&2; exit 2 ;;
 esac
 "$ASSET_PYTHON" test_sheets.py
 "$ASSET_PYTHON" test_profile.py

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { gltfLoader } from './scenery';
 import { toon } from './look';
 import { makeCharacter } from './anime';
 
@@ -41,18 +41,10 @@ function addWheels(body: THREE.Group, halfW: number, front: number, back: number
   return { wheels, steer };
 }
 
-// Blender-built passengers, keyed by passenger id. Missing ones fall back to box people.
+// Blender-built passengers, keyed by passenger id. Passengers are drawn as sprites now, so none are
+// loaded (the Tech Bro model lives in assets/models); without a sprite they fall back to box people.
 export async function loadPeople(): Promise<Partial<Record<string, THREE.Object3D>>> {
-  const people: Partial<Record<string, THREE.Object3D>> = {};
-  for (const id of ['techbro']) {
-    try {
-      const gltf = await new GLTFLoader().loadAsync(`/models/${id}.glb`);
-      people[id] = makeCharacter(gltf.scene);
-    } catch (err) {
-      console.warn(`Using the box ${id}:`, err);
-    }
-  }
-  return people;
+  return {};
 }
 
 export function personFrom(template: THREE.Object3D): PersonModel {
@@ -63,30 +55,66 @@ export function personFrom(template: THREE.Object3D): PersonModel {
   return { root, armL: part('arm_L'), armR: part('arm_R'), raise: 0.3 };
 }
 
-// The player's cab, built in Blender (assets/blender/cab.py). Falls back to the
-// box version if the file can't be loaded.
-export async function loadCab(): Promise<CarModel> {
-  try {
-    const gltf = await new GLTFLoader().loadAsync('/models/cab.glb');
-    const root = new THREE.Group();
-    const body = new THREE.Group();
-    root.add(body);
-    body.add(gltf.scene);
-    makeCharacter(root);
-    const node = (name: string) => {
-      const o = gltf.scene.getObjectByName(name);
-      if (!o) throw new Error(`cab.glb is missing node ${name}`);
-      o.rotation.order = 'YXZ'; // steer about Y, then spin about the axle
-      return o;
-    };
-    const wheels = ['wheel_FL', 'wheel_FR', 'wheel_RL', 'wheel_RR'].map(node);
-    return { root, body, wheels, steer: wheels.slice(0, 2), spinner: node('lidar') };
-  } catch (err) {
-    console.warn('Using the box cab:', err);
+// Playable robotaxis, built in Blender (assets/blender/). Each glb has nodes
+// body, wheel_FL/FR/RL/RR and optionally lidar.
+export interface CabInfo { id: string; name: string; tagline: string }
+export const CABS: CabInfo[] = [
+  { id: 'wayfarer', name: 'WAYFARER', tagline: 'Jaguar-based. Sensors everywhere. Apologises a lot.' },
+  { id: 'cybercab', name: 'CYBER CAB', tagline: 'Two seats, no wheel, delivery date TBC.' },
+  { id: 'zoox', name: 'ZOOMBOX', tagline: 'Both ends are the front. No steering wheel. No regrets.' },
+  { id: 'apollo', name: 'ARTEMIS GO', tagline: 'Cheapest fare in town. Swaps its own battery. Never sleeps.' },
+];
+// Cars that can appear in traffic but aren't playable.
+export const EXTRA_CARS = ['cab'];
+
+const carTemplates = new Map<string, THREE.Object3D>();
+
+// Per-car colour overrides by material role, applied when the model loads, so each
+// brand has its own look regardless of what the Blender export used.
+const CAR_PALETTES: Record<string, Record<string, number>> = {
+  // The real Cybercab is champagne gold with no livery: hide the accent swoosh in the body colour.
+  cybercab: { body: 0xc8b48c, accent: 0xc8b48c, hub: 0x8c7a5c },
+};
+
+export async function loadCars(): Promise<void> {
+  const loader = gltfLoader();
+  await Promise.all([...CABS.map((c) => c.id), ...EXTRA_CARS].map(async (id) => {
+    try {
+      const gltf = await loader.loadAsync(`/models/${id}.glb`);
+      const palette = CAR_PALETTES[id];
+      if (palette)
+        gltf.scene.traverse((o) => {
+          const mat = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+          if (mat && palette[mat.name] !== undefined) mat.color.setHex(palette[mat.name]);
+        });
+      carTemplates.set(id, gltf.scene);
+    } catch (err) {
+      console.warn(`No ${id}.glb:`, err);
+    }
+  }));
+}
+
+// A fresh, independently animated instance of a car (player or traffic).
+export function makeCar(id: string): CarModel {
+  const template = carTemplates.get(id);
+  if (!template) {
     const cab = makeCab();
     makeCharacter(cab.root);
     return cab;
   }
+  const scene = template.clone(true);
+  const root = new THREE.Group();
+  const body = new THREE.Group();
+  root.add(body);
+  body.add(scene);
+  makeCharacter(root);
+  const node = (name: string) => {
+    const o = scene.getObjectByName(name);
+    if (o) o.rotation.order = 'YXZ'; // steer about Y, then spin about the axle
+    return o;
+  };
+  const wheels = ['wheel_FL', 'wheel_FR', 'wheel_RL', 'wheel_RR'].map(node).filter((o): o is THREE.Object3D => !!o);
+  return { root, body, wheels, steer: wheels.slice(0, 2), spinner: node('lidar') };
 }
 
 // The placeholder cab: a polite white robotaxi with a spinning lidar puck.
@@ -203,7 +231,7 @@ export function makePerson(p: PersonSpec): PersonModel {
 
 // Billboard text that always faces the camera.
 export function makeLabel(text: string, opts: { bg?: string; fg?: string; height?: number } = {}) {
-  const font = '700 56px Bungee, Impact, sans-serif';
+  const font = '700 56px Bungee, Impact, "Noto Sans SC", sans-serif'; // Chinese falls through to Noto Sans SC
   const c = document.createElement('canvas');
   const ctx = c.getContext('2d')!;
   ctx.font = font;

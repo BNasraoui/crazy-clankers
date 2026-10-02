@@ -15,6 +15,14 @@
   --body: Inter, system-ui, sans-serif;
   --halftone: radial-gradient(circle, #0000001f 1.2px, transparent 1.4px) 0 0 / 6px 6px;
 }
+/* Chinese: Dela Gothic One and Permanent Marker lack Simplified characters, so headlines and
+   labels use ZCOOL KuaiLe (hand-drawn, manga-friendly) and small text Noto Sans SC. */
+html:lang(zh-Hans) #overlay .menu .logo { font-family: 'Dela Gothic One', sans-serif; } /* the logo stays the logo */
+html:lang(zh-Hans) {
+  --num: 'ZCOOL KuaiLe', 'Noto Sans SC', 'Arial Black', sans-serif;
+  --pen: 'ZCOOL KuaiLe', 'Noto Sans SC', cursive;
+  --body: Inter, 'Noto Sans SC', system-ui, sans-serif;
+}
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #d3e6f3; }
@@ -103,7 +111,7 @@ body { font-family: var(--body); color: var(--paper); user-select: none; }
 
 /* ----- combo, popups ----- */
 #combo {
-  position: absolute; top: 132px; left: 30px; padding: 2px 12px;
+  position: absolute; top: 236px; left: 30px; padding: 2px 12px;
   font: 22px var(--num); color: #fff; background: var(--magenta) var(--halftone);
   border: 3px solid var(--ink); border-radius: 6px; box-shadow: 4px 4px 0 var(--ink); transform: rotate(-5deg);
 }
@@ -177,6 +185,14 @@ body { font-family: var(--body); color: var(--paper); user-select: none; }
   margin: 22px 0 26px; padding: 2px 12px; font: 22px var(--pen); color: var(--ink);
   background: var(--paper); border: 3px solid var(--ink); border-radius: 6px; box-shadow: 4px 4px 0 var(--ink); transform: rotate(2deg);
 }
+#cabpick {
+  display: flex; align-items: center; gap: 14px; margin: -6px 0 20px; padding: 8px 14px;
+  background: var(--ink); color: #fff; border: 3px solid var(--ink); border-radius: 10px; box-shadow: 5px 5px 0 var(--teal);
+  transform: rotate(-1deg); max-width: min(560px, 92vw); text-align: center;
+}
+#cabpick b { display: block; font: 24px var(--num); color: var(--yellow); }
+#cabpick small { display: block; font: 600 13px var(--body); opacity: 0.85; }
+#cabpick .arrow { font: 22px var(--num); color: var(--teal); animation: blink 1.2s steps(2) infinite; }
 #overlay .press { font: 26px var(--num); color: #fff; -webkit-text-stroke: 0.08em var(--ink); paint-order: stroke fill; text-shadow: 4px 4px 0 var(--ink); animation: blink 1s steps(2) infinite; }
 @keyframes blink { 50% { opacity: 0.25; } }
 #overlay .controls, #overlay .stats {
@@ -204,4 +220,538 @@ body { font-family: var(--body); color: var(--paper); user-select: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .popup, #clock.low, #fare.urgent .clock, #overlay .press { animation: none; }
+}
+
+#lookpanel pre { margin: 0; max-width: 360px; white-space: pre-wrap; font: 11px/1.4 ui-monospace, monospace; }
+
+/* ===== Title screen + cab picker (taxi rank) ===== */
+.menu { position: fixed; inset: 0; pointer-events: none; }
+.menu .logo-block { position: absolute; top: max(4%, 26px); /* room for the tilt on short screens */ left: 3%; transform: rotate(-5deg); text-align: left; }
+#overlay .menu .logo { margin: 0; transform: none; font: clamp(40px, 8.2vw, 104px)/0.9 var(--num); color: var(--yellow);
+  -webkit-text-stroke: 0.07em var(--ink); paint-order: stroke fill; text-shadow: 6px 6px 0 var(--ink); }
+#overlay .menu .logo span { display: block; color: var(--teal); }
+#overlay .menu .logo-block .tag { display: inline-block; margin-top: 14px; padding: 2px 12px; font: clamp(15px, 1.8vw, 22px) var(--pen); color: var(--ink);
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 6px; box-shadow: 4px 4px 0 var(--magenta); transform: rotate(2deg); }
+#overlay .menu .logo-block.small .logo { font-size: clamp(28px, 4.6vw, 58px); }
+
+.rating-sticker { position: absolute; top: 5%; right: 3%; padding: 6px 14px; color: var(--ink); background: var(--paper);
+  border: 3px solid var(--ink); border-radius: 10px; box-shadow: 5px 5px 0 var(--ink); transform: rotate(3deg); text-align: right; }
+.rating-sticker small { display: block; font: 15px var(--pen); }
+.rating-sticker b { font: 34px var(--num); font-variant-numeric: tabular-nums; }
+.rating-sticker .star { font-size: 30px; color: var(--yellow); -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; margin-left: 4px; }
+
+.glyph { display: inline-grid; place-items: center; width: 1.5em; height: 1.5em; margin: 0 0.25em; border-radius: 50%; flex: none;
+  font: 0.78em/1 var(--num); font-style: normal; color: #fff; border: 3px solid var(--ink); vertical-align: middle;
+  box-shadow: 2px 2px 0 var(--ink), inset 0 -0.2em 0 #0000002e, inset 0 0.14em 0 #ffffff5c; }
+/* Trim the font's uneven top and bottom space so the letter sits dead centre. */
+.glyph b, .keycap b { display: block; font: inherit; line-height: 1; text-box: trim-both cap alphabetic; }
+.glyph.a { background: var(--teal); color: var(--ink); }
+.glyph.b { background: var(--magenta); }
+.glyph.x { background: #3f7fe0; }
+.glyph.y { background: var(--yellow); color: var(--ink); }
+.glyph.pad { background: var(--ink); color: #fff; border-radius: 7px; font: 900 0.95em system-ui, sans-serif; }
+.keycap { display: inline-grid; place-items: center; min-width: 1.6em; height: 1.5em; padding: 0 0.5em; margin: 0 0.25em; flex: none;
+  font: 800 0.6em/1 var(--body); font-style: normal; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink);
+  background: var(--paper); border: 2.5px solid var(--ink); border-radius: 0.4em; vertical-align: middle;
+  box-shadow: 0 0.18em 0 var(--ink), inset 0 -0.16em 0 #0000001f; transform: translateY(-0.09em); }
+/* Prompts follow the last thing you touched: a pad, the keyboard, or the screen. */
+html:not([data-input="pad"]) .k-pad, html:not([data-input="kb"]) .k-kb, html:not([data-input="touch"]) .k-touch { display: none !important; }
+.key { display: inline-flex; align-items: center; }
+.prompt { display: inline-flex; align-items: center; gap: 2px; margin: 0 14px; font: 20px var(--num); }
+
+.press-start { position: absolute; bottom: 12%; left: 50%; transform: translateX(-50%) rotate(-1deg); padding: 10px 26px;
+  font: clamp(22px, 3vw, 36px) var(--num); color: var(--ink); background: var(--paper); border: 4px solid var(--ink);
+  border-radius: 10px; box-shadow: 6px 6px 0 var(--magenta); animation: nudge 1.2s ease-in-out infinite; white-space: nowrap; }
+@keyframes nudge { 50% { transform: translateX(-50%) rotate(-1deg) scale(1.05); } }
+.corner-prompts { position: absolute; bottom: 4%; right: 3%; padding: 6px 4px; color: var(--ink); background: var(--paper);
+  border: 3px solid var(--ink); border-radius: 8px; box-shadow: 4px 4px 0 var(--ink); }
+.corner-prompts .prompt { font-size: 15px; margin: 0 8px; }
+.pad-note { position: absolute; bottom: 4%; left: 3%; font: 600 13px var(--body); color: var(--ink); background: #ffffffc8; padding: 3px 10px; border-radius: 4px; }
+
+.howto { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 3; max-width: min(720px, 92vw);
+  padding: 16px 22px; color: var(--ink); background: var(--paper); border: 4px solid var(--ink); border-radius: 10px;
+  box-shadow: 7px 7px 0 var(--teal); font: 600 15px/1.8 var(--body); }
+.howto > b { font: 22px var(--num); }
+.howto div b { font: 16px var(--pen); color: var(--magenta); }
+
+/* Painted key art fills the title screen; the logo and prompts sit on top. */
+.title-screen .keyart { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 40%;
+  animation: kenburns 24s ease-in-out infinite alternate; }
+@keyframes kenburns { from { transform: scale(1.02); } to { transform: scale(1.08) translate(-1%, 1%); } }
+.title-screen > :not(.keyart) { z-index: 1; }
+
+/* Picker */
+.inspect-tag { position: absolute; left: 27%; bottom: 23%; padding: 2px 10px; font: 15px var(--pen); color: var(--ink);
+  background: var(--paper); border: 2px solid var(--ink); border-radius: 6px; transform: rotate(-4deg); }
+.picker-panel { position: absolute; top: 4%; right: 2.5%; bottom: 10%; width: min(470px, 40vw); display: flex; flex-direction: column; gap: 10px;
+  padding: 18px 18px 14px; color: var(--ink); background: var(--paper) var(--halftone); border: 4px solid var(--ink); border-radius: 12px;
+  box-shadow: 8px 8px 0 var(--ink); transform: rotate(1deg); }
+#overlay .picker-panel h2 { margin: 0; padding-right: 92px; font: clamp(18px, 1.9vw, 26px)/1 var(--num); color: var(--ink); text-shadow: none; transform: none; }
+.surge { position: absolute; top: -18px; right: -14px; width: 104px; height: 104px; display: grid; place-content: center; text-align: center;
+  font: 15px/1 var(--num); color: #fff; background: var(--red); border: 3px solid var(--ink); transform: rotate(10deg);
+  clip-path: polygon(50% 0, 61% 12%, 77% 6%, 80% 22%, 96% 26%, 89% 41%, 100% 54%, 86% 63%, 91% 80%, 74% 81%, 66% 97%, 52% 87%, 37% 99%, 30% 83%, 12% 84%, 16% 66%, 1% 55%, 12% 42%, 4% 26%, 21% 21%, 25% 5%, 40% 13%); }
+.surge b { display: block; font-size: 28px; }
+.cab-list { display: grid; gap: 8px; }
+.cab-row { position: relative; display: flex; align-items: center; gap: 10px; padding: 6px 10px 6px 6px; background: #fff;
+  border: 3px solid var(--ink); border-radius: 8px; transition: transform 0.12s; }
+.cab-row img { width: 96px; height: 53px; object-fit: contain; flex: none; }
+.cab-row.selected { background: var(--yellow); box-shadow: 4px 4px 0 var(--teal); transform: translateX(-6px) rotate(-1deg); }
+.sel-tab { position: absolute; top: -12px; left: 8px; padding: 0 6px; font: 11px var(--num); color: var(--ink); background: var(--teal); border: 2px solid var(--ink); border-radius: 4px; }
+.cab-info { flex: 1; min-width: 0; }
+.cab-line { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.cab-line b { font: clamp(16px, 1.8vw, 22px) var(--num); }
+.cab-line .price { font: 18px var(--num); }
+.cab-line .eta { font: 14px var(--pen); }
+.cab-tagline { font: 14px/1.2 var(--pen); margin-top: 2px; }
+.stats { display: grid; gap: 6px; padding: 10px 12px; background: #fff; border: 3px solid var(--ink); border-radius: 8px; }
+.stat { display: grid; grid-template-columns: 1fr auto 6.5em; align-items: center; gap: 10px; font: 13px var(--num); }
+.stat-value { font: 13px var(--pen); text-align: right; }
+.cells { display: inline-grid; grid-template-columns: repeat(6, 18px); gap: 3px; }
+.cells i { height: 13px; border: 2px solid var(--ink); border-radius: 2px; background: #e6e1d6; }
+.cells.c0 i.on { background: var(--teal); }
+.cells.c1 i.on { background: var(--lime); }
+.cells.c2 i.on { background: var(--magenta); }
+.confirm { margin-top: auto; text-align: center; padding: 8px; background: var(--yellow); border: 3px solid var(--ink); border-radius: 8px; box-shadow: 4px 4px 0 var(--ink); }
+.confirm .prompt { font-size: 22px; }
+.prompt-strip { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 4vw; padding: 12px 0 calc(12px + env(safe-area-inset-bottom, 0px));
+  background: var(--ink); color: #fff; border-top: 4px solid var(--yellow); }
+
+/* Speed-line burst on confirm */
+.burst { position: fixed; inset: -20%; z-index: 4; pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, #ffffff 0deg 1.2deg, transparent 1.2deg 7deg);
+  -webkit-mask: radial-gradient(circle, transparent 18%, #000 46%); mask: radial-gradient(circle, transparent 18%, #000 46%);
+  animation: burst 0.6s ease-out forwards; }
+@keyframes burst { from { opacity: 1; transform: scale(0.7) rotate(0deg); } to { opacity: 0; transform: scale(1.4) rotate(6deg); } }
+
+@media (max-width: 900px) {
+  .picker-panel { width: 52vw; }
+  .inspect-tag { left: 18%; }
+}
+@media (prefers-reduced-motion: reduce) { .press-start, .burst, .title-screen .keyart { animation: none; } }
+
+/* ----- manga moments: focus lines, halftone and a sound word on the hardest hits ----- */
+#moment { position: absolute; inset: 0; pointer-events: none; overflow: hidden; display: none; }
+#moment.on { display: block; animation: moment-out 0.95s ease-in forwards; }
+#moment .focus {
+  position: absolute; inset: -20%;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 26%, #fff0 26%),
+    repeating-conic-gradient(from 3deg at 50% 50%, var(--ink) 0 0.7deg, transparent 0.7deg 4.3deg);
+  -webkit-mask: radial-gradient(circle at 50% 50%, transparent 0 22%, #000 46%);
+  mask: radial-gradient(circle at 50% 50%, transparent 0 22%, #000 46%);
+  opacity: 0.55;
+}
+#moment .focus::after {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle, #1b172240 1.6px, transparent 1.9px) 0 0 / 9px 9px;
+  -webkit-mask: radial-gradient(circle at 50% 50%, transparent 0 30%, #000 60%);
+  mask: radial-gradient(circle at 50% 50%, transparent 0 30%, #000 60%);
+}
+#moment.on .focus { animation: moment-flash 0.95s ease-out forwards; }
+#moment .sfx {
+  position: absolute; left: 50%; top: 40%; display: grid; justify-items: center; line-height: 0.95;
+  transform: translate(-50%, -50%) rotate(var(--tilt, -4deg));
+  font-family: var(--num); paint-order: stroke fill; -webkit-text-stroke: 10px var(--ink);
+}
+#moment .sfx .jp { font-size: 112px; color: #fff; text-shadow: 8px 8px 0 var(--ink); letter-spacing: -0.04em; }
+#moment .sfx .en { font-size: 40px; color: var(--yellow); -webkit-text-stroke-width: 7px; margin-top: 6px; transform: rotate(-3deg); }
+#moment.on .sfx { animation: moment-pop 0.95s cubic-bezier(.2, 1.6, .4, 1) forwards; }
+@keyframes moment-pop {
+  0% { transform: translate(-50%, -50%) rotate(var(--tilt)) scale(2.2); }
+  18% { transform: translate(-50%, -50%) rotate(var(--tilt)) scale(1); }
+  100% { transform: translate(-50%, -50%) rotate(var(--tilt)) scale(1.06); }
+}
+@keyframes moment-flash {
+  0% { opacity: 0.95; background-color: #fffbe8b0; }
+  12% { opacity: 0.6; background-color: transparent; }
+  100% { opacity: 0.35; }
+}
+@keyframes moment-out { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+@media (max-height: 820px) {
+  #moment .sfx .jp { font-size: 84px; }
+  #moment .sfx .en { font-size: 30px; }
+}
+@media (prefers-reduced-motion: reduce) { #moment.on, #moment.on .focus, #moment.on .sfx { animation-duration: 0.01s; } }
+
+/* Clankers FM: dashboard hardware, paper station cards, unobscured video. */
+#radio-dashboard, #radio-screen, #radio-collapsed, #radio-toast, .radio-menu-button {
+  color: var(--ink); background: var(--paper); border: 3px solid var(--ink);
+  border-radius: 8px; box-shadow: 5px 5px 0 var(--ink);
+}
+#radio-dashboard[hidden], #radio-screen[hidden], #radio-collapsed[hidden], #radio-toast[hidden], .radio-player[hidden] { display: none; }
+#radio-dashboard { position: fixed; left: 18px; bottom: 150px; z-index: 20; width: 262px; padding: 8px; background: var(--teal) var(--halftone); }
+#radio-dashboard > b { display: block; font: 16px/1.3 var(--pen); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.radio-track { font: 600 11px/1.5 var(--body); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-bottom: 5px; }
+.radio-player { width: 240px; height: 200px; background: var(--ink); }
+.radio-player iframe { display: block; width: 240px; height: 200px; border: 0; }
+.radio-controls { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+#radio-dashboard button, #radio-screen button, .radio-menu-button, #radio-collapsed {
+  cursor: pointer; font: 14px var(--pen); border: 2px solid var(--ink); border-radius: 5px; padding: 5px 8px; background: var(--paper); color: var(--ink);
+}
+#radio-dashboard button:hover, #radio-screen button:hover { background: var(--yellow); }
+#radio-dashboard label { display: flex; align-items: center; gap: 10px; font: 13px var(--pen); }
+#radio-dashboard input { min-width: 0; flex: 1; accent-color: var(--ink); }
+#radio-collapsed { position: fixed; left: 18px; bottom: 150px; z-index: 20; background: var(--teal); }
+#radio-toast { position: fixed; top: 185px; right: 18px; z-index: 21; max-width: min(520px, calc(100vw - 370px)); padding: 9px 16px; font: 16px var(--pen); background: var(--yellow); }
+.radio-menu-button { pointer-events: auto; position: relative; margin-top: 18px; background: var(--teal); }
+.title-screen .radio-menu-button { position: absolute; right: 3%; bottom: 13%; }
+#radio-screen { position: fixed; z-index: 15; inset: 24px 24px 24px 350px; padding: 20px 24px; overflow-y: auto; background: var(--paper) var(--halftone); }
+#radio-screen header { border-bottom: 4px solid var(--ink); margin-bottom: 10px; }
+#radio-screen header span { font: 13px var(--pen); }
+#radio-screen h2 { margin: 0; font: 42px/1.3 var(--num); color: var(--ink); text-shadow: 3px 3px 0 var(--teal); }
+#radio-screen p { font: 600 13px/1.5 var(--body); }
+.radio-station { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 10px; margin: 10px 0; background: #fff; border: 2px solid var(--ink); border-radius: 6px; }
+.radio-station > button:first-child { grid-column: 1 / -1; text-align: left; background: var(--yellow) !important; }
+#radio-screen input { width: 100%; min-width: 0; padding: 7px; border: 2px solid var(--ink); border-radius: 4px; font: 14px var(--body); color: var(--ink); background: #fff; user-select: text; }
+.radio-station input { grid-column: span 2; }
+#radio-screen form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-top: 3px solid var(--ink); padding-top: 12px; margin-top: 16px; }
+#radio-screen label { font: 14px var(--pen); }
+#radio-screen form button { grid-column: 1 / -1; background: var(--teal); }
+.radio-local { display: flex; gap: 8px; margin-top: 18px; }
+#radio-screen button:disabled { opacity: 0.4; cursor: default; }
+#radio-screen :focus-visible, #radio-dashboard :focus-visible, .radio-menu-button:focus-visible, #radio-collapsed:focus-visible { outline: 4px solid var(--magenta); outline-offset: 2px; }
+@media (max-width: 659px), (max-height: 599px) {
+  #radio-screen { inset: 12px; }
+  #radio-dashboard { bottom: 12px; }
+}
+#radio-screen .radio-controls > label { display: flex; align-items: center; gap: 8px; flex-basis: 100%; }
+#radio-screen .radio-controls input { width: 180px; }
+
+/* ----- the station wheel (hold LB / T) ----- */
+#radio-wheel { position: fixed; inset: 0; z-index: 22; pointer-events: none; display: grid; place-items: center;
+  background: radial-gradient(circle, #1b172200 30%, #1b172299 75%); }
+#radio-wheel[hidden] { display: none; }
+#radio-wheel .ring { position: relative; width: min(84vh, 660px); aspect-ratio: 1; border-radius: 50%;
+  background: #1b1722b8 var(--halftone); border: 4px solid var(--ink); box-shadow: 0 0 0 6px var(--paper), 8px 8px 0 6px var(--ink);
+  animation: wheel-in 0.16s cubic-bezier(.2, 1.5, .4, 1); }
+#radio-wheel .slot { position: absolute; transform: translate(-50%, -50%) rotate(-3deg); max-width: 22%;
+  padding: 4px 9px; font: 14px/1.1 var(--pen); text-align: center; color: var(--ink); background: var(--paper);
+  border: 3px solid var(--ink); border-radius: 8px; box-shadow: 3px 3px 0 var(--ink); transition: transform 0.08s; }
+#radio-wheel .slot.on { background: var(--yellow); transform: translate(-50%, -50%) rotate(-3deg) scale(1.22); z-index: 1; }
+#radio-wheel .slot.off { opacity: 0.45; }
+#radio-wheel .hub { position: absolute; left: 50%; top: 50%; width: 32%; aspect-ratio: 1; transform: translate(-50%, -50%);
+  border-radius: 50%; display: grid; place-content: center; gap: 4px; text-align: center; padding: 8px;
+  background: var(--teal) var(--halftone); border: 4px solid var(--ink); }
+#radio-wheel .hub b { font: 22px/1.1 var(--num); color: #fff; -webkit-text-stroke: 5px var(--ink); paint-order: stroke fill; }
+#radio-wheel .hub small { font: 12px var(--pen); color: var(--ink); }
+@keyframes wheel-in { from { transform: scale(0.6) rotate(-12deg); opacity: 0; } }
+
+/* Compact radio: a station sticker (plus YouTube's tile when a YouTube station plays). */
+#radio-dashboard > b { cursor: pointer; }
+#radio-dashboard.mini { width: auto; max-width: 262px; padding: 5px 10px; transform: rotate(-2deg); }
+#radio-dashboard.mini .radio-full { display: none; }
+#radio-dashboard.mini > b::before { content: '📻 '; }
+#radio-dashboard.mini .radio-track { margin-bottom: 0; font-size: 10px; }
+#radio-dashboard.mini .radio-player:not([hidden]) { margin-top: 5px; }
+
+/* YouTube stations play from a player kept off screen; the radio stays a sticker. */
+#radio-dashboard .radio-player { position: fixed; left: -10000px; top: 0; }
+
+/* ----- passenger wants: the meter in the fare panel, the pickup card, the drop-off stamp ----- */
+#want {
+  position: absolute; top: 118px; left: 22px; width: 240px; padding: 8px 12px 8px; background: var(--yellow) var(--halftone); color: var(--ink);
+  border: 3px solid var(--ink); border-radius: 10px; box-shadow: 5px 5px 0 var(--ink); transform: rotate(1.5deg);
+}
+#want .lbl { font: 14px var(--pen); }
+#want .score { margin-top: -2px; }
+#want .score b { display: block; font: 18px/1.2 var(--num); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#stamp s { text-decoration: none; color: #1b172233; -webkit-text-stroke: 0; }
+#want .track { position: relative; height: 12px; margin-top: 4px; background: #fff8; border: 2px solid var(--ink); border-radius: 6px; overflow: hidden;
+  background-image: repeating-linear-gradient(90deg, transparent 0 calc(20% - 2px), var(--ink) calc(20% - 2px) 20%); }
+#want .fill { height: 100%; background: var(--magenta); transition: width 0.2s; }
+#want .note { margin-top: 3px; font: 700 10px var(--body); letter-spacing: 0.04em; opacity: 0.75; }
+#want.new { animation: want-in 0.5s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes want-in { from { transform: translateX(-40px) rotate(-6deg) scale(0.85); opacity: 0; } }
+
+#stamp { position: absolute; left: 50%; top: 27%; display: none; text-align: center; pointer-events: none; }
+#stamp.show { display: block; animation: stamp-in 2.8s ease-out forwards; }
+#stamp .stars { font: 60px/1 var(--num); color: #ffd23a; -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill;
+  text-shadow: 5px 5px 0 var(--ink); letter-spacing: -4px; }
+#stamp .line { display: inline-block; margin-top: 6px; padding: 3px 12px; font: 15px var(--pen); color: var(--ink);
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 8px; box-shadow: 4px 4px 0 var(--ink); }
+@keyframes stamp-in {
+  0% { transform: translate(-50%, -50%) rotate(-14deg) scale(2.6); opacity: 0; }
+  10% { transform: translate(-50%, -50%) rotate(-6deg) scale(1); opacity: 1; }
+  80% { transform: translate(-50%, -50%) rotate(-6deg) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) rotate(-6deg) scale(1.05); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { #want.new, #stamp.show { animation: none; } }
+.glyph, .keycap { -webkit-text-stroke: 0; text-shadow: none; }
+#overlay .press .prompt { font-size: 26px; }
+#overlay .pad .prompt { font-size: 14px; margin: 0 8px; }
+
+/* Surge level, tucked into the cash sticker */
+#surge { display: block; margin: 0 -6px 4px; padding: 1px 6px; font: 12px var(--num); color: #fff; background: var(--red); border-radius: 4px; text-align: center; }
+#surge:empty { display: none; }
+
+/* Boot screen: the title with a spinner where the start prompt goes, until the game is ready. */
+.press-start.loading { animation: none; display: inline-flex; align-items: center; gap: 0.5em; letter-spacing: 0.06em; }
+.spinner { width: 0.9em; height: 0.9em; border-radius: 50%; border: 0.17em solid var(--ink); border-right-color: transparent; border-top-color: var(--magenta);
+  animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.title-screen:not(.boot) .press-start { animation: start-in 0.35s cubic-bezier(.2, 1.6, .4, 1), nudge 1.2s ease-in-out 0.35s infinite; }
+@keyframes start-in { from { transform: translateX(-50%) rotate(-1deg) scale(0.7); opacity: 0; } }
+
+/* The selected cab's perk, under its tagline in the picker */
+.cab-perk { display: inline-block; margin-top: 4px; padding: 1px 8px; font: 11px var(--num); letter-spacing: 0.03em; color: var(--ink);
+  background: var(--yellow); border: 2px solid var(--ink); border-radius: 4px; }
+
+/* ===== Phones held sideways: touch controls, a scaled-down HUD, the rotate card ===== */
+html, body { touch-action: pan-x pan-y; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+#view, #hud, #overlay, #touch, #radio-wheel, #radio-dashboard, #radio-collapsed, #rotate { touch-action: none; }
+html:not(.touch) .touch-only, html.touch .pad-only { display: none !important; }
+html.touch [data-tap], html.touch [data-cab], html.touch .tap-btn { pointer-events: auto; cursor: pointer; }
+html.touch .pad-note { display: none; }
+
+/* Sticker buttons for menus. */
+.tap-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; margin: 6px 0 4px; }
+.tap-btn { min-height: 56px; min-width: 64px; padding: 6px 20px; font: 20px var(--num); color: var(--ink); background: var(--paper);
+  border: 3px solid var(--ink); border-radius: 10px; box-shadow: 4px 4px 0 var(--ink); transform: rotate(-1deg); touch-action: manipulation; }
+.tap-btn.go { background: var(--yellow); box-shadow: 4px 4px 0 var(--magenta); }
+/* Press feedback without moving anything (a tap that moves its target loses its click). */
+.tap-btn:active, html.touch [data-tap]:active, html.touch .cab-row:active { filter: brightness(0.88); }
+.title-screen .corner-prompts.tap-row { margin: 0; padding: 0; background: none; border: 0; box-shadow: none; gap: 10px; }
+.title-screen .corner-prompts .tap-btn { min-height: 48px; font-size: 15px; padding: 4px 12px; }
+.picker-screen .corner-back { position: absolute; left: calc(3% + env(safe-area-inset-left, 0px)); top: calc(min(26vw, 52%) + env(safe-area-inset-top, 0px)); }
+html.touch .confirm .prompt { justify-content: center; font-size: 26px; }
+
+/* Driving controls: a floating thumb-stick on the left, sticker buttons on the right. */
+#touch { display: none; position: fixed; inset: 0; z-index: 10; pointer-events: none; user-select: none; -webkit-user-select: none; }
+html.touch body[data-state="play"] #touch { display: block; }
+#touch .steer-zone { position: absolute; left: 0; top: 0; bottom: 0; width: 40%; pointer-events: auto; }
+#touch .stick { position: absolute; width: 136px; height: 136px; margin: -68px 0 0 -68px; pointer-events: none; border-radius: 50%;
+  background: #f6f2e733 var(--halftone); border: 3px solid var(--ink); box-shadow: 4px 4px 0 #1b172288; }
+#touch .stick[hidden] { display: none; }
+#touch .stick::before { content: ''; position: absolute; left: 12px; right: 12px; top: 50%; height: 6px; margin-top: -3px; background: #1b172266; border-radius: 3px; }
+#touch .stick i { position: absolute; left: 50%; top: 50%; width: 62px; height: 62px; margin: -31px; border-radius: 50%;
+  background: var(--yellow); border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+#touch .tb { position: absolute; display: grid; place-content: center; padding: 0; pointer-events: auto; touch-action: none;
+  border-radius: 50%; border: 4px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); color: var(--ink);
+  font: 17px/1 var(--num); letter-spacing: 0.02em; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  background-image: var(--halftone); transition: transform 0.06s, box-shadow 0.06s; }
+#touch .tb small { display: block; margin-top: 3px; font: 10px var(--pen); }
+#touch .tb.down { transform: translate(3px, 3px) scale(0.93); box-shadow: 1px 1px 0 var(--ink); }
+#touch .gas { width: calc(104px * var(--tbs, 1)); height: calc(104px * var(--tbs, 1)); right: calc(14px * var(--tbs, 1) + env(safe-area-inset-right, 0px)); bottom: calc(14px * var(--tbs, 1) + env(safe-area-inset-bottom, 0px));
+  font-size: 22px; background-color: #b9f26bb8; }
+#touch .brake { width: calc(82px * var(--tbs, 1)); height: calc(82px * var(--tbs, 1)); right: calc(130px * var(--tbs, 1) + env(safe-area-inset-right, 0px)); bottom: calc(14px * var(--tbs, 1) + env(safe-area-inset-bottom, 0px));
+  font-size: 14px; background-color: #ff4a3ab0; }
+#touch .drift { width: calc(84px * var(--tbs, 1)); height: calc(84px * var(--tbs, 1)); right: calc(24px * var(--tbs, 1) + env(safe-area-inset-right, 0px)); bottom: calc(132px * var(--tbs, 1) + env(safe-area-inset-bottom, 0px));
+  background-color: #ff4fa8b0; }
+#touch .hop { width: calc(70px * var(--tbs, 1)); height: calc(70px * var(--tbs, 1)); right: calc(124px * var(--tbs, 1) + env(safe-area-inset-right, 0px)); bottom: calc(110px * var(--tbs, 1) + env(safe-area-inset-bottom, 0px));
+  background-color: #2fd6bfb0; }
+#touch .pause { width: 52px; height: 52px; left: 20%; top: calc(8px + env(safe-area-inset-top, 0px)); border-width: 3px;
+  font: 18px/1 var(--body); font-weight: 800; letter-spacing: -2px; background-color: #f6f2e7c8; }
+#touch .gas.down { background-color: var(--lime); }
+#touch .brake.down { background-color: var(--red); }
+#touch .drift.down { background-color: var(--magenta); }
+#touch .hop.down { background-color: var(--teal); }
+
+/* Short screens (a phone on its side): the whole HUD is drawn at desktop size and scaled
+   down as one sticker sheet, inside the safe area, so the corner stacks keep their shape. */
+@media (max-height: 500px) {
+  :root { --hud: var(--ui, 0.58); } /* set from the real screen size in fit.ts */
+  #hud { inset: auto; left: env(safe-area-inset-left, 0px); top: env(safe-area-inset-top, 0px); transform: scale(var(--hud)); transform-origin: 0 0;
+    width: calc((100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)) / var(--hud));
+    height: calc((100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / var(--hud));
+    height: calc((100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / var(--hud)); }
+
+  /* Touch: the bottom corners belong to the thumbs. */
+  html.touch #fare { max-width: 40%; }
+  html.touch #speed { right: calc(232px / var(--hud)); bottom: 22px; }
+  html.touch #launch { right: calc(232px / var(--hud)); bottom: 96px; }
+  html.touch #quip { left: 20%; transform: none; max-width: calc(80% - 300px / var(--hud)); animation-name: pop-touch; }
+  html.touch #combo { top: 128px; left: 280px; }
+
+  /* The radio sticker joins the left column while driving. */
+  html.touch body:is([data-state="play"], [data-state="paused"], [data-state="over"]) :is(#radio-dashboard, #radio-collapsed) {
+    left: calc(12px + env(safe-area-inset-left, 0px)); bottom: auto; top: calc(128px + env(safe-area-inset-top, 0px)); }
+  html.touch #radio-dashboard.mini .radio-track { display: none; }
+  html.touch #radio-dashboard.mini { max-width: 30vw; padding: 6px 12px; }
+  html.touch #radio-dashboard > b { font-size: 13px; line-height: 26px; }
+  /* Radio toast: under the sticker while driving, just above it in the menus. */
+  #radio-toast { top: auto; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); right: auto; left: calc(12px + env(safe-area-inset-left, 0px)); max-width: 34vw; padding: 5px 10px; font-size: 13px; }
+  body:is([data-state="play"], [data-state="paused"], [data-state="over"]) #radio-toast { bottom: auto; top: calc(176px + env(safe-area-inset-top, 0px)); }
+  #radio-collapsed { font-size: 12px; }
+  #radio-wheel .slot { font-size: 12px; padding: 3px 6px; }
+  #radio-wheel .hub b { font-size: 16px; }
+
+  /* Menus */
+  #overlay h2 { font-size: 40px; margin-bottom: 6px; }
+  #overlay .press { font-size: 20px; }
+  #overlay .stats { margin-bottom: 8px; padding: 8px 16px; font-size: 13px; line-height: 1.5; }
+  #overlay .stats .total { font-size: 26px; }
+  #overlay .radio-menu-button { margin-top: 8px; }
+  .howto { font-size: 13px; line-height: 1.5; padding: 10px 16px; }
+  .howto > b { font-size: 18px; }
+  .menu .logo-block { left: calc(3% + env(safe-area-inset-left, 0px)); }
+  #overlay .menu .logo-block .tag { margin-top: 8px; }
+  .press-start { bottom: calc(6% + env(safe-area-inset-bottom, 0px)); padding: 6px 20px; font-size: 24px; }
+  html.touch .title-screen .corner-prompts.tap-row { bottom: calc(4% + env(safe-area-inset-bottom, 0px)); right: calc(3% + env(safe-area-inset-right, 0px));
+    flex-direction: column; align-items: flex-end; gap: 12px; }
+  .title-screen .radio-menu-button { bottom: auto; top: calc(5% + env(safe-area-inset-top, 0px)); right: calc(3% + env(safe-area-inset-right, 0px)); margin: 0; }
+  .picker-panel { top: 3%; bottom: auto; right: calc(2% + env(safe-area-inset-right, 0px)); width: calc(min(470px, 46vw) / var(--hud)); height: calc(94% / var(--hud));
+    transform: rotate(1deg) scale(var(--hud)); transform-origin: top right; }
+  /* The cab list gives way (and scrolls) so the drive button is always on screen. */
+  .picker-panel > * { flex: none; }
+  .picker-panel .cab-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; touch-action: pan-y; padding: 2px 8px 6px 2px; }
+  .picker-panel .stats { display: none; } /* the joke stat bars give their room to the four cabs */
+  #hud .note, #rating .note { display: none; }
+  #lookpanel { top: 8px; right: 8px; max-height: calc(100% - 16px); overflow-y: auto; touch-action: pan-y; }
+}
+@keyframes pop-touch { from { transform: scale(0.85); } to { transform: scale(1); } }
+
+/* Held upright: ask for landscape. */
+#rotate { display: none; position: fixed; inset: 0; z-index: 100; place-items: center; padding: 24px; background: var(--ink) var(--halftone); }
+#rotate .card { display: grid; justify-items: center; gap: 10px; padding: 22px 26px; text-align: center; color: var(--ink); background: var(--paper);
+  border: 4px solid var(--ink); border-radius: 12px; box-shadow: 8px 8px 0 var(--magenta); transform: rotate(-2deg); }
+#rotate .phone { font-size: 64px; line-height: 1; animation: turn 1.6s ease-in-out infinite; }
+#rotate b { font: 30px/1 var(--num); color: var(--yellow); -webkit-text-stroke: 0.08em var(--ink); paint-order: stroke fill; text-shadow: 4px 4px 0 var(--ink); }
+#rotate span { font: 18px var(--pen); }
+@keyframes turn { 0%, 25% { transform: rotate(0deg); } 55%, 100% { transform: rotate(-90deg); } }
+@media (orientation: portrait) and (pointer: coarse) { #rotate { display: grid; } }
+@media (orientation: portrait) { html.touch #rotate { display: grid; } }
+@media (prefers-reduced-motion: reduce) { #rotate .phone { animation: none; transform: rotate(-90deg); } }
+html.touch .radio-menu-button { min-height: 48px; padding: 8px 18px; font-size: 18px; }
+
+/* Touch button labels shrink with the buttons on short screens. */
+#touch .tb { font-size: calc(17px * var(--tbs, 1)); }
+#touch .gas { font-size: calc(22px * var(--tbs, 1)); }
+#touch .brake { font-size: calc(14px * var(--tbs, 1)); }
+
+/* Settings panel: a close button (phones have no B or Esc) */
+#lookpanel .lk-head { display: flex; align-items: center; justify-content: space-between; }
+#lk-close { width: 34px; height: 34px; padding: 0; font: 800 16px var(--body); color: var(--ink); background: var(--paper);
+  border: 2px solid var(--ink); border-radius: 50%; box-shadow: 2px 2px 0 var(--ink); cursor: pointer; pointer-events: auto; touch-action: manipulation; }
+
+/* A crowded station wheel: smaller stickers so neighbours don't overlap. */
+#radio-wheel .ring.dense .slot { font-size: 12px; padding: 3px 7px; max-width: 18%; }
+#radio-wheel .ring.dense .slot.on { transform: translate(-50%, -50%) rotate(-3deg) scale(1.3); }
+
+/* The picker panel fits any screen: the stat bars give way first, then the cab list scrolls;
+   the title and the confirm button always show. */
+.picker-panel > * { flex: none; }
+.picker-panel .stats { flex: 0 100 auto; min-height: 0; overflow: hidden; }
+.picker-panel .cab-list { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
+.picker-panel .confirm { margin-top: auto; }
+
+/* The picker panel scales down as one piece when its content won't fit (fitPicker in menus.ts
+   measures it with .measure: natural height, nothing shrinking). */
+@media (min-height: 501px) {
+  .picker-panel { transform: rotate(1deg) scale(var(--pfit, 1)); transform-origin: top right; }
+}
+.picker-panel.measure { bottom: auto !important; height: auto !important; }
+.picker-panel.measure > *, .picker-panel.measure .cab-list, .picker-panel.measure .stats { flex: none !important; overflow: visible !important; }
+
+/* EN / 中文 switch on the title screen. */
+.lang-switch { position: absolute; top: 4%; right: 3%; display: flex; align-items: center; gap: 2px; padding: 4px; pointer-events: auto; cursor: pointer;
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 10px; box-shadow: 4px 4px 0 var(--ink); transform: rotate(2deg); color: var(--ink); }
+.lang-switch > b { padding: 4px 12px; border-radius: 6px; font: 18px/1.1 'Dela Gothic One', 'ZCOOL KuaiLe', 'Noto Sans SC', sans-serif; opacity: 0.45; }
+.lang-switch > b:last-of-type { font-family: 'ZCOOL KuaiLe', 'Noto Sans SC', sans-serif; }
+.lang-switch > b.on { background: var(--yellow); opacity: 1; box-shadow: inset 0 0 0 2px var(--ink); }
+.lang-switch .keycap { margin-left: 6px; font-size: 12px; }
+#overlay .menu .logo-sub { margin-top: 6px; font: clamp(22px, 3.4vw, 44px)/1 var(--num); color: #fff; letter-spacing: 0.12em;
+  -webkit-text-stroke: 0.14em var(--ink); paint-order: stroke fill; text-shadow: 4px 4px 0 var(--ink); }
+#overlay .menu .logo-block.small .logo-sub { font-size: clamp(16px, 2vw, 26px); }
+@media (max-height: 500px) {
+  /* the bottom-left corner is the radio's and the right column has the menu buttons: beside the Radio button */
+  .lang-switch { top: calc(5% + env(safe-area-inset-top, 0px)); right: calc(3% + 120px + env(safe-area-inset-right, 0px)); }
+  .lang-switch > b { font-size: 15px; padding: 3px 9px; }
+}
+
+/* ----- XP, signing the board, the leaderboard ----- */
+.xpbar { display: inline-block; position: relative; width: 90px; height: 11px; margin: 0 8px; vertical-align: middle; overflow: hidden;
+  background: #fff; border: 2px solid var(--ink); border-radius: 6px; }
+.xpbar::after { content: ''; position: absolute; inset: 0; width: calc(var(--fill, 0) * 100%); background: var(--teal); }
+#overlay .stats .xp { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; }
+#overlay .stats .xp .gain { font: 16px var(--num); color: var(--ink); }
+#overlay .stats .xp .up { padding: 0 6px; font: 13px var(--num); color: #fff; background: var(--magenta); border: 2px solid var(--ink); border-radius: 4px; transform: rotate(-2deg); }
+
+#overlay .over-row { display: flex; align-items: stretch; justify-content: center; gap: 18px; margin: 0 0 22px; }
+#overlay .over-row .stats { margin: 0; }
+.sign { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 12px 18px; color: var(--ink);
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 8px; box-shadow: 5px 5px 0 var(--yellow); transform: rotate(1deg); }
+.sign > b { font: 20px var(--num); }
+.sign .slots { display: flex; gap: 8px; pointer-events: auto; }
+.sign .slot { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+.sign .slots i { display: grid; place-items: center; width: 46px; height: 58px; font: 40px var(--num); font-style: normal; color: var(--ink);
+  background: #fff; border: 3px solid var(--ink); border-radius: 6px; }
+.sign .slot.cur i { background: var(--yellow); box-shadow: 0 4px 0 var(--magenta); }
+.sign .slot.ghost i { color: #1b172266; } /* the suggested letters, until you change one */
+/* ▲ ▼ on the letter being changed: buttons on a touchscreen, a hint for a pad. */
+.sign .slot .up, .sign .slot .down { display: grid; place-items: center; width: 46px; height: 30px; font-size: 18px; line-height: 1; color: var(--ink); visibility: hidden; touch-action: manipulation; }
+.sign .slot.cur .up, .sign .slot.cur .down { visibility: visible; }
+html[data-input="pad"] .sign .slot .up, html[data-input="pad"] .sign .slot .down { display: grid !important; height: 16px; font-size: 12px; }
+html[data-input="kb"] .sign .slot .up, html[data-input="kb"] .sign .slot .down { display: none !important; }
+.sign .kbd { padding: 3px 10px; font: 13px var(--num); color: var(--ink); background: #fff; border: 2px solid var(--ink); border-radius: 6px; touch-action: manipulation; }
+/* The real text field sits invisibly over the letters: a keyboard types into it, a tap opens the phone's keyboard. */
+.sign { position: relative; }
+/* The phone keyboard types into this; it's invisible, the letters above show what was typed. */
+.sign .sign-input { position: absolute; left: 50%; top: 40%; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: 0; padding: 0; caret-color: transparent; }
+.sign .sign-status { max-width: 260px; min-height: 1.3em; font: 600 14px/1.3 var(--body); text-align: center; }
+.sign .sign-status b { font-family: var(--num); color: var(--magenta); }
+#overlay .over-actions { display: flex; flex-direction: column; align-items: center; }
+#overlay .over-actions .pad .prompt { font-size: 15px; margin: 0 8px; }
+
+.board { position: fixed; left: 50%; top: 50%; z-index: 4; transform: translate(-50%, -50%) rotate(-0.5deg); width: min(900px, 94vw); max-height: 94%;
+  display: flex; flex-direction: column; gap: 8px; padding: 14px 20px; overflow: hidden; text-align: left; color: var(--ink);
+  background: var(--paper); border: 4px solid var(--ink); border-radius: 10px; box-shadow: 7px 7px 0 var(--yellow); }
+.board h3 { margin: 0; font: 30px var(--num); color: var(--red); -webkit-text-stroke: 0.06em var(--ink); paint-order: stroke fill; text-shadow: 3px 3px 0 var(--ink); }
+.board h4 { margin: 0 0 4px; font: 15px var(--num); }
+.board .tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.board .tabs b { padding: 3px 10px; font: 14px var(--num); background: #fff; border: 2px solid var(--ink); border-radius: 6px; pointer-events: auto; cursor: pointer; }
+.board .tabs b.on { background: var(--yellow); box-shadow: 2px 2px 0 var(--ink); }
+.board .cols { display: grid; grid-template-columns: 1.15fr 1fr; gap: 18px; min-height: 0; overflow-y: auto; touch-action: pan-y; pointer-events: auto; }
+.board table { width: 100%; border-collapse: collapse; font: 600 14px/1.25 var(--body); }
+.board td, .board th { padding: 3px 6px; white-space: nowrap; }
+.board th { font: 11px var(--num); text-align: left; opacity: 0.7; }
+.board tr:nth-child(even) td { background: #00000009; }
+.board tr.me td, .board .cabs tr.on td { background: #ffd23a8c; }
+.board .n, .board .who, .board .cash { font-family: var(--num); }
+.board .who { letter-spacing: 0.08em; }
+.board .cab { font-weight: 800; }
+.board .cabs i { font: 12px var(--num); font-style: normal; opacity: 0.7; }
+.board .note { margin: 18px 0; font: 600 16px var(--body); }
+.board .board-prompts { align-self: center; margin-top: 2px; }
+.board .board-prompts .prompt { font-size: 15px; margin: 0 8px; }
+.board .tap-row { margin: 0; }
+.board .tap-btn { min-height: 44px; font-size: 16px; }
+
+/* RB and other two-letter buttons are pills, not circles. */
+.glyph.bumper { width: auto; padding: 0 0.35em; font-size: 0.7em; height: 1.9em; }
+
+/* Picker: each cab's level, and the selected cab's progress to the next. */
+.cab-line .lv { padding: 0 5px; font: 11px var(--num); color: #fff; background: var(--ink); border-radius: 4px; }
+.cab-row .xpbar { position: absolute; left: 12px; right: 12px; bottom: 3px; width: auto; height: 6px; margin: 0; border-width: 1.5px; }
+
+@media (max-height: 500px) {
+  #overlay .over-row { gap: 12px; margin-bottom: 10px; }
+  #overlay .stats .xp .gain { font-size: 13px; }
+  .xpbar { width: 60px; height: 9px; }
+  .sign { gap: 4px; padding: 6px 12px; }
+  .sign > b { font-size: 15px; }
+  .sign .slots i { width: 34px; height: 42px; font-size: 28px; }
+  .sign .slot .up, .sign .slot .down { width: 40px; height: 24px; }
+  .sign .sign-status { font-size: 12px; max-width: 200px; }
+  .board { padding: 8px 14px; gap: 5px; max-height: calc(100% - 16px); }
+  .board h3 { font-size: 20px; }
+  .board .tabs b { font-size: 12px; padding: 2px 8px; }
+  .board table { font-size: 12px; line-height: 1.15; }
+  .board td, .board th { padding: 0 5px; }
+  .board .tap-row { position: absolute; right: 12px; top: 8px; }
+  .board .tap-btn { min-height: 38px; font-size: 14px; padding: 2px 14px; }
+}
+
+/* Logging in to keep your XP (results screen), and the note when you're back from Google. */
+.sign .account { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 280px; pointer-events: auto; }
+.sign .account[hidden] { display: none; }
+.sign .account .login { display: inline-flex; align-items: center; gap: 2px; padding: 6px 12px; font: 15px/1.2 var(--num); color: var(--ink); text-align: left;
+  background: #fff; border: 3px solid var(--ink); border-radius: 8px; box-shadow: 3px 3px 0 var(--teal); cursor: pointer; touch-action: manipulation; }
+html.touch .sign .account .login .key { display: none; }
+.sign .account .saved { font: 600 14px var(--body); }
+.sign .account [data-logout] { font: 600 12px var(--body); text-decoration: underline; cursor: pointer; opacity: 0.7; }
+.notice { position: fixed; top: 18px; left: 50%; z-index: 20; transform: translateX(-50%) rotate(-1deg); padding: 8px 18px; font: 18px var(--num); color: var(--ink);
+  background: var(--lime); border: 3px solid var(--ink); border-radius: 8px; box-shadow: 4px 4px 0 var(--ink); pointer-events: none; }
+.notice.failed { background: var(--paper); }
+@media (max-height: 500px) {
+  .sign .account .login { font-size: 12px; padding: 4px 8px; }
 }

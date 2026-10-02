@@ -1,0 +1,10 @@
+{
+  "asset": "public/models/apollo.glb",
+  "triangles": 13060,
+  "iou": {
+    "front": 0.965,
+    "side": 0.9609,
+    "back": 0.9448,
+    "top": 0.9291
+  }
+}

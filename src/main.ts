@@ -1,33 +1,60 @@
 import * as THREE from 'three';
+import './fit';
 import { Game } from './game';
-import { loadCab, loadPeople } from './models';
+import { treeRefs } from './world';
+import { loadCars, loadPeople } from './models';
+import { loadLandmarks, loadStreetKit } from './scenery';
+import { loadFacades, paintFacades } from './facades';
+import { loadSky } from './sky';
 import { Pedestrians } from './pedestrians';
 import { loadPassengerSprites } from './spritepeople';
-import './style.css';
+import { syncAccount } from './account';
 
 const canvas = document.getElementById('view') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 
-const [cab, people] = await Promise.all([loadCab(), loadPeople()]);
-const game = new Game(renderer, cab, people);
-loadPassengerSprites().then((s) => { game.paxSprites = s; game.refreshPassengers(); }).catch((err) => console.warn('No passenger sprites:', err));
-Pedestrians.load(game.scene).then((p) => { game.peds = p; }).catch((err) => console.warn('No pedestrians:', err));
+const account = syncAccount(); // finishes a login coming back from Google, or syncs XP
+const [, people] = await Promise.all([loadCars(), loadPeople(), loadStreetKit(), loadFacades(), loadSky()]);
+const game = new Game(renderer, people);
+document.body.classList.add('ready'); // the boot screen's title is now the real one
+const painted = paintFacades(); // the building drawings stream in behind the title
+const landmarks = loadLandmarks(); // and the landmark models, which you can't see from the taxi rank
+account.then((login) => { if (login) game.loginNotice(login); });
+const sprites = loadPassengerSprites().then((s) => { game.paxSprites = s; game.refreshPassengers(); }).catch((err) => console.warn('No passenger sprites:', err));
+const peds = Pedestrians.load(game.scene).then((p) => { game.peds = p; }).catch((err) => console.warn('No pedestrians:', err));
 const fit = () => {
+  // Up to ~1080 real pixels tall: sharp on high-density phones, the same 1.5 cap as before on desktops.
+  renderer.setPixelRatio(Math.min(devicePixelRatio, Math.max(1.5, 1080 / innerHeight)));
   renderer.setSize(innerWidth, innerHeight, false);
   game.resize(innerWidth, innerHeight);
 };
 addEventListener('resize', fit);
 fit();
 
+// ?still (the world snapshots, tests/ui/world.spec.ts): nothing moves; the test frames each view itself.
+const still = new URLSearchParams(location.search).has('still');
+const everything = Promise.all([painted, landmarks, sprites, peds]);
+void everything.then(() => { (window as unknown as { loaded: boolean }).loaded = true; }); // the UI tests wait for this
+if (still) {
+  void everything.then(() => {
+    (window as unknown as { still: unknown }).still = (eye: THREE.Vector3Tuple, target: THREE.Vector3Tuple) => {
+      game.camera.position.set(...eye);
+      game.camera.up.set(0, 1, 0);
+      game.camera.lookAt(...target);
+      game.renderStill(100); // a fixed moment, so clouds and swaying trees hold still
+    };
+  });
+}
+
 let last = performance.now();
-renderer.setAnimationLoop((now) => {
+if (!still) renderer.setAnimationLoop((now) => {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   game.frame(dt);
 });
 
 // Handy for poking at the game from the console.
-(window as unknown as { game: Game }).game = game;
+(window as unknown as { game: Game; treeRefs: typeof treeRefs }).game = game;
+(window as unknown as { treeRefs: typeof treeRefs }).treeRefs = treeRefs;

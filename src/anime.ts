@@ -85,7 +85,11 @@ const outlineMaterial = new THREE.ShaderMaterial({
 // Hull normals are smoothed across hard edges so the outline never cracks.
 function hullGeometry(geo: THREE.BufferGeometry) {
   const g = new THREE.BufferGeometry();
-  g.setAttribute('position', geo.getAttribute('position'));
+  // Models are meshopt-compressed: positions arrive packed and quantized, so copy them out as plain floats.
+  const src = geo.getAttribute('position');
+  const pos = new Float32Array(src.count * 3);
+  for (let i = 0; i < src.count; i++) { pos[i * 3] = src.getX(i); pos[i * 3 + 1] = src.getY(i); pos[i * 3 + 2] = src.getZ(i); }
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   if (geo.index) g.setIndex(geo.index);
   const merged = mergeVertices(g, 1e-4);
   merged.computeVertexNormals();

@@ -1,0 +1,269 @@
+{
+  "cable_car": {
+    "triangles": 8752,
+    "budget": 16000,
+    "size_m": {
+      "x": 2.41,
+      "length": 8.46,
+      "height": 3.23
+    },
+    "min_z": -0.03,
+    "nodes": [
+      "body",
+      "cable_car",
+      "wheel_F1",
+      "wheel_F2",
+      "wheel_R1",
+      "wheel_R2"
+    ],
+    "materials": [
+      "accent",
+      "body",
+      "brass",
+      "cream",
+      "glass",
+      "ink",
+      "lamp_red",
+      "light_head",
+      "metal",
+      "roof",
+      "trim",
+      "wheel",
+      "wood"
+    ]
+  },
+  "cable_car_track": {
+    "triangles": 84,
+    "budget": 400,
+    "size_m": {
+      "x": 1.13,
+      "length": 10.0,
+      "height": 0.01
+    },
+    "min_z": -0.004,
+    "nodes": [
+      "cable_car_track",
+      "track"
+    ],
+    "materials": [
+      "groove",
+      "rail",
+      "slot",
+      "slot_rail"
+    ]
+  },
+  "street_lamp": {
+    "triangles": 798,
+    "budget": 800,
+    "size_m": {
+      "x": 2.04,
+      "length": 0.55,
+      "height": 7.75
+    },
+    "min_z": 0.0,
+    "nodes": [
+      "lamp",
+      "street_lamp"
+    ],
+    "materials": [
+      "light_head",
+      "pole",
+      "trim"
+    ]
+  },
+  "trolley_pole": {
+    "triangles": 392,
+    "budget": 800,
+    "size_m": {
+      "x": 0.5,
+      "length": 0.62,
+      "height": 9.12
+    },
+    "min_z": 0.0,
+    "nodes": [
+      "pole",
+      "trolley_pole",
+      "wire"
+    ],
+    "materials": [
+      "band",
+      "metal",
+      "trim"
+    ]
+  },
+  "utility_pole": {
+    "triangles": 776,
+    "budget": 800,
+    "size_m": {
+      "x": 2.4,
+      "length": 0.98,
+      "height": 10.44
+    },
+    "min_z": 0.0,
+    "nodes": [
+      "pole",
+      "utility_pole",
+      "wire_0",
+      "wire_1",
+      "wire_2",
+      "wire_3"
+    ],
+    "materials": [
+      "ink",
+      "insulator",
+      "metal",
+      "wood",
+      "wood_dark"
+    ]
+  },
+  "muni_shelter": {
+    "triangles": 900,
+    "budget": 2000,
+    "size_m": {
+      "x": 4.2,
+      "length": 1.88,
+      "height": 2.68
+    },
+    "min_z": 0.0,
+    "nodes": [
+      "muni_shelter",
+      "shelter"
+    ],
+    "materials": [
+      "ad_panel",
+      "bench",
+      "frame",
+      "glass",
+      "glint",
+      "roof"
+    ]
+  },
+  "tree_plane": {
+    "triangles": 2576,
+    "budget": 3000,
+    "size_m": {
+      "x": 7.13,
+      "length": 7.3,
+      "height": 7.6
+    },
+    "min_z": -0.018,
+    "nodes": [
+      "leaves",
+      "tree_plane",
+      "trunk"
+    ],
+    "materials": [
+      "bark",
+      "bark_light",
+      "leaf_dark",
+      "leaf_light",
+      "leaf_mid"
+    ]
+  },
+  "tree_cypress": {
+    "triangles": 1886,
+    "budget": 3000,
+    "size_m": {
+      "x": 11.08,
+      "length": 7.72,
+      "height": 9.69
+    },
+    "min_z": 0.0,
+    "nodes": [
+      "leaves",
+      "tree_cypress",
+      "trunk"
+    ],
+    "materials": [
+      "bark",
+      "bark_light",
+      "leaf_dark",
+      "leaf_light",
+      "leaf_mid"
+    ]
+  },
+  "tree_palm": {
+    "triangles": 2772,
+    "budget": 3000,
+    "size_m": {
+      "x": 10.05,
+      "length": 10.19,
+      "height": 9.22
+    },
+    "min_z": -0.013,
+    "nodes": [
+      "leaves",
+      "tree_palm",
+      "trunk"
+    ],
+    "materials": [
+      "bark",
+      "bark_light",
+      "knob",
+      "leaf_dark",
+      "leaf_light",
+      "leaf_mid"
+    ]
+  },
+  "bench": {
+    "triangles": 400,
+    "budget": 600,
+    "size_m": {
+      "x": 1.8,
+      "length": 0.64,
+      "height": 0.92
+    },
+    "min_z": 0.0,
+    "nodes": [
+      "bench",
+      "body"
+    ],
+    "materials": [
+      "frame",
+      "wood"
+    ]
+  },
+  "planter": {
+    "triangles": 554,
+    "budget": 1000,
+    "size_m": {
+      "x": 1.44,
+      "length": 1.44,
+      "height": 0.63
+    },
+    "min_z": 0.0,
+    "nodes": [
+      "box",
+      "planter",
+      "shrubs"
+    ],
+    "materials": [
+      "cap",
+      "concrete",
+      "ink",
+      "leaf_dark",
+      "leaf_light",
+      "soil"
+    ]
+  },
+  "fire_hydrant": {
+    "triangles": 752,
+    "budget": 800,
+    "size_m": {
+      "x": 0.5,
+      "length": 0.44,
+      "height": 0.84
+    },
+    "min_z": 0.0,
+    "nodes": [
+      "fire_hydrant",
+      "hydrant"
+    ],
+    "materials": [
+      "body",
+      "cap",
+      "ink",
+      "metal"
+    ]
+  }
+}

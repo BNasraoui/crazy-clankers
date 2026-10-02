@@ -3,7 +3,7 @@ import { Car } from './car';
 import { CELL, HALF, N, rng } from './world';
 import { groundAt, movingRamps, rampGeometry, type Ramp } from './features';
 import { toon } from './look';
-import { makeSedan, makeToaster, makeWedge, type CarModel } from './models';
+import { makeCar, makeSedan, makeToaster, makeWedge, type CarModel } from './models';
 
 // Car carriers: the ramp starts at the back and rises over the flatbed.
 const CARRIER_RAMP = { back: 4.6, length: 6.2, width: 2.6, lift: 2.3 };
@@ -42,6 +42,7 @@ function makeCarrier(): CarModel {
 
 interface TCar {
   model: CarModel;
+  rival: string | null;
   carrier: boolean;
   ramp?: Ramp;
   axis: 'x' | 'z';
@@ -57,9 +58,11 @@ interface TCar {
   honkAt: number;
   x: number;
   z: number;
+  // Rammed by the Artemis: off its street, flying and tumbling until it respawns.
+  fly: { vx: number; vy: number; vz: number; y: number; rx: number; ry: number; rz: number; sx: number; sy: number; sz: number; t: number } | null;
 }
 
-export interface TrafficEvents { impact: number; nearMisses: number; honk: boolean }
+export interface TrafficEvents { impact: number; nearMisses: number; honk: boolean; rams: THREE.Vector3[] }
 
 const COLORS = [0x2d4a7a, 0x8a2b2b, 0x1f1f22, 0xd8d8d8, 0x4a6a3a, 0xc9a227, 0x6a6f78, 0x7a3f8a];
 const LANE = 3;
@@ -67,17 +70,21 @@ const LANE = 3;
 const PARTS = [-1.4, 0, 1.4];
 const CARRIER_PARTS = [2.4, 3.6]; // only the cab is solid; the ramp is for driving on
 const PART_R = 1.1;
+const MID = 0.85; // half a car's height: a rammed car tumbles about this point
 
 export class Traffic {
   cars: TCar[] = [];
   private clock = 0;
+  rammer = false; // the Artemis Go: traffic flies off it instead of stopping it
 
-  constructor(scene: THREE.Scene, count: number) {
+  // rivals: ids of the robotaxis you aren't driving; some traffic is drawn as them.
+  constructor(scene: THREE.Scene, count: number, private rivals: string[] = []) {
     const r = rng(5);
     for (let k = 0; k < count; k++) {
       const pick = r();
       const carrier = k < 6;
-      const model = carrier ? makeCarrier() : pick < 0.12 ? makeWedge() : pick < 0.27 ? makeToaster() : makeSedan(COLORS[Math.floor(r() * COLORS.length)]);
+      const rival = !carrier && this.rivals.length > 0 && pick > 0.82 ? this.rivals[k % this.rivals.length] : null;
+      const model = carrier ? makeCarrier() : rival ? makeCar(rival) : pick < 0.12 ? makeWedge() : pick < 0.27 ? makeToaster() : makeSedan(COLORS[Math.floor(r() * COLORS.length)]);
       scene.add(model.root);
       const cruise = carrier ? 8 : 9 + r() * 4;
       let ramp: Ramp | undefined;
@@ -86,12 +93,26 @@ export class Traffic {
         movingRamps.push(ramp);
       }
       this.cars.push({
-        model, carrier, ramp, axis: r() < 0.5 ? 'x' : 'z', line: -HALF + Math.floor(r() * (N + 1)) * CELL,
+        model, carrier, ramp, rival, axis: r() < 0.5 ? 'x' : 'z', line: -HALF + Math.floor(r() * (N + 1)) * CELL,
         dir: r() < 0.5 ? 1 : -1, s: 0, speed: cruise, cruise, stopped: 0, blockedFor: 0,
-        near: false, hitAt: -99, honkAt: -99, x: 0, z: 0,
+        near: false, hitAt: -99, honkAt: -99, x: 0, z: 0, fly: null,
       });
     }
     this.scatter();
+  }
+
+  // Re-skin rival robotaxis so none of them matches the cab you chose.
+  setRivals(scene: THREE.Scene, rivals: string[]) {
+    let k = 0;
+    for (const c of this.cars) {
+      if (!c.rival) continue;
+      const id = rivals[k++ % rivals.length];
+      if (id === c.rival) continue;
+      scene.remove(c.model.root);
+      c.model = makeCar(id);
+      c.rival = id;
+      scene.add(c.model.root);
+    }
   }
 
   scatter() {
@@ -119,11 +140,12 @@ export class Traffic {
 
   update(dt: number, player: Car, walkers: { x: number; z: number }[] = []): TrafficEvents {
     this.clock += dt;
-    const ev: TrafficEvents = { impact: 0, nearMisses: 0, honk: false };
+    const ev: TrafficEvents = { impact: 0, nearMisses: 0, honk: false, rams: [] };
     const pf = player.fwd;
     const playerParts = PARTS.map((o) => [player.pos.x + pf.x * o, player.pos.z + pf.y * o]);
 
     for (const c of this.cars) {
+      if (c.fly) { this.tumble(c, dt, player); continue; }
       const [fx, fz] = this.heading(c);
       let blocked = false;
       let byPlayer = false;
@@ -135,7 +157,7 @@ export class Traffic {
       };
       if (check(player.pos.x, player.pos.z)) { blocked = true; byPlayer = true; }
       if (!blocked && c.blockedFor < 3)
-        for (const o of this.cars) if (o !== c && check(o.x, o.z)) { blocked = true; break; }
+        for (const o of this.cars) if (o !== c && !o.fly && check(o.x, o.z)) { blocked = true; break; }
       if (!blocked) for (const w of walkers) if (check(w.x, w.z)) { blocked = true; break; }
 
       if (c.stopped > 0) { c.stopped -= dt; c.speed = 0; }
@@ -173,6 +195,18 @@ export class Traffic {
         player.pos.z += nz * push;
         const rvx = player.vel.x - fx * c.speed, rvz = player.vel.y - fz * c.speed;
         const vn = rvx * nx + rvz * nz;
+        if (this.rammer && !c.carrier && -vn > 4) {
+          // The Artemis doesn't bounce: the other car does, right off the road.
+          const kick = player.speed * 0.9 + 6;
+          const r = () => (Math.random() - 0.5) * 2;
+          c.fly = { vx: -nx * kick + player.vel.x * 0.3, vy: 6 + player.speed * 0.2, vz: -nz * kick + player.vel.y * 0.3,
+            y: groundAt(c.x, c.z, false) + MID, rx: 0, ry: Math.atan2(fx, fz), rz: 0, sx: r() * 6, sy: r() * 5, sz: r() * 6, t: 3.5 };
+          c.speed = 0;
+          player.vel.multiplyScalar(0.92);
+          ev.rams.push(new THREE.Vector3(c.x, c.fly.y + 1, c.z));
+          c.near = false;
+          continue;
+        }
         if (vn < 0) {
           player.vel.x -= nx * vn * 1.4;
           player.vel.y -= nz * vn * 1.4;
@@ -193,16 +227,50 @@ export class Traffic {
     return ev;
   }
 
+  // A rammed car flies, bounces and tumbles, then quietly rejoins traffic somewhere out of sight.
+  private tumble(c: TCar, dt: number, player: Car) {
+    const f = c.fly!;
+    f.vy -= 30 * dt;
+    c.x += f.vx * dt; c.z += f.vz * dt; f.y += f.vy * dt;
+    f.rx += f.sx * dt; f.ry += f.sy * dt; f.rz += f.sz * dt;
+    // f.y is the car's middle (it spins about that), so it never dips into the road.
+    const ground = groundAt(c.x, c.z, false) + MID;
+    if (f.y < ground) {
+      f.y = ground;
+      f.vy = Math.abs(f.vy) * 0.35;
+      f.vx *= 0.6; f.vz *= 0.6;
+      f.sx *= 0.6; f.sy *= 0.6; f.sz *= 0.6;
+    }
+    f.t -= dt;
+    if (f.t > 0) return;
+    c.fly = null;
+    c.model.body.position.y = 0;
+    const along = c.axis === 'z' ? player.pos.z : player.pos.x;
+    c.s = along + (along > 0 ? -1 : 1) * (HALF * 0.8); // well away from the cab
+    c.speed = c.cruise;
+    c.stopped = 0;
+    this.place(c);
+  }
+
   sync(dt: number) {
     for (const c of this.cars) {
+      if (c.fly) {
+        // Spin about the car's middle: the root sits there, the body hangs half a car below it.
+        c.model.root.position.set(c.x, c.fly.y, c.z);
+        c.model.root.rotation.set(c.fly.rx, c.fly.ry, c.fly.rz, 'YXZ');
+        c.model.body.rotation.x = 0;
+        c.model.body.position.y = -MID;
+        continue;
+      }
       const [fx, fz] = this.heading(c);
       const y = groundAt(c.x, c.z, false);
       const slope = (groundAt(c.x + fx * 1.5, c.z + fz * 1.5, false) - groundAt(c.x - fx * 1.5, c.z - fz * 1.5, false)) / 3;
       const { root, body, wheels } = c.model;
       root.position.set(c.x, y, c.z);
-      root.rotation.y = Math.atan2(fx, fz);
+      root.rotation.set(0, Math.atan2(fx, fz), 0); // full reset, after any tumble
       body.rotation.x = -Math.atan(slope);
       for (const w of wheels) w.rotation.x += (c.speed * dt) / 0.42;
+      if (c.model.spinner) c.model.spinner.rotation.y += dt * 10;
     }
   }
 }

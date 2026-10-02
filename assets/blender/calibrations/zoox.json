@@ -1,0 +1,98 @@
+{
+  "character": "zoox",
+  "height_m": 1.847,
+  "note": "One scale for the sheet, a compromise between the brief's 3.6 m length and 1.9 m height: the drawing is 2% long for its height. Soles = the ground line (row 427).",
+  "body": {
+    "image": "docs/art/vehicles/zoox.png",
+    "metres_per_pixel": 0.0054,
+    "world_y_at_zero": 2.3058,
+    "views": {
+      "front": {
+        "crop": [
+          20,
+          60,
+          400,
+          427
+        ],
+        "axis": 210.5,
+        "sign": 1,
+        "direction": [
+          0,
+          0,
+          1
+        ],
+        "right": [
+          1,
+          0,
+          0
+        ]
+      },
+      "side": {
+        "crop": [
+          430,
+          60,
+          1150,
+          427
+        ],
+        "axis": 793,
+        "sign": 1,
+        "direction": [
+          -1,
+          0,
+          0
+        ],
+        "right": [
+          0,
+          0,
+          1
+        ]
+      },
+      "back": {
+        "crop": [
+          1190,
+          60,
+          1560,
+          427
+        ],
+        "axis": 1370.5,
+        "sign": 1,
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "right": [
+          -1,
+          0,
+          0
+        ]
+      },
+      "top": {
+        "crop": [
+          430,
+          480,
+          1160,
+          862
+        ],
+        "axis": 793,
+        "sign": 1,
+        "up_axis": 676,
+        "direction": [
+          0,
+          1,
+          0
+        ],
+        "right": [
+          0,
+          0,
+          1
+        ],
+        "up": [
+          1,
+          0,
+          0
+        ]
+      }
+    }
+  }
+}

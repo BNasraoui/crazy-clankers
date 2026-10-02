@@ -1,0 +1,63 @@
+name: UI tests
+
+# Every screen at desktop, laptop, Steam Deck and phone sizes: layout checks plus snapshots
+# (tests/ui, playwright.config.ts). After an intended design change, run this workflow by hand
+# with "update snapshots" ticked: it regenerates the approved images and commits them.
+on:
+  pull_request:
+  push:
+    branches: [cabs, main]
+  workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: Regenerate the approved snapshots and commit them
+        type: boolean
+        default: false
+
+concurrency:
+  group: ui-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The leaderboard and account API (worker/index.ts) in Node, against the real migrations.
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - run: npm ci
+      - run: npm run test:api
+
+  ui:
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+      - run: npm ci
+      - name: Run the UI tests
+        run: npx playwright test ${{ inputs.update_snapshots && '--update-snapshots' || '' }}
+        env:
+          CI: '1'
+      # A new screen's first snapshot fails its test by design (Playwright writes it and flags it), so
+      # commit whatever was written even when the run failed; the next run compares against it.
+      - name: Commit new or updated snapshots
+        if: ${{ always() && github.event_name != 'pull_request' }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/ui/snapshots
+          git commit -m "Update UI snapshots" || exit 0
+          git push
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7

@@ -1,0 +1,38 @@
+// Cloudflare Worker: the static build plus the leaderboard API (worker/index.ts).
+// Deploy with `npm run deploy`. Database changes go in migrations/; see docs/leaderboard.md.
+{
+  "name": "crazy-clankers",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-01",
+  "routes": [
+    { "pattern": "crazyclankers.com", "custom_domain": true },
+    { "pattern": "www.crazyclankers.com", "custom_domain": true }
+  ],
+  // Keep the workers.dev address alongside the custom domain.
+  "workers_dev": true,
+  "preview_urls": true,
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // Only the API runs code; every other request is a plain static file.
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "crazy-clankers", "database_id": "19e23a6f-7ae8-491f-bef1-f613b123164e", "migrations_dir": "migrations" }
+  ],
+  // Score posts per visitor: 5 a minute.
+  "ratelimits": [
+    { "name": "SUBMIT", "namespace_id": "1001", "simple": { "limit": 5, "period": 60 } }
+  ],
+  // Workers Builds' preview deploys (`npx wrangler preview`). Bindings aren't inherited, so
+  // previews get a scratch database and never write to the real leaderboard.
+  "previews": {
+    "d1_databases": [
+      { "binding": "DB", "database_name": "crazy-clankers-preview", "database_id": "95d57b7e-7795-4cc0-b787-9ff6e8df98c9", "migrations_dir": "migrations" }
+    ],
+    "ratelimits": [
+      { "name": "SUBMIT", "namespace_id": "1002", "simple": { "limit": 5, "period": 60 } }
+    ]
+  }
+}

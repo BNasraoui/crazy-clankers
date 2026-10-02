@@ -20,7 +20,7 @@ export async function loadPassengerSprites(): Promise<Record<string, SpriteSet>>
   await Promise.all(Object.entries(meta).map(async ([id, size]) => {
     const frames: Partial<Record<Frame, THREE.Texture>> = {};
     await Promise.all((Object.keys(size) as Frame[]).map(async (f) => {
-      const tex = await loader.loadAsync(`/sprites/pax-${id}-${f}.png`);
+      const tex = await loader.loadAsync(`/sprites/pax-${id}-${f}.avif`);
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = 4;
       frames[f] = tex;

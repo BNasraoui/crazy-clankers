@@ -1,0 +1,98 @@
+{
+  "character": "apollo",
+  "height_m": 2.08,
+  "note": "One scale for the sheet, a compromise between the brief's 4.6 x 1.85 x 1.65 m and the drawing, which is about 8% short for its height. Soles = the ground line (row 462); the side view's nose is on the left, so it is drawn from the car's left.",
+  "body": {
+    "image": "docs/art/vehicles/apollo.png",
+    "metres_per_pixel": 0.0061,
+    "world_y_at_zero": 2.8182,
+    "views": {
+      "front": {
+        "crop": [
+          15,
+          100,
+          385,
+          462
+        ],
+        "axis": 200,
+        "sign": 1,
+        "direction": [
+          0,
+          0,
+          1
+        ],
+        "right": [
+          1,
+          0,
+          0
+        ]
+      },
+      "side": {
+        "crop": [
+          415,
+          100,
+          1175,
+          462
+        ],
+        "axis": 784.5,
+        "sign": 1,
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "right": [
+          0,
+          0,
+          -1
+        ]
+      },
+      "back": {
+        "crop": [
+          1205,
+          100,
+          1570,
+          462
+        ],
+        "axis": 1385.5,
+        "sign": 1,
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "right": [
+          -1,
+          0,
+          0
+        ]
+      },
+      "top": {
+        "crop": [
+          405,
+          515,
+          1185,
+          866
+        ],
+        "axis": 784.5,
+        "sign": 1,
+        "up_axis": 697,
+        "direction": [
+          0,
+          1,
+          0
+        ],
+        "right": [
+          0,
+          0,
+          -1
+        ],
+        "up": [
+          -1,
+          0,
+          0
+        ]
+      }
+    }
+  }
+}

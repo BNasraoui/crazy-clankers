@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CHARACTER_LAYER, setOutlineResolution } from './anime';
+import { translate } from './i18n';
 
 // The game's look: cel lighting with one shadow tone, ink outlines drawn from
 // the depth buffer, the 3D rendered at low resolution and scaled up with hard
@@ -22,7 +23,7 @@ export const glslColor = (hex: THREE.ColorRepresentation) => {
   return `vec3(${c.r.toFixed(4)}, ${c.g.toFixed(4)}, ${c.b.toFixed(4)})`;
 };
 
-export const SKY = { zenith: 0x2c74d6, horizon: 0xd3e6f3 };
+export const SKY = { zenith: 0x1a64d8, horizon: 0xbfdcf2 }; // the key art's deep, saturated blue
 
 export function makeSky() {
   const mat = new THREE.ShaderMaterial({
@@ -37,21 +38,9 @@ export function makeSky() {
       }`,
     fragmentShader: /* glsl */ `
       varying vec3 vDir;
-      float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-      float noise(vec2 p) {
-        vec2 i = floor(p), f = fract(p);
-        f = f * f * (3.0 - 2.0 * f);
-        return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
-      }
-      float fbm(vec2 p) { return 0.55 * noise(p) + 0.3 * noise(p * 2.1) + 0.15 * noise(p * 4.3); }
       void main() {
         float h = vDir.y;
         vec3 col = mix(${glslColor(SKY.horizon)}, ${glslColor(SKY.zenith)}, smoothstep(-0.02, 0.5, h));
-        // Flat cel clouds: a lit top and one shadow tone underneath.
-        vec2 q = vDir.xz / max(h, 0.06) * 0.9;
-        float n = fbm(q * 0.7);
-        float band = smoothstep(0.03, 0.12, h) * (1.0 - smoothstep(0.55, 0.8, h));
-        if (n > 0.6 && band > 0.5) col = n > 0.64 ? vec3(1.0) : ${glslColor(0xc9d6e6)};
         gl_FragColor = vec4(col, 1.0);
         #include <colorspace_fragment>
       }`,
@@ -63,8 +52,8 @@ export function makeSky() {
 }
 
 export interface LookSettings { height: number; grain: number; outline: boolean; speedLines: boolean; people: number; camBack: number; camUp: number; fov: number; paxSprites: boolean }
-const DEFAULTS: LookSettings = { height: 480, grain: 0.07, outline: true, speedLines: true, people: 1.2, camBack: 6.5, camUp: 3, fov: 60, paxSprites: true };
-const STORE = 'clankers.look.v2'; // bump when defaults change, so old saved tweaks don't hide them
+const DEFAULTS: LookSettings = { height: 720, grain: 0, outline: true, speedLines: true, people: 1.2, camBack: 6.5, camUp: 3, fov: 60, paxSprites: true };
+const STORE = 'clankers.look.v5'; // bump when defaults change, so old saved tweaks don't hide them
 
 function loadSettings(): LookSettings {
   try {
@@ -101,6 +90,7 @@ export class Look {
         tDepth: { value: this.target.depthTexture },
         tChar: { value: this.chars.texture },
         tCharDepth: { value: this.chars.depthTexture },
+        uFull: { value: new THREE.Vector2(1, 1) },
         uLow: { value: new THREE.Vector2(1, 1) },
         uNear: { value: 0.5 },
         uFar: { value: 1000 },
@@ -120,6 +110,7 @@ export class Look {
         uniform sampler2D tChar;
         uniform sampler2D tCharDepth;
         uniform vec2 uLow;
+        uniform vec2 uFull;
         uniform float uNear, uFar, uTime, uGrain, uOutline, uSpeed, uAspect;
         varying vec2 vUv;
 
@@ -127,6 +118,10 @@ export class Look {
         // Laplacian is zero on planes and spikes at creases and silhouettes.
         float invZ(vec2 uv) {
           float d = texture2D(tDepth, uv).x;
+          return 1.0 / max(-perspectiveDepthToViewZ(d, uNear, uFar), 0.001);
+        }
+        float charInvZ(vec2 uv) {
+          float d = texture2D(tCharDepth, uv).x;
           return 1.0 / max(-perspectiveDepthToViewZ(d, uNear, uFar), 0.001);
         }
         float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
@@ -151,10 +146,22 @@ export class Look {
           }
 
           // Characters, at full resolution, wherever they're in front of the world.
+          float isChar = 0.0;
           vec4 ch = texture2D(tChar, vUv);
           if (ch.a > 0.5) {
             float charDist = -perspectiveDepthToViewZ(texture2D(tCharDepth, vUv).x, uNear, uFar);
-            if (charDist < 1.0 / invZ(uv) + 0.4) col = ch.rgb;
+            if (charDist < 1.0 / invZ(uv) + 0.4) {
+              col = ch.rgb;
+              isChar = 1.0;
+              // Ink on creases inside the silhouette (car panel breaks, bumpers, arches),
+              // found the same way as the world's lines: where 1/depth stops being planar.
+              vec2 t = 1.0 / uFull;
+              float c = charInvZ(vUv);
+              float lap = abs(4.0 * c - charInvZ(vUv - vec2(t.x, 0.0)) - charInvZ(vUv + vec2(t.x, 0.0))
+                                   - charInvZ(vUv - vec2(0.0, t.y)) - charInvZ(vUv + vec2(0.0, t.y))) / c;
+              float crease = smoothstep(0.012, 0.03, lap) * smoothstep(1.0 / 60.0, 1.0 / 25.0, c);
+              col = mix(col, ${glslColor(0x1b1722)}, crease * 0.85);
+            }
           }
 
           // Manga speed lines from the screen edges.
@@ -168,8 +175,19 @@ export class Look {
             col = mix(col, vec3(1.0), sl * 0.6);
           }
 
-          col += (hash(gl_FragCoord.xy + fract(uTime * 7.3) * 517.0) - 0.5) * uGrain;
-          col *= 1.0 - 0.2 * smoothstep(0.5, 0.95, length((vUv - 0.5) * vec2(uAspect, 1.0)));
+          // Film grain on the world only, re-rolled 12 times a second (film, not TV static).
+          float frame = floor(uTime * 12.0);
+          col += (hash(floor(gl_FragCoord.xy / 2.0) + fract(frame * 0.6180339) * 517.0) - 0.5) * uGrain * (1.0 - isChar);
+          // Grade the world towards the key art: punchier saturation and contrast,
+          // cool violet shadows and warm highlights. Characters keep their drawn colours.
+          if (isChar < 0.5) {
+            float luma = dot(col, vec3(0.299, 0.587, 0.114));
+            col = mix(vec3(luma), col, 1.22);
+            col = (col - 0.5) * 1.07 + 0.5;
+            col *= mix(vec3(0.9, 0.93, 1.1), vec3(1.05, 1.01, 0.94), smoothstep(0.2, 0.75, luma));
+            col = clamp(col, 0.0, 1.0);
+          }
+          col *= 1.0 - 0.14 * smoothstep(0.55, 0.98, length((vUv - 0.5) * vec2(uAspect, 1.0)));
           gl_FragColor = vec4(col, 1.0);
           #include <colorspace_fragment>
         }`,
@@ -184,11 +202,13 @@ export class Look {
   setSize(w: number, h: number) {
     this.w = w;
     this.h = h;
-    const lh = Math.min(h, this.settings.height);
+    // The world's resolution is in real pixels: a phone is ~300 CSS px tall but ~900 real ones.
+    const pr = this.renderer.getPixelRatio();
+    const lh = Math.round(Math.min(h * pr, this.settings.height));
     const lw = Math.round((lh * w) / h);
     this.target.setSize(lw, lh);
-    const pr = this.renderer.getPixelRatio();
     this.chars.setSize(Math.round(w * pr), Math.round(h * pr));
+    this.quad.material.uniforms.uFull.value.set(Math.round(w * pr), Math.round(h * pr));
     setOutlineResolution(Math.round(w * pr), Math.round(h * pr));
     this.quad.material.uniforms.uLow.value.set(lw, lh);
     this.quad.material.uniforms.uAspect.value = w / h;
@@ -230,20 +250,23 @@ export class Look {
     panel.id = 'lookpanel';
     panel.hidden = true;
     panel.innerHTML = `
-      <b>LOOK</b>
-      <label>Resolution <select id="lk-res">
-        ${[240, 360, 480, 720, 4000].map((v) => `<option value="${v}">${v === 4000 ? 'native' : v + 'p'}</option>`).join('')}
+      <div class="lk-head"><b data-i18n="look.title"></b><button type="button" id="lk-close" data-i18n-aria="look.close">✕</button></div>
+      <label><span data-i18n="look.res"></span> <select id="lk-res">
+        ${[240, 360, 480, 720, 4000].map((v) => `<option value="${v}"${v === 4000 ? ' data-i18n="look.native"' : ''}>${v + 'p'}</option>`).join('')}
       </select></label>
-      <label>Grain <input id="lk-grain" type="range" min="0" max="0.25" step="0.01"></label>
-      <label><input id="lk-outline" type="checkbox"> Outlines</label>
-      <label><input id="lk-speed" type="checkbox"> Speed lines</label>
-      <label>People size <input id="lk-people" type="range" min="0.8" max="2" step="0.05"><output id="lk-people-v"></output></label>
-      <label>Camera distance <input id="lk-back" type="range" min="4" max="12" step="0.25"><output id="lk-back-v"></output></label>
-      <label>Camera height <input id="lk-up" type="range" min="1.5" max="7" step="0.1"><output id="lk-up-v"></output></label>
-      <label>Field of view <input id="lk-fov" type="range" min="45" max="90" step="1"><output id="lk-fov-v"></output></label>
-      <label><input id="lk-pax" type="checkbox"> Passengers as sprites</label>
-      <button id="lk-reset" type="button">Reset</button>`;
+      <label><span data-i18n="look.grain"></span> <input id="lk-grain" type="range" min="0" max="0.25" step="0.01"></label>
+      <label><input id="lk-outline" type="checkbox"> <span data-i18n="look.outlines"></span></label>
+      <label><input id="lk-speed" type="checkbox"> <span data-i18n="look.speedLines"></span></label>
+      <label><span data-i18n="look.people"></span> <input id="lk-people" type="range" min="0.8" max="2" step="0.05"><output id="lk-people-v"></output></label>
+      <label><span data-i18n="look.camBack"></span> <input id="lk-back" type="range" min="4" max="12" step="0.25"><output id="lk-back-v"></output></label>
+      <label><span data-i18n="look.camUp"></span> <input id="lk-up" type="range" min="1.5" max="7" step="0.1"><output id="lk-up-v"></output></label>
+      <label><span data-i18n="look.fov"></span> <input id="lk-fov" type="range" min="45" max="90" step="1"><output id="lk-fov-v"></output></label>
+      <label><input id="lk-pax" type="checkbox"> <span data-i18n="look.pax"></span></label>
+      <button id="lk-reset" type="button" data-i18n="look.reset"></button>
+      <b data-i18n="look.pads"></b>
+      <pre id="lk-pads"></pre>`;
     document.body.appendChild(panel);
+    translate(panel);
     const res = panel.querySelector<HTMLSelectElement>('#lk-res')!;
     const grain = panel.querySelector<HTMLInputElement>('#lk-grain')!;
     const outline = panel.querySelector<HTMLInputElement>('#lk-outline')!;
@@ -296,8 +319,13 @@ export class Look {
     });
     addEventListener('keydown', (e) => { if (e.code === 'Backquote') panel.hidden = !panel.hidden; });
     this.togglePanel = () => { panel.hidden = !panel.hidden; };
+    panel.querySelector<HTMLButtonElement>('#lk-close')!.onclick = () => { panel.hidden = true; }; // touch has no B or Esc
   }
 
   togglePanel = () => {};
+  setPadDebug(text: string) {
+    const el = document.getElementById('lk-pads');
+    if (el && !el.closest('[hidden]') && el.textContent !== text) el.textContent = text;
+  }
   onChange = () => {};
 }

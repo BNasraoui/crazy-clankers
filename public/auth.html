@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Crazy Clankers · Log in</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body { display: grid; place-items: center; background: #1b1722; font: 600 17px/1.4 system-ui, sans-serif; color: #1b1722; }
+    p { margin: 16px; padding: 16px 22px; max-width: 320px; text-align: center; background: #f6f2e7; border: 3px solid #1b1722;
+      border-radius: 10px; box-shadow: 5px 5px 0 #ffd23a; }
+  </style>
+</head>
+<body>
+  <p id="msg">Logging in…</p>
+  <script>
+    // Google (through Shoo) sends the login back here with ?code=…&state=….
+    // Popup login (the usual way): hand the code to the game's tab and close. The game's tab
+    // can't be reached through window.opener (Google's pages cut that link), so this goes
+    // through a same-site BroadcastChannel instead.
+    // Whole-page login (when the popup was blocked): carry on to the game, which finishes it.
+    const search = location.search;
+    let redirect = false;
+    try { redirect = sessionStorage.getItem('clankers.loginMode') === 'redirect'; sessionStorage.removeItem('clankers.loginMode'); } catch {}
+    if (redirect) location.replace('/' + search);
+    else {
+      const q = new URLSearchParams(search);
+      let saved = null;
+      try { saved = localStorage.getItem('clankers.lang'); } catch {}
+      const zh = saved ? saved === 'zh' : /^zh/i.test(navigator.language);
+      try { new BroadcastChannel('clankers-login').postMessage({ code: q.get('code'), state: q.get('state'), error: q.get('error') }); } catch {}
+      document.getElementById('msg').textContent = q.get('code')
+        ? (zh ? '登录成功！回到游戏吧。' : "You're logged in! Head back to the game.")
+        : (zh ? '登录没有完成。回到游戏再试一次。' : "That didn't log you in. Head back to the game and try again.");
+      setTimeout(() => window.close(), 400);
+    }
+  </script>
+</body>
+</html>

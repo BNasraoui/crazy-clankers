@@ -1,0 +1,25 @@
+# The page itself: always check for a new version (it names the current build's bundles).
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+
+# Vite's bundles have content hashes in their names: cache them for good.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Art keeps its name between builds: an hour in the browser, then quietly revalidated (redrawn art shows up fast).
+/models/*
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+/facades/*
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+/sprites/*
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+/sky/*
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+/keyart/*
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+/portraits/*
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+/sounds/*
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
