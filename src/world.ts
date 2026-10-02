@@ -73,9 +73,36 @@ export const SEA_FLOOR = -14;
 // East and north (the bay side) are open out to here; west and south stop at BOUND.
 export const SEA_REACH = HALF + 170;
 
+// The Palace of Fine Arts' lagoon (assets/blender/landmarks.py PF_LAGOON), in the park on
+// block 0,0: the model's water sheet sits at `level`, half a metre below the bank; the bed
+// is carved out of the terrain below it, so a cab can drive in.
+const PALACE = { x: -HALF + CELL / 2, z: -HALF + CELL / 2 };
+export const LAGOON = (() => {
+  const x = PALACE.x + 10, z = PALACE.z + 1;
+  return { x, z, rx: 8, rz: 13, level: heightAt(x, z) - 0.5 };
+})();
+const LAGOON_BANK = 1.6; // the carve reaches this far past the water's edge
+
+// Alcatraz out in the bay (assets/blender/landmarks.py AZ_*): the model's origin, at the
+// water line. features.ts gives it ground: the island's top, its cliffs and the causeway.
+export const ALCATRAZ = { x: 150, z: -440, top: WATER + 7 };
+const ALCATRAZ_WALL = { rx: 17 + 3, rz: 36 + 3 }; // the top's ellipse, 3 m out (features.ts AZ_*)
+
+// The surface of whatever water is here: the lagoon, or the bay.
+export function waterAt(x: number, z: number) {
+  const u = (x - LAGOON.x) / LAGOON.rx, v = (z - LAGOON.z) / LAGOON.rz;
+  return u * u + v * v < 1 ? LAGOON.level : WATER;
+}
+
 export function terrainAt(x: number, z: number) {
   const over = Math.max(Math.abs(x), Math.abs(z)) - (HALF + 8);
-  const h = heightAt(x, z);
+  let h = heightAt(x, z);
+  const u = (x - LAGOON.x) / (LAGOON.rx + LAGOON_BANK), v = (z - LAGOON.z) / (LAGOON.rz + LAGOON_BANK);
+  const s = u * u + v * v;
+  if (s < 1) {
+    const t = clamp((1 - s) / 0.28, 0, 1);
+    h += (LAGOON.level - 1.4 - h) * t * t * (3 - 2 * t);
+  }
   if (over <= 0) return h;
   const t = clamp(over / 24, 0, 1);
   return h + (SEA_FLOOR - h) * t * t * (3 - 2 * t);
@@ -105,8 +132,9 @@ export interface Block {
   circles: Circle[];
 }
 
-const PARKS = new Set(['4,5', '2,7', '0,2', '0,3', '3,0', '1,8']);
-const LANDMARK_BLOCKS = new Set(['8,2', '7,1', '9,1']);
+// 0,0 is the Palace of Fine Arts' park; 5,4 is City Hall.
+const PARKS = new Set(['4,5', '2,7', '0,2', '0,3', '3,0', '1,8', '0,0']);
+const LANDMARK_BLOCKS = new Set(['8,2', '7,1', '9,1', '5,4']);
 
 export const blocks: Block[] = [];
 {
@@ -183,6 +211,17 @@ export function collide(pos: THREE.Vector3, vel: THREE.Vector2, r: number): numb
     }
   }
   if (Math.abs(pos.x) > HALF + 10 || Math.abs(pos.z) > HALF + 10) {
+    // Alcatraz's cliffs are a wall below the top (else a slow cab could crawl up them):
+    // the causeway is the way up. Halfway out along the cliffs, as an ellipse.
+    const ax = ALCATRAZ_WALL.rx + r, az = ALCATRAZ_WALL.rz + r;
+    const lx = pos.x - ALCATRAZ.x, lz = pos.z - ALCATRAZ.z;
+    const s = Math.hypot(lx / ax, lz / az);
+    if (s < 1 && s > 1e-4 && pos.y < ALCATRAZ.top - 1.5) {
+      const nx = lx / (ax * ax), nz = lz / (az * az), n = Math.hypot(nx, nz);
+      pos.x = ALCATRAZ.x + lx / s;
+      pos.z = ALCATRAZ.z + lz / s;
+      hit(nx / n, nz / n);
+    }
     for (const c of extraCircles) {
       const dx = pos.x - c.x, dz = pos.z - c.z;
       const d = Math.hypot(dx, dz);
@@ -247,6 +286,10 @@ const LANDMARK_SPOTS: [string, number, number, Side, number][] = [
   ['The Lab', 6, 4, 'E', 0.4],
   ['Crypto Castle', 8, 6, 'N', 0.5],
   ['Burrito Spot', 3, 6, 'E', 0.5],
+  ['City Hall', 5, 4, 'E', 0.5],
+  ['Dragon Gate', 7, 2, 'W', 0.75], // on Grant Ave just south of the gate, which spans the street
+  ['Palace of Fine Arts', 0, 0, 'E', 0.5], // across the sidewalk from the lagoon
+  ['Lombard Street', 2, 0, 'S', 0.1], // the foot of the crooked street
 ];
 // One-of-a-kind buildings, painted from their own drawing (public/facades/drop-*.jpg),
 // so every drop-off is recognisable without a sign. [drawing, block bi, bj, face, t, width]
@@ -273,6 +316,15 @@ export const landmarks: Landmark[] = LANDMARK_SPOTS.map(([name, bi, bj, side, t]
   name,
   curb: curb(bi, bj, side, t),
 }));
+// Alcatraz has no curb: the drop-off is on the landing, up the causeway from the sea floor.
+landmarks.push({
+  name: 'Alcatraz',
+  curb: {
+    walk: new THREE.Vector3(ALCATRAZ.x + 8, ALCATRAZ.top, ALCATRAZ.z - 4.5),
+    road: new THREE.Vector3(ALCATRAZ.x + 9, ALCATRAZ.top, ALCATRAZ.z),
+    facing: 0,
+  },
+});
 
 // Builds every static mesh: ground, buildings, landmarks, trees, water, signs.
 export function buildWorld(scene: THREE.Scene) {
@@ -330,6 +382,7 @@ export function buildWorld(scene: THREE.Scene) {
         const tx = x0 + 3 + r() * (x1 - x0 - 6);
         const tz = z0 + 3 + r() * (z1 - z0 - 6);
         if (b.bi === 3 && b.bj === 0 && Math.hypot(tx - (x0 + x1) / 2, tz - (z0 + z1) / 2) < 9) continue;
+        if (b.bi === 0 && b.bj === 0 && Math.hypot(tx - PALACE.x + 1, tz - PALACE.z) < 22) continue; // the Palace and its lagoon
         const circle: Circle = { x: tx, z: tz, r: 1.1, breakable: true };
         b.circles.push(circle);
         const s = 0.8 + r() * 0.6;
@@ -1069,7 +1122,56 @@ function addLandmarks(scene: THREE.Scene) {
       blocks[0 * N + 3].circles.push({ x, z, r: 4.2 });
     }
   }
+  // City Hall faces east onto its plaza, gilded dome and all; the block is solid as usual.
+  {
+    const { x, z } = blockCenter(5, 4);
+    place('city_hall', x, seat(x, z, 19.5, 19.5), z);
+  }
+  // The Dragon Gate stands across Grant Ave (the street at x = 128) at the foot of Chinatown.
+  // Cabs drive through it: only the two outer pillars, at the back of the sidewalks, are solid.
+  {
+    const x = -HALF + 7 * CELL, z = -HALF + 2 * CELL + CELL / 2;
+    if (place('dragon_gate', x, heightAt(x, z), z))
+      for (const sx of [-1, 1]) blockAt(x + sx * 9.8, z)?.circles.push({ x: x + sx * 9.8, z, r: 0.75 });
+  }
+  // The Palace of Fine Arts in its park: the rotunda (drive through the arches), the
+  // colonnade wings, and the lagoon in front, level with the model's water sheet.
+  {
+    const { x, z } = PALACE;
+    if (place('palace_of_fine_arts', x, LAGOON.level + 0.5, z)) {
+      const park = blocks[0 * N + 0];
+      // Model space (assets/blender/landmarks.py) is east +x, north +y: game z = z - y.
+      const solid = (mx: number, my: number, r: number) => park.circles.push({ x: x + mx, z: z - my, r });
+      for (let k = 0; k < 8; k++) {
+        const a = (2 * Math.PI * (k + 0.5)) / 8;
+        solid(-7 + 8.6 * Math.cos(a), 8.6 * Math.sin(a), 1.4);
+      }
+      for (const [a0, a1] of [[125, 163], [197, 235]])
+        for (let k = 0; k < 6; k++) {
+          const a = ((a0 + ((a1 - a0) * k) / 5) * Math.PI) / 180;
+          solid(6 + 21 * Math.cos(a), 21 * Math.sin(a), 1.6);
+        }
+      for (const [mx, my] of [[-18, 15], [-18.5, -14], [-12, 18], [-13, -18]]) solid(mx, my, 0.5);
+    }
+  }
+  // Alcatraz: the cellhouse, its administration wing and yard wall, the lighthouse, the
+  // water tower's legs, the warden's house and the guard tower. features.ts makes the ground.
+  if (place('alcatraz', ALCATRAZ.x, WATER, ALCATRAZ.z)) {
+    const solid = (mx: number, my: number, r: number) => extraCircles.push({ x: ALCATRAZ.x + mx, z: ALCATRAZ.z - my, r });
+    for (const my of [-6, -1, 4, 9, 14, 18]) solid(-4, my, 6);
+    for (const mx of [-8, -4, 0]) solid(mx, -12.4, 3.3);
+    for (let k = 0; k <= 7; k++) { solid(-10 - k / 7, 21 + k, 0.7); solid(2 + k / 7, 21 + k, 0.7); solid(-11 + 2 * k, 28, 0.7); }
+    solid(-4, -16.5, 2.2);
+    for (const [mx, my] of [[4.7, 22.7], [9.3, 22.7], [4.7, 27.3], [9.3, 27.3]]) solid(mx, my, 0.4);
+    solid(-9, -25, 3.8);
+    solid(8, -24, 1.8);
+    for (const my of [5.8, 10.2]) solid(13, my, 0.3);
+  }
 }
+
+// Somewhere the seabed should stay clear: Alcatraz, and its causeway.
+const nearAlcatraz = (x: number, z: number) =>
+  (Math.abs(x - ALCATRAZ.x) < 32 && Math.abs(z - ALCATRAZ.z) < 50) || (x > ALCATRAZ.x && x < ALCATRAZ.x + 100 && Math.abs(z - ALCATRAZ.z) < 9);
 
 function makeSeabed() {
   const g = new THREE.Group();
@@ -1094,13 +1196,13 @@ function makeSeabed() {
   };
   for (let k = 0; k < 70; k++) {
     const [x, z] = spot();
-    const s = 1.2 + r() * 2.2;
+    const s = (1.2 + r() * 2.2) * (nearAlcatraz(x, z) ? 0 : 1); // none on the island or its causeway
     rocks.setMatrixAt(k, m.compose(new THREE.Vector3(x, SEA_FLOOR + s * 0.3, z), q.setFromEuler(e.set(r() * 3, r() * 3, r() * 3)), new THREE.Vector3(s, s * 0.7, s)));
-    extraCircles.push({ x, z, r: s * 0.9 });
+    if (s > 0) extraCircles.push({ x, z, r: s * 0.9 });
   }
   for (let k = 0; k < 160; k++) {
     const [x, z] = spot();
-    const h = 2 + r() * 6;
+    const h = (2 + r() * 6) * (nearAlcatraz(x, z) ? 0 : 1);
     kelp.setMatrixAt(k, m.compose(new THREE.Vector3(x, SEA_FLOOR, z), q.setFromEuler(e.set((r() - 0.5) * 0.3, r() * 3, (r() - 0.5) * 0.3)), new THREE.Vector3(1, h, 1)));
   }
   rocks.castShadow = true;

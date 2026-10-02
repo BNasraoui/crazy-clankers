@@ -33,10 +33,14 @@ case "${1:-techbro}" in
     done
     exit ;;
   landmarks)
-    # Salesforce Tower, the Pyramid, the Ferry Building, Coit Tower and the Golden Gate to
-    # public/models/landmarks with a toon sheet each, then a reimport check.
+    # Salesforce Tower, the Pyramid, the Ferry Building, Coit Tower, the Golden Gate, City
+    # Hall, the Dragon Gate, the Palace of Fine Arts and Alcatraz to public/models/landmarks
+    # with a toon sheet each, a reimport check, then meshopt compression (the game expects it).
     for step in all check; do
       "$BLENDER" --background --factory-startup --python-exit-code 1 --python landmarks.py -- "$step"
+    done
+    for glb in ../../public/models/landmarks/*.glb; do
+      npx -y @gltf-transform/cli meshopt "$glb" "$glb.tmp" && mv "$glb.tmp" "$glb"
     done
     exit ;;
   techbro) ;;

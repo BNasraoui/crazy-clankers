@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CELL, HALF, N, SEA_FLOOR, blocks, heightAt, terrainAt } from './world';
+import { ALCATRAZ, CELL, HALF, N, SEA_FLOOR, WATER, blocks, heightAt, terrainAt } from './world';
 import { toon } from './look';
 
 // Set pieces: drivable ramps layered on top of the terrain. The car, traffic
@@ -32,8 +32,35 @@ function rampAt(r: Ramp, x: number, z: number): number | null {
   return (r.abs ?? terrainAt(x, z)) + r.height(a / r.length);
 }
 
+// Alcatraz (assets/blender/landmarks.py AZ_*): a flat top, an ellipse 34 x 72 m, and cliffs
+// that are offset ellipses down to the sea floor: [offset from the top's edge, height above
+// the water]. The model is built from the same numbers.
+const AZ_RX = 17, AZ_RZ = 36;
+const AZ_CLIFF = [[0, 7], [0.6, 4.6], [1.7, 1.6], [3.2, -2.4], [4.7, -6.8], [5.8, -10.4], [6.4, -12.5]];
+
+function islandAt(x: number, z: number): number | null {
+  const lx = x - ALCATRAZ.x, lz = z - ALCATRAZ.z;
+  const last = AZ_CLIFF[AZ_CLIFF.length - 1][0];
+  if (Math.abs(lx) > AZ_RX + last || Math.abs(lz) > AZ_RZ + last) return null;
+  const out = (o: number) => (lx / (AZ_RX + o)) ** 2 + (lz / (AZ_RZ + o)) ** 2 - 1;
+  if (out(0) <= 0) return ALCATRAZ.top;
+  if (out(last) > 0) return null;
+  let lo = 0, hi = last; // the offset ellipse through this point
+  for (let k = 0; k < 14; k++) {
+    const mid = (lo + hi) / 2;
+    if (out(mid) > 0) lo = mid; else hi = mid;
+  }
+  for (let k = 1; k < AZ_CLIFF.length; k++) {
+    const [o0, h0] = AZ_CLIFF[k - 1], [o1, h1] = AZ_CLIFF[k];
+    if (lo <= o1) return WATER + h0 + ((h1 - h0) * (lo - o0)) / (o1 - o0);
+  }
+  return null;
+}
+
 export function groundAt(x: number, z: number, moving = true): number {
   let h = terrainAt(x, z);
+  const island = islandAt(x, z);
+  if (island !== null && island > h) h = island;
   for (const r of ramps) {
     const v = rampAt(r, x, z);
     if (v !== null && v > h) h = v;
@@ -116,6 +143,13 @@ export function buildFeatures(scene: THREE.Scene) {
     addRamp(scene, r, 0x9a7650);
     addPilings(scene, r);
   }
+
+  // Alcatraz's causeway: from the sea floor east of the island up to the landing, 76 m at
+  // about 14 degrees. The island's model draws it, so it is only registered here.
+  ramps.push({
+    x: ALCATRAZ.x + 93, z: ALCATRAZ.z, yaw: WEST, length: 76, width: 10, abs: SEA_FLOOR,
+    height: (t) => t * (ALCATRAZ.top - SEA_FLOOR),
+  });
 
   // Boat ramps: the only way back out of the bay.
   for (const [x, z, yaw] of [[HALF + 60, -64, WEST], [192, -HALF - 60, SOUTH]] as const) {

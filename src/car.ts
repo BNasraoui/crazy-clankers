@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Input } from './input';
-import { WATER, collide } from './world';
+import { collide, waterAt } from './world';
 import { groundAt } from './features';
 import type { CarModel } from './models';
 
@@ -71,7 +71,7 @@ export class Car {
   launchCharge = 0; // seconds held in Launch Mode, 0 when not charging
   private lastHop = -9;
 
-  get underwater() { return this.pos.y < WATER - 0.6; }
+  get underwater() { return this.pos.y < waterAt(this.pos.x, this.pos.z) - 0.6; } // the bay, or the Palace's lagoon
 
   // Something (a geyser) shoves the car upwards.
   launch(vy: number) {
@@ -189,7 +189,8 @@ export class Car {
       ev.hop = true;
     }
 
-    const wasDry = this.pos.y > WATER;
+    const water = waterAt(this.pos.x, this.pos.z);
+    const wasDry = this.pos.y > water;
     const ground = groundAt(this.pos.x, this.pos.z);
     if (this.grounded) {
       const groundVy = (ground - this.pos.y) / dt;
@@ -218,7 +219,7 @@ export class Car {
         this.vy = Math.min(0, (groundAt(this.pos.x + this.vel.x * ahead, this.pos.z + this.vel.y * ahead) - ground) / ahead);
       }
     }
-    if (wasDry && this.pos.y <= WATER) ev.splash = true;
+    if (wasDry && this.pos.y <= water) ev.splash = true;
     return ev;
   }
 
