@@ -35,8 +35,10 @@ fit();
 
 // ?still (the world snapshots, tests/ui/world.spec.ts): nothing moves; the test frames each view itself.
 const still = new URLSearchParams(location.search).has('still');
+const everything = Promise.all([painted, landmarks, sprites, peds]);
+void everything.then(() => { (window as unknown as { loaded: boolean }).loaded = true; }); // the UI tests wait for this
 if (still) {
-  void Promise.all([painted, landmarks, sprites, peds]).then(() => {
+  void everything.then(() => {
     (window as unknown as { still: unknown }).still = (eye: THREE.Vector3Tuple, target: THREE.Vector3Tuple) => {
       game.camera.position.set(...eye);
       game.camera.up.set(0, 1, 0);

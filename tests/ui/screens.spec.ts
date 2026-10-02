@@ -6,8 +6,11 @@ import { test, expect, type Page } from '@playwright/test';
 //  2. a snapshot of the interface with the 3D view hidden, compared with the approved image.
 // Math.random is seeded, so passengers, names and positions are the same on every run.
 
+// reseed() starts the sequence again: the game spends random numbers while it boots (passengers come
+// and go), and how many depends on how long that takes, so tests reseed just before starting a shift.
 const SEED = `(() => {
   let a = 1234567;
+  window.reseed = () => { a = 1234567; };
   Math.random = () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   try { localStorage.clear(); } catch { /* fine */ }
 })();`;
@@ -24,7 +27,8 @@ type G = Record<string, any>;
 async function boot(page: Page) {
   await page.addInitScript(SEED);
   await page.goto('/');
-  await page.waitForFunction(() => (window as unknown as G).game, null, { timeout: 150_000 });
+  // Everything loaded (drawings, landmarks, passengers, pedestrians), so a shift starts the same way every run.
+  await page.waitForFunction(() => (window as unknown as G).loaded, null, { timeout: 170_000 });
   await page.evaluate(() => (window as unknown as G).game.renderer.setAnimationLoop(null)); // freeze the world
   await page.addStyleTag({ content: STILL });
   await page.evaluate(() => document.fonts.ready);
@@ -84,7 +88,7 @@ for (const cab of [0, 3]) {
 
 test('driving with a passenger', async ({ page }) => {
   await boot(page);
-  await page.evaluate(() => { const g = (window as unknown as G).game; g.start(); g.pickup(g.waiting[0]); g.updateHud(); });
+  await page.evaluate(() => { (window as unknown as G).reseed(); const g = (window as unknown as G).game; g.start(); g.pickup(g.waiting[0]); g.updateHud(); });
   expect(await offscreen(page, ['#clock', '#want', '#fare', '#cash', '#rating', '#touch .tb'])).toEqual([]);
   for (const hud of ['#rating', '#cash', '#want', '#clock', '#fare']) expect(await overlaps(page, hud, '#touch .tb')).toEqual([]);
   expect(await overlaps(page, '#want', '#fare')).toEqual([]);
@@ -93,14 +97,14 @@ test('driving with a passenger', async ({ page }) => {
 
 test('pause', async ({ page }) => {
   await boot(page);
-  await page.evaluate(() => { const g = (window as unknown as G).game; g.start(); g.setState('paused'); });
+  await page.evaluate(() => { (window as unknown as G).reseed(); const g = (window as unknown as G).game; g.start(); g.setState('paused'); });
   expect(await offscreen(page, ['#overlay h2', '#overlay .press', '#overlay .tap-btn', '#overlay .radio-menu-button'])).toEqual([]);
   await shot(page, 'pause');
 });
 
 test('results', async ({ page }) => {
   await boot(page);
-  await page.evaluate(() => { const g = (window as unknown as G).game; g.start(); g.gameOver('TIME UP'); });
+  await page.evaluate(() => { (window as unknown as G).reseed(); const g = (window as unknown as G).game; g.start(); g.gameOver('TIME UP'); });
   expect(await offscreen(page, ['#overlay h2', '#overlay .stats', '#overlay .press', '#overlay .tap-btn'])).toEqual([]);
   await shot(page, 'results');
 });
@@ -125,7 +129,7 @@ test.describe('中文', () => {
 
   test('driving with a passenger', async ({ page }) => {
     await boot(page);
-    await page.evaluate(() => { const g = (window as unknown as G).game; g.start(); g.pickup(g.waiting[0]); g.updateHud(); });
+    await page.evaluate(() => { (window as unknown as G).reseed(); const g = (window as unknown as G).game; g.start(); g.pickup(g.waiting[0]); g.updateHud(); });
     expect(await offscreen(page, ['#clock', '#want', '#fare', '#cash', '#rating', '#touch .tb'])).toEqual([]);
     for (const hud of ['#rating', '#cash', '#want', '#clock', '#fare']) expect(await overlaps(page, hud, '#touch .tb')).toEqual([]);
     await shot(page, 'driving-zh');
