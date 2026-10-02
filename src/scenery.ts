@@ -10,7 +10,7 @@ import { toon } from './look';
 // and the cable car, loaded once and drawn as instanced meshes; and the landmarks.
 
 export const kit: Partial<Record<string, THREE.Object3D>> = {};
-const KIT = ['tree_plane', 'tree_cypress', 'tree_palm', 'street_lamp', 'trolley_pole', 'utility_pole',
+const KIT = ['tree_plane', 'tree_cypress', 'tree_palm', 'tree_plane_far', 'tree_cypress_far', 'tree_palm_far', 'street_lamp', 'trolley_pole', 'utility_pole',
   'muni_shelter', 'bench', 'planter', 'fire_hydrant', 'cable_car', 'cable_car_track'];
 
 // Retries a load a few times: the browser refuses requests when too many are in flight.
@@ -105,12 +105,16 @@ export function partsOf(template: THREE.Object3D): Part[] {
 const CHUNK = 160;
 const HEAVY = 100_000; // triangles, all copies together
 const REACH = 12; // a toppled tree or lamp lies this far outside where it stood
+const FAR = 250; // squares whose centre is further than this use the far model, if there is one
 
 export interface Slot { meshes: THREE.InstancedMesh[]; index: number }
 
-export function instance(template: THREE.Object3D, matrices: THREE.Matrix4[], shadows = true) {
+// `far`: a simpler version of the model for distant squares (scripts/far-trees.sh). A slot moves
+// both versions, so its meshes (and the returned locals) are the near parts, then the far ones.
+export function instance(template: THREE.Object3D, matrices: THREE.Matrix4[], shadows = true, far?: THREE.Object3D) {
   const group = new THREE.Group();
   const parts = partsOf(template);
+  const farParts = far ? partsOf(far) : [];
   const tris = parts.reduce((n, p) => n + (p.geometry.index?.count ?? p.geometry.attributes.position.count) / 3, 0);
   const size = tris * matrices.length > HEAVY ? CHUNK : Infinity;
   const cells = new Map<string, number[]>();
@@ -123,21 +127,37 @@ export function instance(template: THREE.Object3D, matrices: THREE.Matrix4[], sh
   const slots: Slot[] = [];
   const meshes: THREE.InstancedMesh[] = [];
   const m = new THREE.Matrix4();
+  const build = (list: Part[], members: number[], into: THREE.Object3D) => list.map((p) => {
+    const inst = new THREE.InstancedMesh(p.geometry, p.material, members.length);
+    members.forEach((i, k) => inst.setMatrixAt(k, m.multiplyMatrices(matrices[i], p.local)));
+    inst.castShadow = shadows;
+    inst.receiveShadow = true;
+    inst.computeBoundingSphere();
+    inst.boundingSphere!.radius += REACH;
+    into.add(inst);
+    return inst;
+  });
   for (const members of cells.values()) {
-    const chunk = parts.map((p) => {
-      const inst = new THREE.InstancedMesh(p.geometry, p.material, members.length);
-      members.forEach((i, k) => inst.setMatrixAt(k, m.multiplyMatrices(matrices[i], p.local)));
-      inst.castShadow = shadows;
-      inst.receiveShadow = true;
-      inst.computeBoundingSphere();
-      inst.boundingSphere!.radius += REACH;
-      group.add(inst);
-      return inst;
-    });
+    let chunk: THREE.InstancedMesh[];
+    if (farParts.length && size !== Infinity) {
+      // A level of detail per square, centred on it; the instances keep their world positions.
+      const centre = new THREE.Vector3();
+      for (const i of members) centre.add(at.setFromMatrixPosition(matrices[i]));
+      centre.divideScalar(members.length);
+      const lod = new THREE.LOD();
+      lod.position.copy(centre);
+      const near = new THREE.Group(), distant = new THREE.Group();
+      near.position.copy(centre).negate();
+      distant.position.copy(centre).negate();
+      chunk = [...build(parts, members, near), ...build(farParts, members, distant)];
+      lod.addLevel(near, 0);
+      lod.addLevel(distant, FAR, 0.05);
+      group.add(lod);
+    } else chunk = build(parts, members, group);
     meshes.push(...chunk);
     members.forEach((i, k) => (slots[i] = { meshes: chunk, index: k }));
   }
-  return { group, meshes, slots, locals: parts.map((p) => p.local) };
+  return { group, meshes, slots, locals: [...parts, ...(size !== Infinity ? farParts : [])].map((p) => p.local) };
 }
 
 // Points where the poles' wires attach, relative to the pole's base.

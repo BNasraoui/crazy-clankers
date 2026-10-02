@@ -898,7 +898,7 @@ function makeTrees(spots: TreeSpot[]) {
     if (template) {
       const k = SPECIES_SCALE[species];
       const mats = list.map((t) => t.m.clone().multiply(new THREE.Matrix4().makeScale(k, k, k)));
-      const { group, slots, locals } = instance(template, mats);
+      const { group, slots, locals } = instance(template, mats, true, kit[`tree_${species}_far`]);
       list.forEach((t, i) => treeRefs.set(t.c, { circle: t.c, base: mats[i], ...slots[i], locals, kind: 'tree' }));
       g.add(group);
       continue;
