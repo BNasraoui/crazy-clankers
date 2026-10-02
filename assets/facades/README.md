@@ -46,3 +46,18 @@ reprocessed. `refs/crypto-redo/` has the before/after and the in-game shot.
 The game loads **AVIF** images and **meshopt-compressed** models, not the JPG/PNG and plain GLB the scripts here produce.
 After writing new art into `public/`, run `scripts/avif.sh` (converts every JPG/PNG under `public/` to AVIF at quality 60
 and removes the original) and compress new models with `npx @gltf-transform/cli meshopt in.glb out.glb`.
+
+## Third pass: the whole city (2026-10-02)
+Every district house (v1-v6 and the 37 city.py ids), the four tower tiles and the two lobbies, redrawn with the drop-off
+recipe so they sit alongside the drop-offs. `refs/pass3/` has before/after shots per district and `all.jpg`.
+
+- `houses.py <workdir> [id[:tag] ...]`: drops.py's style prompt and key-art crops, city.py's descriptions (v1-v6 written
+  from their first-pass drawings, a few colours warmed up, "no text" shopfronts given pictograms or goods in the window).
+  One try each was enough; every drawing was kept.
+- `process_houses.py <workdir> public/facades [id ...]` (needs Pillow >= 11.3 for AVIF, plus numpy): trims the line of
+  sky most drawings have along the top and the sidewalk strips listed in `BOTTOM`, crops to the size class, writes AVIF
+  at quality 60 and updates `wall`/`base` (`WALL` overrides six where body_colour picked trim, a door or a shopfront).
+- Tower tiles: the drawings show four storeys but only roughly repeat, so the crop is placed where the line just past
+  each edge matches the first line on the opposite edge (vertically held to four measured storeys), then a short fade
+  hides the rest. Stacking 2x2 copies shows no seam.
+- `district-shots.mjs <outdir> [port]` screenshots each district (shots.mjs's camera recipe).
