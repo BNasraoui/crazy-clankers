@@ -169,6 +169,7 @@ export class Game {
     this.car = new Car(cab);
     this.car.h = handlingOf(CABS[this.cabIndex].id);
     this.traffic = new Traffic(this.scene, 46, this.rivals());
+    this.traffic.rammer = CABS[this.cabIndex].id === 'apollo'; // the Artemis Go bulldozes traffic
     this.rank = new Rank(this.scene, this.cabIndex);
     this.cableCars = new CableCars(this.scene);
     this.thumbs = snapshotCabs(renderer);
@@ -370,6 +371,7 @@ export class Game {
     this.scene.remove(this.car.model.root);
     this.car.model = makeCar(CABS[this.cabIndex].id);
     this.car.h = handlingOf(CABS[this.cabIndex].id);
+    this.traffic.rammer = CABS[this.cabIndex].id === 'apollo';
     this.scene.add(this.car.model.root);
     this.traffic.setRivals(this.scene, this.rivals());
     this.car.model.root.visible = this.state === 'play';
@@ -461,6 +463,15 @@ export class Game {
     impact = Math.max(impact, this.cableCars.update(dt, this.car));
     impact = Math.max(impact, tev.impact);
     if (tev.honk) sfx.honk();
+    // The Artemis Go bulldozes traffic: the car flies, the cab barely notices.
+    for (const at of tev.rams) {
+      crunch(14);
+      this.shake = Math.max(this.shake, 0.35);
+      this.particles.emit(at, 18, 0x2a2730, 7, 6, 0.3);
+      this.moments.panel('crash', 0.5);
+      this.popup('BULLDOZED!', 'big');
+      this.tip('smash', 1, 'RAM');
+    }
 
     if (impact > 5) this.onCrash(impact);
     else if (impact > 1.5) bump(impact);
