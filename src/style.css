@@ -634,6 +634,6 @@ html.touch .radio-menu-button { min-height: 48px; padding: 8px 18px; font-size: 
   -webkit-text-stroke: 0.14em var(--ink); paint-order: stroke fill; text-shadow: 4px 4px 0 var(--ink); }
 #overlay .menu .logo-block.small .logo-sub { font-size: clamp(16px, 2vw, 26px); }
 @media (max-height: 500px) {
-  .lang-switch { top: auto; bottom: calc(18% + env(safe-area-inset-bottom, 0px)); right: calc(3% + env(safe-area-inset-right, 0px)); }
+  .lang-switch { top: auto; right: auto; bottom: calc(6% + env(safe-area-inset-bottom, 0px)); left: calc(3% + env(safe-area-inset-left, 0px)); }
   .lang-switch > b { font-size: 15px; padding: 3px 9px; }
 }
