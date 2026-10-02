@@ -5,7 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Crazy Clankers</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Permanent+Marker&family=Inter:wght@600;800&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Permanent+Marker&family=Inter:wght@600;800&display=block" />
+    <link rel="preload" as="image" href="/keyart/jump.avif" fetchpriority="high" />
+    <link rel="stylesheet" href="/src/style.css" />
+    <style>
+      /* Until the game is ready only the boot screen shows: no bare canvas, no unstyled HUD. */
+      html, body { background: #1b1722; }
+      .hidden { display: none !important; }
+      body:not(.ready) #view { visibility: hidden; }
+    </style>
   </head>
   <body>
     <canvas id="view"></canvas>
@@ -38,7 +46,13 @@
       <div id="launch" hidden><span>LAUNCH MODE</span><div class="bar"><div class="fill"></div></div></div>
       <div id="speed"><b>0</b><small>MPH</small></div>
     </div>
-    <div id="overlay"></div>
+    <div id="overlay">
+      <div class="menu title-screen boot">
+        <img class="keyart" src="/keyart/jump.avif" alt="" fetchpriority="high" />
+        <div class="logo-block"><h1 class="logo">CRAZY<span>CLANKERS</span></h1><div class="tag">You are AGI. Drive like it.</div></div>
+        <div class="press-start loading"><i class="spinner"></i>LOADING</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

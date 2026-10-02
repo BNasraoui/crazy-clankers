@@ -475,3 +475,11 @@ html:not([data-input="pad"]) .k-pad, html:not([data-input="kb"]) .k-kb, html:not
 /* Surge level, tucked into the cash sticker */
 #surge { display: block; margin: 0 -6px 4px; padding: 1px 6px; font: 12px var(--num); color: #fff; background: var(--red); border-radius: 4px; text-align: center; }
 #surge:empty { display: none; }
+
+/* Boot screen: the title with a spinner where the start prompt goes, until the game is ready. */
+.press-start.loading { animation: none; display: inline-flex; align-items: center; gap: 0.5em; letter-spacing: 0.06em; }
+.spinner { width: 0.9em; height: 0.9em; border-radius: 50%; border: 0.17em solid var(--ink); border-right-color: transparent; border-top-color: var(--magenta);
+  animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.title-screen:not(.boot) .press-start { animation: start-in 0.35s cubic-bezier(.2, 1.6, .4, 1), nudge 1.2s ease-in-out 0.35s infinite; }
+@keyframes start-in { from { transform: translateX(-50%) rotate(-1deg) scale(0.7); opacity: 0; } }

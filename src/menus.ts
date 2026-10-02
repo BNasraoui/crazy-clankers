@@ -18,7 +18,7 @@ const LOGO = `<h1 class="logo">CRAZY<span>CLANKERS</span></h1>`;
 
 // Painted key art behind the title, a different one each visit.
 const KEYART = ['jump', 'rank', 'chaos'];
-let keyartIndex = Math.floor(Math.random() * KEYART.length);
+let keyartIndex = 0; // the boot screen (index.html) shows 'jump', so the first title matches it
 
 export function titleHTML(padName: string) {
   const art = KEYART[keyartIndex++ % KEYART.length];
