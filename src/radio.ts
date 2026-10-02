@@ -126,6 +126,9 @@ export class Radio {
   private playing = false;
   private interacted = false;
   private autostarting = false; // trying to play before any input, which some browsers refuse
+  private blocked = false; // the browser refused to start: the station stays loaded and starts on the next input
+  private retried = false; // one retry per station when the browser blocks it after an input
+  private refused = false; // blocked since it last played: YouTube only says so once, later blocks look like stalls
   private volume = 0.35;
   private ducked = false;
   private failedTracks = new Set<number>();
@@ -222,16 +225,19 @@ export class Radio {
     this.audio.onerror = () => (this.isStream() ? this.stationFailed() : this.trackFailed());
     document.addEventListener('click', e => {
       if ((e.target as Element).closest('[data-radio-open]')) this.open();
-      else if (!this.interacted && e.isTrusted) this.gesture();
+      else if (this.waiting && e.isTrusted) this.gesture();
     });
     // Phones: driving taps never become clicks, so start on the first lifted finger (iOS counts touchend as a gesture).
-    document.addEventListener('touchend', e => { if (!this.interacted && e.isTrusted) this.gesture(); });
+    document.addEventListener('touchend', e => { if (this.waiting && e.isTrusted) this.gesture(); });
+    // Keys too, inside the keydown itself: the game reads keys on the next frame, outside the event.
+    addEventListener('keydown', e => { if (this.waiting && e.isTrusted && e.key !== 'Escape') this.gesture(); });
   }
 
   /** Returns true when the radio screen consumes menu input. */
   frame(input: Input, state: string): boolean {
     const menu = state === 'title' || state === 'paused';
-    if (!this.interacted && (input.confirm || input.back || input.alt || input.navX || input.navY || input.radioNext || input.radioSkip || input.radioMenu)) this.gesture();
+    // Pads land here. Browsers don't count a pad button as a gesture, so a blocked radio may stay blocked.
+    if (this.waiting && (input.confirm || input.back || input.alt || input.navX || input.navY || input.radioNext || input.radioSkip || input.radioMenu)) this.gesture();
     const duck = voiceActive();
     if (duck !== this.ducked) { this.ducked = duck; this.applyVolume(); }
     if (this.screen.hidden && menu && (input.radioMenu || input.radioSkip)) { this.open(); return true; }
@@ -284,19 +290,44 @@ export class Radio {
     this.audio.addEventListener('playing', () => { this.autostarting = false; }, { once: true });
   }
 
-  // The browser wants a tap or key before sound: wait quietly and start on the next input.
-  private waitForInput() {
+  // The browser wants a tap or key before sound. Keep the station loaded (YouTube cued, the stream's
+  // src set) so the next input can start it inside its own event: rebuilding the player first loses
+  // the gesture, and strict browsers (iPhone, in-app browsers) then block it again, on every input.
+  private waitForInput(refused = true) {
+    clearTimeout(this.watchdog);
+    // An input came in while the station loaded, after the player had already been refused: Chrome
+    // and Firefox let it play now.
+    const retry = !this.refused && !this.retried && !!navigator.userActivation?.hasBeenActive;
+    this.refused ||= refused;
+    if (retry) { this.retried = true; this.resume(); return; }
+    if (!this.autostarting) this.message(t('radio.pressPlay')); // a pad press, which isn't a gesture, or a strict browser
     this.autostarting = false;
-    this.off();
-    this.collapsed.hidden = true;
-    this.interacted = false;
+    this.blocked = true;
+    this.playing = false; this.showToggle();
+    if (this.isYouTube()) this.trackLabel.textContent = t('radio.pressPlay'); // instead of "Tuning…"; the title replaces it
+  }
+
+  // Start the waiting station; called from input events so the play counts as the player's.
+  private resume() {
+    this.blocked = false;
+    this.playing = true; this.showToggle();
+    if (this.selected === this.stations.length || this.isStream()) this.startLocalAudio();
+    else { if (this.ready) this.player?.playVideo(); this.armWatchdog(); } // not ready yet: onReady plays it
   }
 
   private firstStation() { return Math.max(0, this.stations.findIndex((s) => s.source === FIRST_STATION)); }
 
+  // Whether the next input should start the radio. Autostart counts: an input that arrives while it
+  // loads must not be lost, or a blocked autostart waits for a second one.
+  private get waiting() { return !this.interacted || this.autostarting || this.blocked; }
+
   private gesture() {
-    this.interacted = true;
-    if (this.stations.length) this.tune(this.firstStation());
+    if (this.blocked) this.resume();
+    else if (this.autostarting) this.autostarting = false; // let it load; from now on a block retries (waitForInput)
+    else {
+      this.interacted = true;
+      if (this.stations.length) this.tune(this.firstStation());
+    }
   }
 
   private isStream() { const s = this.stations[this.selected]; return !!s && !!streamSource(s.source); }
@@ -315,6 +346,7 @@ export class Radio {
 
   private stopSource() {
     ++this.generation;
+    this.blocked = false;
     clearTimeout(this.watchdog); clearTimeout(this.retry);
     this.audio.pause(); this.audio.removeAttribute('src'); this.audio.load();
     if (this.objectURL) { URL.revokeObjectURL(this.objectURL); this.objectURL = ''; }
@@ -337,7 +369,7 @@ export class Radio {
     this.interacted = true;
     if (!automatic) this.failedStations.clear();
     this.stopSource();
-    this.selected = index; this.failedTracks.clear(); this.failedAttempts = 0;
+    this.selected = index; this.failedTracks.clear(); this.failedAttempts = 0; this.retried = this.refused = false;
     const station = this.stations[index];
     this.enabled = this.playing = true;
     this.dashboard.hidden = false; this.collapsed.hidden = true;
@@ -385,7 +417,7 @@ export class Radio {
               } else if (this.playing) this.player!.playVideo();
             }
             if (data === 1) {
-              this.autostarting = false;
+              this.autostarting = this.refused = this.blocked = false;
               this.failedAttempts = 0;
               clearTimeout(this.watchdog);
               this.playing = true; this.showToggle();
@@ -416,7 +448,13 @@ export class Radio {
   private armWatchdog() {
     clearTimeout(this.watchdog);
     if (!this.playing) return;
-    this.watchdog = window.setTimeout(() => this.stationFailed(), 20000);
+    // Before any input, or after a block, a stall is most likely the browser holding the player back, not a
+    // dead station. A refused player sits unstarted, so it needs less time; if it starts late, onStateChange catches up.
+    this.watchdog = window.setTimeout(() => {
+      if (this.autostarting) this.waitForInput(false); // not known to be refused: a stall after input still skips the station
+      else if (this.refused) this.waitForInput();
+      else this.stationFailed();
+    }, this.refused ? 12000 : 20000);
   }
 
   private trackFailed() {
@@ -446,6 +484,7 @@ export class Radio {
 
   playPause() {
     if (!this.enabled) { this.tune(this.selected); return; }
+    this.blocked = false;
     this.playing = !this.playing;
     this.showToggle();
     clearTimeout(this.watchdog);
@@ -518,16 +557,13 @@ export class Radio {
     const token = this.generation;
     void this.audio.play().catch(error => {
       if (token !== this.generation || error.name === 'AbortError') return;
-      if (error.name === 'NotAllowedError') {
-        // Before any input: wait quietly, and start on the first key, click or button.
-        if (this.autostarting) { this.waitForInput(); return; }
-        this.playing = false; this.showToggle(); this.message(t('radio.pressPlay'));
-      } else this.trackFailed();
+      if (error.name === 'NotAllowedError') this.waitForInput(); // start on the next key, click or tap
+      else this.trackFailed();
     });
   }
 
   private open() {
-    if (!this.interacted) this.gesture();
+    if (this.waiting) this.gesture();
     this.returnFocus = document.activeElement as HTMLElement;
     this.screen.hidden = false;
     this.screen.querySelector<HTMLElement>('button')?.focus();
