@@ -370,6 +370,13 @@ export class Game {
     this.look.render(this.scene, this.camera, performance.now() / 1000, rush);
   }
 
+  // One frame at a fixed time from wherever the camera is (the world snapshots, main.ts ?still).
+  renderStill(time: number) {
+    this.sky.position.copy(this.camera.position);
+    updateSky(time, this.camera.position.y);
+    this.look.render(this.scene, this.camera, time, 0);
+  }
+
   private start() {
     unlockAudio();
     burst();

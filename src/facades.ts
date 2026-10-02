@@ -24,11 +24,12 @@ export async function loadFacades() {
 }
 
 // The drawings themselves, started once the game is up so they don't hold up the files it needs first.
-export function paintFacades() {
+// Resolves when every drawing has arrived (or given up).
+export function paintFacades(): Promise<unknown> {
   const all = Object.values(facadeSets).flat();
   const repeats = new Set(all.filter((f) => f.kind !== 'house').map((f) => f.id));
   const loader = new THREE.TextureLoader();
-  void pool([...new Set(all.map((f) => f.id))], 4, async (id) => {
+  return pool([...new Set(all.map((f) => f.id))], 4, async (id) => {
     try {
       const tex = await retry(() => loader.loadAsync(`/facades/${id}.avif`));
       tex.colorSpace = THREE.SRGBColorSpace;

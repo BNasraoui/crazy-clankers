@@ -19,10 +19,10 @@ const account = syncAccount(); // finishes a login coming back from Google, or s
 const [, people] = await Promise.all([loadCars(), loadPeople(), loadStreetKit(), loadFacades(), loadSky()]);
 const game = new Game(renderer, people);
 document.body.classList.add('ready'); // the boot screen's title is now the real one
-paintFacades(); // the building drawings stream in behind the title
+const painted = paintFacades(); // the building drawings stream in behind the title
 account.then((login) => { if (login) game.loginNotice(login); });
-loadPassengerSprites().then((s) => { game.paxSprites = s; game.refreshPassengers(); }).catch((err) => console.warn('No passenger sprites:', err));
-Pedestrians.load(game.scene).then((p) => { game.peds = p; }).catch((err) => console.warn('No pedestrians:', err));
+const sprites = loadPassengerSprites().then((s) => { game.paxSprites = s; game.refreshPassengers(); }).catch((err) => console.warn('No passenger sprites:', err));
+const peds = Pedestrians.load(game.scene).then((p) => { game.peds = p; }).catch((err) => console.warn('No pedestrians:', err));
 const fit = () => {
   // Up to ~1080 real pixels tall: sharp on high-density phones, the same 1.5 cap as before on desktops.
   renderer.setPixelRatio(Math.min(devicePixelRatio, Math.max(1.5, 1080 / innerHeight)));
@@ -32,8 +32,21 @@ const fit = () => {
 addEventListener('resize', fit);
 fit();
 
+// ?still (the world snapshots, tests/ui/world.spec.ts): nothing moves; the test frames each view itself.
+const still = new URLSearchParams(location.search).has('still');
+if (still) {
+  void Promise.all([painted, sprites, peds]).then(() => {
+    (window as unknown as { still: unknown }).still = (eye: THREE.Vector3Tuple, target: THREE.Vector3Tuple) => {
+      game.camera.position.set(...eye);
+      game.camera.up.set(0, 1, 0);
+      game.camera.lookAt(...target);
+      game.renderStill(100); // a fixed moment, so clouds and swaying trees hold still
+    };
+  });
+}
+
 let last = performance.now();
-renderer.setAnimationLoop((now) => {
+if (!still) renderer.setAnimationLoop((now) => {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   game.frame(dt);
