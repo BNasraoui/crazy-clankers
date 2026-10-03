@@ -53,312 +53,312 @@
   {
    "id": "haight-10",
    "kind": "house",
-   "wall": "#f5d764",
-   "base": "#e0d6c4"
+   "wall": "#fee366",
+   "base": "#cec1ad"
   },
   {
    "id": "haight-7",
    "kind": "house",
-   "wall": "#d8c8af",
-   "base": "#728580"
+   "wall": "#f5a090",
+   "base": "#9a9f99"
   },
   {
    "id": "haight-8",
    "kind": "house",
-   "wall": "#80afcc",
-   "base": "#9cacb1"
+   "wall": "#68abdc",
+   "base": "#77a0c3"
   },
   {
    "id": "haight-9",
    "kind": "house",
-   "wall": "#d8c8ae",
-   "base": "#8b816e"
+   "wall": "#93a383",
+   "base": "#908e78"
   },
   {
    "id": "v1",
    "kind": "house",
-   "wall": "#e5d7bb",
-   "base": "#b6b59c"
+   "wall": "#9dbe87",
+   "base": "#80907a"
   },
   {
    "id": "v2",
    "kind": "house",
-   "wall": "#f1d492",
-   "base": "#a8afa2"
+   "wall": "#f8dc7a",
+   "base": "#7e988f"
   },
   {
    "id": "v3",
    "kind": "house",
-   "wall": "#6d889b",
-   "base": "#909ca2"
+   "wall": "#5e829e",
+   "base": "#84949c"
   },
   {
    "id": "v4",
    "kind": "house",
-   "wall": "#b05a3b",
-   "base": "#b98062"
+   "wall": "#ca684a",
+   "base": "#717066"
   },
   {
    "id": "v5",
    "kind": "house",
-   "wall": "#b6a9ca",
-   "base": "#968ca6"
+   "wall": "#c9adc6",
+   "base": "#998887"
   },
   {
    "id": "v6",
    "kind": "house",
-   "wall": "#d9a381",
-   "base": "#97917a"
+   "wall": "#eaab84",
+   "base": "#aaa285"
   }
  ],
  "mission": [
   {
    "id": "mission-1",
    "kind": "house",
-   "wall": "#2db8c0",
-   "base": "#5b9695"
+   "wall": "#4dd7c8",
+   "base": "#8db3a2"
   },
   {
    "id": "mission-2",
    "kind": "house",
-   "wall": "#f86396",
-   "base": "#e0857e"
+   "wall": "#f57595",
+   "base": "#b18375"
   },
   {
    "id": "mission-3",
    "kind": "house",
-   "wall": "#e3b14c",
-   "base": "#baa085"
+   "wall": "#fed84b",
+   "base": "#706e51"
   },
   {
    "id": "mission-4",
    "kind": "house",
-   "wall": "#e5d6b1",
-   "base": "#659887"
+   "wall": "#5a9289",
+   "base": "#6a9080"
   },
   {
    "id": "mission-5",
    "kind": "house",
-   "wall": "#9dcb50",
-   "base": "#7d727d"
+   "wall": "#c7e477",
+   "base": "#938e9f"
   },
   {
    "id": "mission-6",
    "kind": "house",
-   "wall": "#eb7f35",
-   "base": "#ca8a5b"
+   "wall": "#fd933c",
+   "base": "#d1966d"
   }
  ],
  "northbeach": [
   {
    "id": "nb-1",
    "kind": "house",
-   "wall": "#dbb269",
-   "base": "#3f4842"
+   "wall": "#f5c05a",
+   "base": "#686958"
   },
   {
    "id": "nb-2",
    "kind": "house",
-   "wall": "#abbc9b",
-   "base": "#768574"
+   "wall": "#c2d89b",
+   "base": "#859573"
   },
   {
    "id": "nb-3",
    "kind": "house",
-   "wall": "#d67348",
-   "base": "#6b5c60"
+   "wall": "#f5833f",
+   "base": "#897f7a"
   },
   {
    "id": "nb-4",
    "kind": "house",
-   "wall": "#b2b0c9",
-   "base": "#c6c2c6"
+   "wall": "#c9bcdb",
+   "base": "#b0aaad"
   },
   {
    "id": "nb-5",
    "kind": "house",
-   "wall": "#e9d6b1",
-   "base": "#4c5b4b"
+   "wall": "#f8ecc6",
+   "base": "#3c6654"
   },
   {
    "id": "nb-6",
    "kind": "house",
-   "wall": "#d9957f",
-   "base": "#c4b2a3"
+   "wall": "#fda28d",
+   "base": "#e69d8d"
   }
  ],
  "nob": [
   {
    "id": "nob-1",
    "kind": "house",
-   "wall": "#e7d6bd",
-   "base": "#b2a490"
+   "wall": "#f1dcba",
+   "base": "#b2a48b"
   },
   {
    "id": "nob-2",
    "kind": "house",
-   "wall": "#d9b786",
-   "base": "#988b75"
+   "wall": "#e4bc91",
+   "base": "#b89d82"
   },
   {
    "id": "nob-3",
    "kind": "house",
-   "wall": "#dac9b0",
-   "base": "#696054"
+   "wall": "#f4d5a2",
+   "base": "#9b876e"
   },
   {
    "id": "nob-4",
    "kind": "house",
-   "wall": "#586b83",
-   "base": "#6d6964"
+   "wall": "#f4daad",
+   "base": "#af9d85"
   }
  ],
  "pacheights": [
   {
    "id": "pac-1",
    "kind": "house",
-   "wall": "#dad5c9",
-   "base": "#a5a29c"
+   "wall": "#adc8dc",
+   "base": "#acb2b7"
   },
   {
    "id": "pac-2",
    "kind": "house",
-   "wall": "#d9ccae",
-   "base": "#707864"
+   "wall": "#e5dabc",
+   "base": "#979b88"
   },
   {
    "id": "pac-3",
    "kind": "house",
-   "wall": "#a2734d",
-   "base": "#daceb9"
+   "wall": "#e5a259",
+   "base": "#cdc6c0"
   },
   {
    "id": "pac-4",
    "kind": "house",
-   "wall": "#f6de9d",
-   "base": "#d6cec3"
+   "wall": "#fddb82",
+   "base": "#ada99f"
   },
   {
    "id": "pac-5",
    "kind": "house",
-   "wall": "#ca948e",
-   "base": "#c6ada7"
+   "wall": "#db9185",
+   "base": "#b67571"
   },
   {
    "id": "pac-6",
    "kind": "house",
-   "wall": "#825c40",
-   "base": "#937258"
+   "wall": "#f5ead4",
+   "base": "#997058"
   }
  ],
  "potrero": [
   {
    "id": "potrero-1",
    "kind": "house",
-   "wall": "#d7cdbe",
-   "base": "#94a3a0"
+   "wall": "#5b8790",
+   "base": "#869593"
   },
   {
    "id": "potrero-2",
    "kind": "house",
-   "wall": "#a15e49",
-   "base": "#624d49"
+   "wall": "#d77759",
+   "base": "#ad6b59"
   },
   {
    "id": "potrero-3",
    "kind": "house",
-   "wall": "#b0855f",
-   "base": "#75685e"
+   "wall": "#d7843f",
+   "base": "#534642"
   }
  ],
  "soma": [
   {
    "id": "soma-1",
    "kind": "house",
-   "wall": "#bd654c",
-   "base": "#7d6d69"
+   "wall": "#ca785a",
+   "base": "#836a62"
   },
   {
    "id": "soma-2",
    "kind": "house",
-   "wall": "#e8d7c0",
-   "base": "#31383f"
+   "wall": "#f2d8b0",
+   "base": "#504f53"
   },
   {
    "id": "soma-3",
    "kind": "house",
-   "wall": "#9e6449",
-   "base": "#645d56"
+   "wall": "#af775b",
+   "base": "#956e5d"
   },
   {
    "id": "soma-4",
    "kind": "house",
-   "wall": "#2e5e8f",
-   "base": "#8d8c87"
+   "wall": "#f0ce9f",
+   "base": "#6a6666"
   }
  ],
  "sunset": [
   {
    "id": "sunset-1",
    "kind": "house",
-   "wall": "#a0ccab",
-   "base": "#b4b59d"
+   "wall": "#bcd7ba",
+   "base": "#a5c1a9"
   },
   {
    "id": "sunset-2",
    "kind": "house",
-   "wall": "#e8aea3",
-   "base": "#daa69c"
+   "wall": "#fdb9b1",
+   "base": "#e8aca7"
   },
   {
    "id": "sunset-3",
    "kind": "house",
-   "wall": "#f8d988",
-   "base": "#b2aa88"
+   "wall": "#fde185",
+   "base": "#dac6a0"
   },
   {
    "id": "sunset-4",
    "kind": "house",
-   "wall": "#69b9e5",
-   "base": "#bfc8c4"
+   "wall": "#8fbfe4",
+   "base": "#bfc3c1"
   }
  ],
  "fidi": [
   {
    "id": "tower-1",
    "kind": "tile",
-   "wall": "#56799e",
-   "base": "#6f89a3"
+   "wall": "#2f86da",
+   "base": "#5ba4e3"
   },
   {
    "id": "tower-2",
    "kind": "tile",
-   "wall": "#eaddc6",
-   "base": "#d1c6b1"
+   "wall": "#f7e2bd",
+   "base": "#beab93"
   },
   {
    "id": "tower-3",
    "kind": "tile",
-   "wall": "#30485d",
-   "base": "#354a5b"
+   "wall": "#1680da",
+   "base": "#4495d9"
   },
   {
    "id": "tower-4",
    "kind": "tile",
-   "wall": "#5c4a3a",
-   "base": "#4d3f34"
+   "wall": "#927659",
+   "base": "#826950"
   },
   {
    "id": "towerbase-1",
    "kind": "towerbase",
-   "wall": "#ae9474",
-   "base": "#a59b97"
+   "wall": "#e5cdb9",
+   "base": "#8b7c72"
   },
   {
    "id": "towerbase-2",
    "kind": "towerbase",
-   "wall": "#e7d8bc",
-   "base": "#e0d1b5"
+   "wall": "#f6dbba",
+   "base": "#fae3c1"
   }
  ]
 }
